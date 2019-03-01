@@ -1,3 +1,3 @@
-import * as wasm from "gameboy";
+import('gameboy')
+  .catch(console.error);
 
-wasm.greet();
