@@ -26,9 +26,9 @@ fn draw(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
     for row in 0..height {
         for col in 0..width {
             let idx : usize = (row*width*4 + col*4) as usize;
-            data[idx+0] = i as u8;
-            data[idx+1] = i as u8;
-            data[idx+2] = i as u8;
+            data[idx+0] = (i + row + col) as u8;
+            data[idx+1] = (i + row + col) as u8;
+            data[idx+2] = (i + row + col) as u8;
             data[idx+3] = 255;
         }
     }
@@ -56,9 +56,7 @@ pub fn run() -> Result<(), JsValue> {
         .unwrap();
 
     let width = canvas.width() as u32;
-    let height = ((144.0 / 160.0) * width as f64).ceil() as u32;
-    canvas.set_height(height);
-
+    let height = canvas.height() as u32;
     log(&format!("Height {} and width {}", height, width));
 
     let ctx = canvas
