@@ -1,10 +1,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+extern crate console_error_panic_hook;
 extern crate wasm_bindgen;
+
+#[cfg(test)]
+pub mod test {
+    pub extern crate proptest;
+}
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{JsCast, Clamped};
+
+mod register_kind;
+mod instr;
+mod register;
+mod cpu;
+mod mem;
+mod utils;
 
 fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
@@ -49,11 +62,15 @@ extern "C" {
 // This function is automatically invoked after the wasm module is instantiated.
 #[wasm_bindgen(start)]
 pub fn run() -> Result<(), JsValue> {
+    utils::set_panic_hook();
+
     let canvas = document().get_element_by_id("canvas").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
         .unwrap();
+
+    let _x = instr::Instr::Ld;
 
     let width = canvas.width() as u32;
     let height = canvas.height() as u32;
@@ -99,6 +116,8 @@ pub fn run() -> Result<(), JsValue> {
             // Drop our handle to this closure so that it will get cleaned
             // up once we return.
             let _ = f.borrow_mut().take();
+            let m = mem::Memory::create();
+            let _ = mem::Memory::ld8(&m, 0xff00);
             return;
         }
 
@@ -109,6 +128,7 @@ pub fn run() -> Result<(), JsValue> {
         draw(&mut data, width, height, i);
         let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(Clamped(&mut data), width, height).expect("u8 clamped array");
         ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
+        ctx.set_font("bold 12px Monaco");
         ctx.fill_text(&format!("FPS {}", (1000.0 / diff).ceil()), 10.0, 50.0).expect("fill_text");
 
         // Set the body's text content to how many times this
