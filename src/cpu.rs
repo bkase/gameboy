@@ -2,6 +2,7 @@ use register::{Registers, R16};
 use register_kind::{RegisterKind16, RegisterKind8};
 use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
 use mem::{Memory, Addr, Direction};
+use alu;
 
 pub struct Cpu {
     registers : Registers,
@@ -127,22 +128,44 @@ impl Cpu {
 
         match arith {
             Xor(r) => {
-                let result = self.registers.a.0 ^ self.registers.read8(r).0;
+                let old_a = self.registers.a.0;
+                let operand = self.registers.read8(r).0;
+                let result =
+                    alu::xor(
+                        &mut self.registers.flags,
+                        old_a,
+                        operand);
                 self.registers.write8n(RegisterKind8::A, result);
-                self.registers.flags.reset();
-                self.registers.flags.z = result == 0;
             },
             XorHlInd => {
-                let n = self.indirect_ld(RegisterKind16::Hl);
-                let result = self.registers.a.0 ^ n;
-                self.registers.flags.reset();
-                self.registers.flags.z = result == 0;
+                let old_a = self.registers.a.0;
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                let result =
+                    alu::xor(
+                        &mut self.registers.flags,
+                        old_a,
+                        operand);
+                self.registers.write8n(RegisterKind8::A, result);
             },
             Sub(r) => {
-                panic!("TODO");
+                let old_a = self.registers.a.0;
+                let operand = self.registers.read8(r).0;
+                let result =
+                    alu::sub(
+                        &mut self.registers.flags,
+                        old_a,
+                        operand);
+                self.registers.write8n(RegisterKind8::A, result);
             },
             SubHlInd => {
-                panic!("TODO");
+                let old_a = self.registers.a.0;
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                let result =
+                    alu::sub(
+                        &mut self.registers.flags,
+                        old_a,
+                        operand);
+                self.registers.write8n(RegisterKind8::A, result);
             },
             Inc8(r) => {
                 panic!("TODO");
@@ -162,10 +185,8 @@ impl Cpu {
             DecHlInd => {
                 panic!("TODO");
             },
-
         }
         panic!("TODO");
-
     }
 
     fn execute_rotate(&mut self, rotate: Rotate) -> BranchAction {
