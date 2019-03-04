@@ -1,7 +1,7 @@
 use register_kind::{RegisterKind8, RegisterKind16};
 use std::error::Error;
 use std::fmt;
-use mem::Memory;
+use mem::{Memory, Addr, Direction};
 
 /*   mneumonic       opcode clocks flag explanation
  *
@@ -58,10 +58,10 @@ pub enum Ld {
     HlIndGetsN(u8),
     AGetsBcInd,
     AGetsDeInd,
-    AGetsNnInd(u16),
+    AGetsNnInd(Addr),
     BcIndGetsA,
     DeIndGetsA,
-    NnIndGetsA(u16),
+    NnIndGetsA(Addr),
     AGetsIOOffset(u8),
     IOOffsetGetsA(u8),
     AGetsIOOffsetByC,
@@ -165,11 +165,11 @@ pub enum Instr {
     Arith(Arith),
     Rotate(Rotate),
     Jump(Jump),
-    Bit7h, // 2
-    CpHlInd, Cp(u8), // both 2
-    PopBc, // 3
-    PushBc, // 4
-    Ret, // 4
+    Bit7h,
+    CpHlInd, Cp(u8),
+    PopBc,
+    PushBc,
+    Ret,
 }
 use self::Instr::*;
 
@@ -191,29 +191,25 @@ impl HasDuration for Instr {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct InstrPointer(u16);
+pub struct InstrPointer(Addr);
 impl InstrPointer {
     pub fn create() -> InstrPointer {
-        InstrPointer(0x0100)
-    }
-    fn unwrap(&self) -> u16 {
-        let InstrPointer(ref x) = self;
-        *x
+        InstrPointer(Addr::directly(0x0100))
     }
 
     fn rewind(&mut self, n : u16) {
-        let InstrPointer(ref mut x) = self;
-        *x -= n;
+        let new_val = self.0.offset(n, Direction::Neg);
+        (*self).0 = new_val
     }
 
     fn inc(&mut self) {
-        let InstrPointer(ref mut x) = self;
-        *x += 1
+        let new_val = self.0.offset(1, Direction::Pos);
+        (*self).0 = new_val
     }
 
     fn inc_by(&mut self, n : u16) {
-        let InstrPointer(ref mut x) = self;
-        *x += n
+        let new_val = self.0.offset(n, Direction::Pos);
+        (*self).0 = new_val;
     }
 }
 
@@ -231,7 +227,7 @@ impl<'a> LiveInstrPointer<'a> {
     }
 
     fn peek8(&self) -> u8 {
-        self.memory.ld8(self.ptr.unwrap())
+        self.memory.ld8(self.ptr.0)
     }
 
     fn read8(&mut self) -> u8 {
@@ -241,7 +237,7 @@ impl<'a> LiveInstrPointer<'a> {
     }
 
     fn peek16(&self) -> u16 {
-        self.memory.ld16(self.ptr.unwrap())
+        self.memory.ld16(self.ptr.0)
     }
 
     fn read16(&mut self) -> u16 {
@@ -574,7 +570,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xe8 => panic!(format!("unimplemented instruction {}", pos0)),
             0xe9 => panic!(format!("unimplemented instruction {}", pos0)),
             0xea =>
-                (Ld(NnIndGetsA(self.read16())), 3),
+                (Ld(NnIndGetsA(Addr::directly(self.read16()))), 3),
             0xeb => panic!(format!("unimplemented instruction {}", pos0)),
             0xec => panic!(format!("unimplemented instruction {}", pos0)),
             0xed => panic!(format!("unimplemented instruction {}", pos0)),
@@ -593,7 +589,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xf8 => panic!(format!("unimplemented instruction {}", pos0)),
             0xf9 => panic!(format!("unimplemented instruction {}", pos0)),
             0xfa =>
-                (Ld(AGetsNnInd(self.read16())), 3),
+                (Ld(AGetsNnInd(Addr::directly(self.read16()))), 3),
             0xfb => panic!(format!("unimplemented instruction {}", pos0)),
             0xfc => panic!(format!("unimplemented instruction {}", pos0)),
             0xfd => panic!(format!("unimplemented instruction {}", pos0)),

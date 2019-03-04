@@ -117,7 +117,7 @@ pub fn run() -> Result<(), JsValue> {
             // up once we return.
             let _ = f.borrow_mut().take();
             let m = mem::Memory::create();
-            let _ = mem::Memory::ld8(&m, 0xff00);
+            let _ = mem::Memory::ld8(&m, mem::Addr::directly(0xff00));
             return;
         }
 

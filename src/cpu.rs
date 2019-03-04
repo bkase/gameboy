@@ -1,6 +1,7 @@
-use register::Registers;
-use instr::{Instr, HasDuration, InstrPointer};
-use mem::Memory;
+use register::{Registers, R16};
+use register_kind::{RegisterKind16, RegisterKind8};
+use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
+use mem::{Memory, Addr, Direction};
 
 pub struct Cpu {
     registers : Registers,
@@ -21,8 +22,142 @@ impl Cpu {
         }
     }
 
-    fn execute(&self, instr: Instr) -> BranchAction {
-        panic!("TODO")
+    fn indirect_ld(&mut self, k: RegisterKind16) -> u8 {
+        let r = self.registers.read16(k);
+        self.memory.ld8(Addr::indirectly(r))
+    }
+
+    fn indirect_st(&mut self, k: RegisterKind16, n: u8) {
+        let r = self.registers.read16(k);
+        self.memory.st8(Addr::indirectly(r), n)
+    }
+
+    fn execute_ld(&mut self, ld: Ld) -> BranchAction {
+        use self::Ld::*;
+
+        match ld {
+            RGetsR(r1, r2) => {
+                let n = self.registers.read8(r2);
+                self.registers.write8r(r1, n);
+            },
+            RGetsN(r, n) => self.registers.write8n(r, n),
+            RGetsHlInd(r) => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                self.registers.write8n(r, n);
+            },
+            HlIndGetsR(r) => {
+                let n = self.registers.read8(r);
+                self.indirect_st(RegisterKind16::Hl, n.0)
+            },
+            HlIndGetsN(n) => {
+                self.indirect_st(RegisterKind16::Hl, n)
+            },
+            AGetsBcInd => {
+                let n = self.indirect_ld(RegisterKind16::Bc);
+                self.registers.write8n(RegisterKind8::A, n);
+            },
+            AGetsDeInd => {
+                let n = self.indirect_ld(RegisterKind16::De);
+                self.registers.write8n(RegisterKind8::A, n);
+            },
+            AGetsNnInd(nn) => {
+                let n = self.memory.ld8(nn);
+                self.registers.write8n(RegisterKind8::A, n);
+            },
+            BcIndGetsA => {
+                let n = self.registers.a;
+                self.indirect_st(RegisterKind16::Bc, n.0)
+            },
+            DeIndGetsA => {
+                let n = self.registers.a;
+                self.indirect_st(RegisterKind16::De, n.0)
+            },
+            NnIndGetsA(nn) => {
+                let n = self.registers.a;
+                self.memory.st8(nn, n.0);
+            },
+            AGetsIOOffset(offset) => {
+                let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
+                let n = self.memory.ld8(addr);
+                self.registers.write8n(RegisterKind8::A, n)
+            },
+            IOOffsetGetsA(offset) => {
+                let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
+                let n = self.registers.read8(RegisterKind8::A);
+                self.memory.st8(addr, n.0);
+            },
+            AGetsIOOffsetByC => {
+                let offset = self.registers.c();
+                let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
+                let n = self.memory.ld8(addr);
+                self.registers.write8n(RegisterKind8::A, n)
+            },
+            IOOffsetByCGetsA => {
+                let offset = self.registers.c();
+                let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
+                let n = self.registers.read8(RegisterKind8::A);
+                self.memory.st8(addr, n.0);
+            },
+            HlIndGetsAInc => {
+                let n = self.registers.read8(RegisterKind8::A);
+                self.indirect_st(RegisterKind16::Hl, n.0);
+                self.registers.hl.inc()
+            },
+            AGetsHlIndInc => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                self.registers.write8n(RegisterKind8::A, n);
+                self.registers.hl.inc()
+            },
+            HlIndGetsADec => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                self.registers.write8n(RegisterKind8::A, n);
+                self.registers.hl.dec()
+            },
+            AGetsHlIndDec => {
+              let n = self.registers.read8(RegisterKind8::A);
+              self.indirect_st(RegisterKind16::Hl, n.0);
+              self.registers.hl.dec()
+            },
+        };
+        BranchAction::Take
+    }
+
+    fn execute_arith(&mut self, arith: Arith) -> BranchAction {
+        /*match arith {
+            Xor(r) => ,
+            XorHlInd,
+            Sub(RegisterKind8), SubHlInd,
+            Inc8(RegisterKind8), Inc16(RegisterKind16), IncHlInd,
+            Dec8(RegisterKind8), Dec16(RegisterKind16), DecHlInd,
+
+        }*/
+        panic!("TODO");
+
+    }
+
+    fn execute_rotate(&mut self, rotate: Rotate) -> BranchAction {
+        panic!("TODO");
+    }
+
+    fn execute_jump(&mut self, jump: Jump) -> BranchAction {
+        panic!("TODO");
+    }
+
+    fn execute(&mut self, instr: Instr) -> BranchAction {
+        use self::Instr::*;
+
+        match instr {
+          Ld(ld) => self.execute_ld(ld),
+          Arith(arith) => self.execute_arith(arith),
+          Rotate(rotate) => self.execute_rotate(rotate),
+          Jump(jump) => self.execute_jump(jump),
+          Bit7h => panic!("TODO"),
+          CpHlInd => panic!("TODO"),
+          Cp(n) => panic!("TODO"),
+          PopBc => panic!("TODO"),
+          PushBc => panic!("TODO"),
+          Ret => panic!("TODO"),
+        }
     }
 
     // clock speed is 4.194304 MHz

@@ -1,3 +1,4 @@
+use register::R16;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -32,6 +33,36 @@ pub struct Memory {
     rom0: Vec<u8>,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Addr(u16);
+
+pub enum Direction { Pos, Neg }
+
+impl Addr {
+    pub fn indirectly(r : R16) -> Addr {
+        Addr(r.0)
+    }
+
+    pub fn directly(n : u16) -> Addr {
+        Addr(n)
+    }
+
+    pub fn io_memory() -> Addr {
+        Addr::directly(0xff00)
+    }
+}
+
+impl Addr {
+    pub fn offset(&self, by: u16, direction: Direction) -> Addr {
+        let new_val =
+            match direction {
+                Direction::Pos => self.0 + by,
+                Direction::Neg => self.0 - by
+            };
+        Addr(new_val)
+    }
+}
+
 impl Memory {
     pub fn create() -> Memory {
         Memory {
@@ -41,7 +72,7 @@ impl Memory {
         }
     }
 
-    pub fn ld8(&self, addr: u16) -> u8 {
+    pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
             0xffff => panic!("interrupt enable register"),
             0xff80 ... 0xfffe => panic!("zero page"),
@@ -71,7 +102,7 @@ impl Memory {
         }
     }
 
-    pub fn ld16(&self, addr: u16) -> u16 {
+    pub fn ld16(&self, Addr(addr): Addr) -> u16 {
         fn u16read(vec : &Vec<u8>, addr: u16) -> u16 {
             ((vec[addr as usize] as u16) << 8) | vec[(addr+1) as usize] as u16
         }
@@ -102,8 +133,8 @@ impl Memory {
         }
     }
 
-    pub fn st8(&self, addr: u16) {
-
+    pub fn st8(&mut self, addr: Addr, n: u8) {
+        panic!("TODO");
     }
 }
 

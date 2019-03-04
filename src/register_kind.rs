@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub enum RegisterKind8 {
-    A, F,
+    A,
     B, C,
     D, E,
     H, L
@@ -8,11 +8,9 @@ pub enum RegisterKind8 {
 
 #[derive(Debug)]
 pub enum RegisterKind16 {
-    Af,
     Bc,
     De,
     Hl,
     Sp,
-    Pc
 }
 
