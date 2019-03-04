@@ -104,8 +104,8 @@ impl HasDuration for Ld {
 pub enum Arith {
     Xor(RegisterKind8), XorHlInd,
     Sub(RegisterKind8), SubHlInd,
-    Inc8(RegisterKind8), Inc16(RegisterKind16), IncH1Ind,
-    Dec8(RegisterKind8), Dec16(RegisterKind16), DecH1Ind,
+    Inc8(RegisterKind8), Inc16(RegisterKind16), IncHlInd,
+    Dec8(RegisterKind8), Dec16(RegisterKind16), DecHlInd,
     // Add / and / etc
 }
 use self::Arith::*;
@@ -114,15 +114,15 @@ impl HasDuration for Arith {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
             Xor(_) => (1, None),
-            XorH1Ind => (2, None),
+            XorHlInd => (2, None),
             Sub(_) => (1, None),
-            SubH1Ind => (2, None),
+            SubHlInd => (2, None),
             Inc8(_) => (1, None),
             Inc16(_) => (2, None),
-            IncH1Ind => (3, None),
+            IncHlInd => (3, None),
             Dec8(_) => (1, None),
             Dec16(_) => (2, None),
-            DecH1Ind => (3, None),
+            DecHlInd => (3, None),
         }
     }
 }
@@ -312,8 +312,8 @@ impl<'a> LiveInstrPointer<'a> {
             0x31 => panic!(format!("unimplemented instruction {}", pos0)),
             0x32 => (Ld(HlIndGetsADec), 1),
             0x33 => (Arith(Inc16(RegisterKind16::Sp)), 1),
-            0x34 => (Arith(IncH1Ind), 1),
-            0x35 => (Arith(DecH1Ind), 1),
+            0x34 => (Arith(IncHlInd), 1),
+            0x35 => (Arith(DecHlInd), 1),
             0x36 => (Ld(HlIndGetsN(self.read8())), 2),
             0x37 => panic!(format!("unimplemented instruction {}", pos0)),
             0x38 => panic!(format!("unimplemented instruction {}", pos0)),
