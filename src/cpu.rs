@@ -123,14 +123,47 @@ impl Cpu {
     }
 
     fn execute_arith(&mut self, arith: Arith) -> BranchAction {
-        /*match arith {
-            Xor(r) => ,
-            XorHlInd,
-            Sub(RegisterKind8), SubHlInd,
-            Inc8(RegisterKind8), Inc16(RegisterKind16), IncHlInd,
-            Dec8(RegisterKind8), Dec16(RegisterKind16), DecHlInd,
+        use self::Arith::*;
 
-        }*/
+        match arith {
+            Xor(r) => {
+                let result = self.registers.a.0 ^ self.registers.read8(r).0;
+                self.registers.write8n(RegisterKind8::A, result);
+                self.registers.flags.reset();
+                self.registers.flags.z = result == 0;
+            },
+            XorHlInd => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                let result = self.registers.a.0 ^ n;
+                self.registers.flags.reset();
+                self.registers.flags.z = result == 0;
+            },
+            Sub(r) => {
+                panic!("TODO");
+            },
+            SubHlInd => {
+                panic!("TODO");
+            },
+            Inc8(r) => {
+                panic!("TODO");
+            },
+            Inc16(r16) => {
+                panic!("TODO");
+            },
+            IncHlInd => {
+                panic!("TODO");
+            },
+            Dec8(r) => {
+                panic!("TODO");
+            },
+            Dec16(r16) => {
+                panic!("TODO");
+            },
+            DecHlInd => {
+                panic!("TODO");
+            },
+
+        }
         panic!("TODO");
 
     }

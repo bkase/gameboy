@@ -15,6 +15,7 @@ use wasm_bindgen::{JsCast, Clamped};
 mod register_kind;
 mod instr;
 mod register;
+mod alu;
 mod cpu;
 mod mem;
 mod utils;

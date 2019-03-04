@@ -78,6 +78,14 @@ pub struct Flags {
     pub h: bool,
     pub c: bool,
 }
+impl Flags {
+    pub fn reset(&mut self) {
+        self.z = false;
+        self.n = false;
+        self.h = false;
+        self.c = false;
+    }
+}
 
 pub struct Registers {
     pub bc : R16,
