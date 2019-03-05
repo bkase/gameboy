@@ -124,6 +124,14 @@ pub fn rl(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn bit(flags: &mut Flags, x: u8, b: u8) {
+    assert!(b < 8);
+    flags.z = x & (1 << b) == 0;
+    flags.n = false;
+    flags.h = true;
+    // c not affected
+}
+
 #[cfg(test)]
 mod tests {
     use alu;

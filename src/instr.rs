@@ -212,6 +212,10 @@ impl InstrPointer {
         (*self).0 = new_val;
     }
 
+    pub fn jump(&mut self, addr: Addr) {
+        (*self).0 = addr
+    }
+
     pub fn offset_by(&mut self, n : i8) {
         let (offset, direction) =
             if n > 0 { (n as u16, Direction::Pos) } else { ((n*(-1)) as u16, Direction::Neg) };
@@ -222,7 +226,6 @@ impl InstrPointer {
 }
 
 struct LiveInstrPointer<'a> {
-    // TODO: Keep this in sync with Register pc somehow
     ptr : &'a mut InstrPointer,
     memory : &'a Memory
 }

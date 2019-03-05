@@ -1,4 +1,4 @@
-use register::{Registers, Flags};
+use register::{Registers, Flags, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
 use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
 use mem::{Memory, Addr, Direction};
@@ -233,6 +233,17 @@ impl Cpu {
         }
     }
 
+    fn pop(&mut self) -> R8 {
+        let (v, _) = self.indirect_ld(RegisterKind16::Sp);
+        self.registers.sp.inc();
+        R8(v)
+    }
+
+    fn push(&mut self, n: R8) {
+        self.indirect_st(RegisterKind16::Sp, n.0);
+        self.registers.sp.dec();
+    }
+
     fn execute(&mut self, instr: Instr) -> BranchAction {
         use self::Instr::*;
 
@@ -241,12 +252,42 @@ impl Cpu {
           Arith(arith) => self.execute_arith(arith),
           Rotate(rotate) => self.execute_rotate(rotate),
           Jump(jump) => self.execute_jump(jump),
-          Bit7h => panic!("TODO"),
-          CpHlInd => panic!("TODO"),
-          Cp(n) => panic!("TODO"),
-          PopBc => panic!("TODO"),
-          PushBc => panic!("TODO"),
-          Ret => panic!("TODO"),
+          Bit7h => {
+            let x = self.registers.read8(RegisterKind8::H);
+            alu::bit(&mut self.registers.flags, x.0, 7);
+            BranchAction::Take
+          },
+          CpHlInd => {
+            let x = self.registers.read8(RegisterKind8::A);
+            let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
+            let _ = alu::sub(&mut self.registers.flags, x.0, operand);
+            BranchAction::Take
+          },
+          Cp(n) => {
+            let x = self.registers.read8(RegisterKind8::A);
+            let _ = alu::sub(&mut self.registers.flags, x.0, n);
+            BranchAction::Take
+          },
+          PopBc => {
+            // TODO: Are we pushing and popping the stack in the right order
+            let x0 = self.pop();
+            let x1 = self.pop();
+            self.registers.bc = x0.concat(x1);
+            BranchAction::Take
+          },
+          PushBc => {
+            let b = self.registers.b();
+            let c = self.registers.c();
+            self.push(c);
+            self.push(b);
+            BranchAction::Take
+          },
+          Ret => {
+            let x0 = self.pop();
+            let x1 = self.pop();
+            self.ip.jump(Addr::directly(x0.concat(x1).0));
+            BranchAction::Take
+          }
         }
     }
 

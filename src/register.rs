@@ -16,17 +16,17 @@ impl R16 {
 
     pub fn inc(&mut self) {
         let old = self.0;
-        (*self).0 = old +& 1;
+        (*self).0 = old.wrapping_add(1);
     }
 
     pub fn dec(&mut self) {
         let old = self.0;
-        (*self).0 = old -& 1;
+        (*self).0 = old.wrapping_sub(1);
     }
 }
 
 impl R8 {
-    fn concat(self, lo : R8) -> R16 {
+    pub fn concat(self, lo : R8) -> R16 {
         R16(((self.0 as u16) << 8) | lo.0 as u16)
     }
 
