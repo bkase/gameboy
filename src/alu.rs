@@ -116,6 +116,14 @@ pub fn dec16(flags: &mut Flags, x: u16) -> u16 {
     x.wrapping_sub(1)
 }
 
+pub fn rl(flags: &mut Flags, x: u8) -> u8 {
+    let r = x << 1;
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = x & 0x80 == 0x80;
+    r
+}
+
 #[cfg(test)]
 mod tests {
     use alu;

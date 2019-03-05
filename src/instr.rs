@@ -211,6 +211,14 @@ impl InstrPointer {
         let new_val = self.0.offset(n, Direction::Pos);
         (*self).0 = new_val;
     }
+
+    pub fn offset_by(&mut self, n : i8) {
+        let (offset, direction) =
+            if n > 0 { (n as u16, Direction::Pos) } else { ((n*(-1)) as u16, Direction::Neg) };
+
+        let new_val = self.0.offset(offset, direction);
+        (*self).0 = new_val;
+    }
 }
 
 struct LiveInstrPointer<'a> {

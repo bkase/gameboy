@@ -189,11 +189,48 @@ impl Cpu {
     }
 
     fn execute_rotate(&mut self, rotate: Rotate) -> BranchAction {
-        panic!("TODO");
+        use self::Rotate::*;
+
+        match rotate {
+            Rla => {
+                let n = self.registers.read8(RegisterKind8::A);
+                let result = alu::rl(&mut self.registers.flags, n.0);
+                self.registers.write8n(RegisterKind8::A, result);
+            },
+            Rl(r) => {
+                let n = self.registers.read8(r);
+                let result = alu::rl(&mut self.registers.flags, n.0);
+                self.registers.write8n(RegisterKind8::A, result);
+            }
+        };
+        BranchAction::Take
     }
 
     fn execute_jump(&mut self, jump: Jump) -> BranchAction {
-        panic!("TODO");
+        use self::Jump::*;
+
+        match jump {
+            Jr(offset) => {
+                self.ip.offset_by(offset);
+                BranchAction::Take
+            },
+            JrNz(offset) => {
+                if !self.registers.flags.z {
+                    self.ip.offset_by(offset);
+                    BranchAction::Take
+                } else {
+                    BranchAction::Skip
+                }
+            },
+            JrZ(offset) => {
+                if self.registers.flags.z {
+                    self.ip.offset_by(offset);
+                    BranchAction::Take
+                } else {
+                    BranchAction::Skip
+                }
+            }
+        }
     }
 
     fn execute(&mut self, instr: Instr) -> BranchAction {
