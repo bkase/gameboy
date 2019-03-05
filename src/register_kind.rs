@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RegisterKind8 {
     A,
     B, C,
@@ -6,7 +6,7 @@ pub enum RegisterKind8 {
     H, L
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RegisterKind16 {
     Bc,
     De,

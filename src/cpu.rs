@@ -1,4 +1,4 @@
-use register::{Registers, R16};
+use register::{Registers, Flags};
 use register_kind::{RegisterKind16, RegisterKind8};
 use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
 use mem::{Memory, Addr, Direction};
@@ -23,9 +23,10 @@ impl Cpu {
         }
     }
 
-    fn indirect_ld(&mut self, k: RegisterKind16) -> u8 {
+    fn indirect_ld(&mut self, k: RegisterKind16) -> (u8, Addr) {
         let r = self.registers.read16(k);
-        self.memory.ld8(Addr::indirectly(r))
+        let addr = Addr::indirectly(r);
+        (self.memory.ld8(addr), addr)
     }
 
     fn indirect_st(&mut self, k: RegisterKind16, n: u8) {
@@ -43,7 +44,7 @@ impl Cpu {
             },
             RGetsN(r, n) => self.registers.write8n(r, n),
             RGetsHlInd(r) => {
-                let n = self.indirect_ld(RegisterKind16::Hl);
+                let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(r, n);
             },
             HlIndGetsR(r) => {
@@ -54,11 +55,11 @@ impl Cpu {
                 self.indirect_st(RegisterKind16::Hl, n)
             },
             AGetsBcInd => {
-                let n = self.indirect_ld(RegisterKind16::Bc);
+                let (n, _) = self.indirect_ld(RegisterKind16::Bc);
                 self.registers.write8n(RegisterKind8::A, n);
             },
             AGetsDeInd => {
-                let n = self.indirect_ld(RegisterKind16::De);
+                let (n, _) = self.indirect_ld(RegisterKind16::De);
                 self.registers.write8n(RegisterKind8::A, n);
             },
             AGetsNnInd(nn) => {
@@ -105,12 +106,12 @@ impl Cpu {
                 self.registers.hl.inc()
             },
             AGetsHlIndInc => {
-                let n = self.indirect_ld(RegisterKind16::Hl);
+                let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(RegisterKind8::A, n);
                 self.registers.hl.inc()
             },
             HlIndGetsADec => {
-                let n = self.indirect_ld(RegisterKind16::Hl);
+                let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(RegisterKind8::A, n);
                 self.registers.hl.dec()
             },
@@ -123,70 +124,68 @@ impl Cpu {
         BranchAction::Take
     }
 
+    fn execute_alu_binop<F>(&mut self, f: F, operand: u8) -> u8
+         where F: FnOnce(&mut Flags, u8, u8) -> u8 {
+             let old_a = self.registers.a.0;
+             let result = f(&mut self.registers.flags,
+                            old_a,
+                            operand);
+             self.registers.write8n(RegisterKind8::A, result);
+             result
+    }
+
     fn execute_arith(&mut self, arith: Arith) -> BranchAction {
         use self::Arith::*;
 
         match arith {
             Xor(r) => {
-                let old_a = self.registers.a.0;
                 let operand = self.registers.read8(r).0;
-                let result =
-                    alu::xor(
-                        &mut self.registers.flags,
-                        old_a,
-                        operand);
-                self.registers.write8n(RegisterKind8::A, result);
+                self.execute_alu_binop(alu::xor, operand);
             },
             XorHlInd => {
-                let old_a = self.registers.a.0;
-                let operand = self.indirect_ld(RegisterKind16::Hl);
-                let result =
-                    alu::xor(
-                        &mut self.registers.flags,
-                        old_a,
-                        operand);
-                self.registers.write8n(RegisterKind8::A, result);
+                let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
+                self.execute_alu_binop(alu::xor, operand);
             },
             Sub(r) => {
-                let old_a = self.registers.a.0;
                 let operand = self.registers.read8(r).0;
-                let result =
-                    alu::sub(
-                        &mut self.registers.flags,
-                        old_a,
-                        operand);
-                self.registers.write8n(RegisterKind8::A, result);
+                self.execute_alu_binop(alu::sub, operand);
             },
             SubHlInd => {
-                let old_a = self.registers.a.0;
-                let operand = self.indirect_ld(RegisterKind16::Hl);
-                let result =
-                    alu::sub(
-                        &mut self.registers.flags,
-                        old_a,
-                        operand);
-                self.registers.write8n(RegisterKind8::A, result);
+                let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
+                self.execute_alu_binop(alu::sub, operand);
             },
             Inc8(r) => {
-                panic!("TODO");
+                let operand = self.registers.read8(r);
+                let result = alu::inc(&mut self.registers.flags, operand.0);
+                self.registers.write8n(r, result);
             },
             Inc16(r16) => {
-                panic!("TODO");
+                let operand = self.registers.read16(r16);
+                let result = alu::inc16(&mut self.registers.flags, operand.0);
+                self.registers.write16n(r16, result);
             },
             IncHlInd => {
-                panic!("TODO");
+                let (operand, addr) = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::inc(&mut self.registers.flags, operand);
+                self.memory.st8(addr, result);
             },
             Dec8(r) => {
-                panic!("TODO");
+                let operand = self.registers.read8(r);
+                let result = alu::dec(&mut self.registers.flags, operand.0);
+                self.registers.write8n(r, result);
             },
             Dec16(r16) => {
-                panic!("TODO");
+                let operand = self.registers.read16(r16);
+                let result = alu::dec16(&mut self.registers.flags, operand.0);
+                self.registers.write16n(r16, result);
             },
             DecHlInd => {
-                panic!("TODO");
+                let (operand, addr) = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::dec(&mut self.registers.flags, operand);
+                self.memory.st8(addr, result);
             },
-        }
-        panic!("TODO");
+        };
+        BranchAction::Take
     }
 
     fn execute_rotate(&mut self, rotate: Rotate) -> BranchAction {

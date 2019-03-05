@@ -67,7 +67,7 @@ fn sub_(left: u8, right: u8) -> (u8, bool, bool) {
     for i in 0 .. 8 {
         let (o, bo) = lookup(borrow, bits_left[i], bits_right[i]);
         borrow = bo;
-        if i == 4 {
+        if i == 3 {
             borrow_at_4 = bo;
         };
         result[i] = o;
@@ -92,7 +92,29 @@ pub fn xor(flags: &mut Flags, left: u8, right: u8) -> u8 {
     r
 }
 
+pub fn inc(flags: &mut Flags, x: u8) -> u8 {
+    let r = x.wrapping_add(1);
+    flags.z = r == 0;
+    flags.n = false;
+    flags.h = x & 0b111 == 0b111;
+    // c not affected
+    r
+}
 
+pub fn dec(flags: &mut Flags, x: u8) -> u8 {
+    let old_c = flags.c;
+    let r = sub(flags, x, 1);
+    flags.c = old_c;
+    r
+}
+
+pub fn inc16(flags: &mut Flags, x: u16) -> u16 {
+    x.wrapping_add(1)
+}
+
+pub fn dec16(flags: &mut Flags, x: u16) -> u16 {
+    x.wrapping_sub(1)
+}
 
 #[cfg(test)]
 mod tests {
@@ -101,7 +123,7 @@ mod tests {
 
     #[test]
     fn borrow_at_4() {
-        let (_, b4, _) = alu::sub_(0b01111, 0b10000);
+        let (_, b4, _) = alu::sub_(0b0111, 0b1000);
         assert!(b4);
     }
 

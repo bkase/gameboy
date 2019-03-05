@@ -160,4 +160,17 @@ impl Registers {
     pub fn write8n(&mut self, kind: RegisterKind8, n: u8) {
         self.write8r(kind, R8(n))
     }
+
+    pub fn write16r(&mut self, kind: RegisterKind16, n: R16) {
+        match kind {
+            RegisterKind16::Bc => self.bc = n,
+            RegisterKind16::De => self.de = n,
+            RegisterKind16::Hl => self.hl = n,
+            RegisterKind16::Sp => self.sp = n,
+        }
+    }
+
+    pub fn write16n(&mut self, kind: RegisterKind16, n: u16) {
+        self.write16r(kind, R16(n))
+    }
 }
