@@ -4,6 +4,10 @@ use std::rc::Rc;
 extern crate console_error_panic_hook;
 extern crate wasm_bindgen;
 
+extern crate packed_struct;
+#[macro_use] extern crate packed_struct_codegen;
+
+
 #[cfg(test)]
 pub mod test {
     pub extern crate proptest;
@@ -15,6 +19,7 @@ use wasm_bindgen::{JsCast, Clamped};
 mod register_kind;
 mod instr;
 mod register;
+mod ppu;
 mod alu;
 mod cpu;
 mod mem;

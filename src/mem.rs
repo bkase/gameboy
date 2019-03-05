@@ -1,4 +1,5 @@
 use register::R16;
+use ppu::{Ppu, ViewU8, ReadViewU8};
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -31,6 +32,7 @@ pub struct Memory {
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
+    ppu: Ppu
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -68,7 +70,8 @@ impl Memory {
         Memory {
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
-            rom0: vec![0; 0x4000]
+            rom0: vec![0; 0x4000],
+            ppu: Ppu::create()
         }
     }
 
@@ -77,7 +80,14 @@ impl Memory {
             0xffff => panic!("interrupt enable register"),
             0xff80 ... 0xfffe => panic!("zero page"),
             0xff4c ... 0xff7f => panic!("unusable"),
-            0xff00 ... 0xff4b => panic!("I/O ports"),
+            0xff11 => { println!("Sound mode change, not-implemented for now"); 0 },
+            0xff13 => { println!("Sound mode change, not-implemented for now"); 0 },
+            0xff40 => self.ppu.lcdc.read(),
+            0xff42 => self.ppu.scy.read(),
+            0xff44 => self.ppu.ly.read(),
+            0xff47 => self.ppu.bgp.read(),
+            0xff50 => { println!("The last instruction, doesn't matter for now"); 0 },
+            0xff00 ... 0xff4b => panic!("rest of I/O ports"),
             0xfea0 ... 0xfeff => panic!("unusable"),
             0xfe00 ... 0xfe9f => panic!("sprite oam"),
             0xe000 ... 0xfdff => panic!("echo ram"),
@@ -133,8 +143,39 @@ impl Memory {
         }
     }
 
-    pub fn st8(&mut self, addr: Addr, n: u8) {
-        panic!("TODO");
+    pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
+        match addr {
+            0xffff => panic!("interrupt enable register"),
+            0xff80 ... 0xfffe => panic!("zero page"),
+            0xff4c ... 0xff7f => panic!("unusable"),
+            0xff11 => { println!("Sound mode change, not-implemented for now") },
+            0xff13 => { println!("Sound mode change, not-implemented for now") },
+            0xff40 => self.ppu.lcdc.set(n),
+            0xff42 => self.ppu.scy.set(n),
+            0xff44 => panic!("Cannot write to LY register"),
+            0xff47 => self.ppu.bgp.set(n),
+            0xff50 => { println!("The last instruction, doesn't matter for now") },
+            0xff00 ... 0xff4b => panic!("rest of I/O ports"),
+            0xfea0 ... 0xfeff => panic!("unusable"),
+            0xfe00 ... 0xfe9f => panic!("sprite oam"),
+            0xe000 ... 0xfdff => panic!("echo ram"),
+            // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
+            // 0xc000 ... 0xcfff => panic!("ram bank 0"),
+            0xc000 ... 0xdfff => self.main[(addr-0xc000) as usize] = n,
+            0xa000 ... 0xbfff => panic!("cartridge ram"),
+            // end video ram
+            // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
+            // 0x9800 ... 0x9bff => panic!("bg map data 1"),
+            // 0x8000 ... 0x97ff => panic!("character ram"),
+            0x8000 ... 0x9fff => self.video[(addr-0x8000) as usize] = n,
+            // begin video ram
+            0x4000 ... 0x7fff => panic!("switchable rom banks xx"),
+            0x0150 ... 0x3fff => panic!("Cannot write to ROM"),
+            0x0100 ... 0x014f =>
+                // cartridge header
+                panic!("Cannot write to ROM"),
+            0x0000 ... 0x00ff => panic!("restart/int vectors"),
+        }
     }
 }
 
