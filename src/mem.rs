@@ -1,5 +1,5 @@
 use register::R16;
-use ppu::{Ppu, ViewU8, ReadViewU8};
+use ppu::{PpuRegisters, ViewU8, ReadViewU8};
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -32,7 +32,7 @@ pub struct Memory {
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
-    ppu: Ppu
+    ppu: PpuRegisters
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -71,7 +71,7 @@ impl Memory {
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
             rom0: vec![0; 0x4000],
-            ppu: Ppu::create()
+            ppu: PpuRegisters::create()
         }
     }
 

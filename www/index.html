@@ -3,10 +3,19 @@
   <head>
     <meta charset="utf-8">
     <title>Gameboy</title>
+    <link rel="stylesheet" href="https://unpkg.com/tachyons@4/css/tachyons.min.css">
   </head>
   <body>
-    <div style="max-width: 600px; margin-left: 3rem; margin-right: 3rem;">
-    <canvas width="160" height="144" id="canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+    <div class="flex">
+      <div class="mw7 ph4 mt2 w-60">
+        <canvas width="160" height="144" id="canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+      </div>
+      <div class="mw6 ph4 w-30 ba mt2 pv2">
+        <h3>Tiles</h3>
+        <div class="w-100">
+          <canvas width="32" height="128" id="tiles" style="width: 100%; image-rendering: pixelated;"></canvas>
+        </div>
+      </div>
     </div>
     <script src="./bootstrap.js"></script>
   </body>

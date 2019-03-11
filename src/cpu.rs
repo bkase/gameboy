@@ -306,11 +306,12 @@ impl Cpu {
             let action = {
                 self.execute(instr)
             };
-            clocks_to_tick -=
+            let duration =
                 match action {
                     BranchAction::Take => take_duration,
                     BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration)
                 };
+            clocks_to_tick -= duration;
 
             let _ = self.ip.read(&self.memory);
             instr = self.ip.peek(&self.memory);
