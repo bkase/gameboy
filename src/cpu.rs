@@ -1,4 +1,4 @@
-use register::{Registers, Flags, R8};
+use register::{Registers, Flags, R8, R16};
 use register_kind::{RegisterKind16, RegisterKind8};
 use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
 use mem::{Memory, Addr, Direction};
@@ -120,6 +120,15 @@ impl Cpu {
               self.indirect_st(RegisterKind16::Hl, n.0);
               self.registers.hl.dec()
             },
+            SpGetsAddr(addr) => {
+              self.registers.sp = addr.into_register();
+            },
+            HlGetsAddr(addr) => {
+              self.registers.hl = addr.into_register();
+            },
+            DeGetsAddr(addr) => {
+              self.registers.hl = addr.into_register();
+            },
         };
         BranchAction::Take
     }
@@ -153,6 +162,10 @@ impl Cpu {
             SubHlInd => {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::sub, operand);
+            },
+            AddH1Ind => {
+                let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
+                self.execute_alu_binop(alu::add, operand);
             },
             Inc8(r) => {
                 let operand = self.registers.read8(r);
@@ -206,6 +219,23 @@ impl Cpu {
         BranchAction::Take
     }
 
+    fn pop(&mut self) -> R8 {
+        let (v, _) = self.indirect_ld(RegisterKind16::Sp);
+        self.registers.sp.inc();
+        R8(v)
+    }
+
+    fn push(&mut self, n: R8) {
+        self.indirect_st(RegisterKind16::Sp, n.0);
+        self.registers.sp.dec();
+    }
+
+    fn push16(&mut self, n: R16) {
+        self.push(n.lo());
+        self.push(n.hi());
+    }
+
+
     fn execute_jump(&mut self, jump: Jump) -> BranchAction {
         use self::Jump::*;
 
@@ -230,18 +260,13 @@ impl Cpu {
                     BranchAction::Skip
                 }
             }
+            Call(addr) => {
+                let r16 = self.ip.0.into_register();
+                self.push16(r16);
+                self.ip.jump(addr);
+                BranchAction::Take
+            }
         }
-    }
-
-    fn pop(&mut self) -> R8 {
-        let (v, _) = self.indirect_ld(RegisterKind16::Sp);
-        self.registers.sp.inc();
-        R8(v)
-    }
-
-    fn push(&mut self, n: R8) {
-        self.indirect_st(RegisterKind16::Sp, n.0);
-        self.registers.sp.dec();
     }
 
     fn execute(&mut self, instr: Instr) -> BranchAction {
@@ -276,10 +301,8 @@ impl Cpu {
             BranchAction::Take
           },
           PushBc => {
-            let b = self.registers.b();
-            let c = self.registers.c();
-            self.push(c);
-            self.push(b);
+            let bc = self.registers.bc;
+            self.push16(bc);
             BranchAction::Take
           },
           Ret => {

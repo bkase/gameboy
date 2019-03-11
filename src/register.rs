@@ -6,11 +6,11 @@ pub struct R16(pub u16);
 pub struct R8(pub u8);
 
 impl R16 {
-    fn hi(&self) -> R8 {
+    pub fn hi(&self) -> R8 {
         R8(((self.0 & 0xff00) >> 8) as u8)
     }
 
-    fn lo(&self) -> R8 {
+    pub fn lo(&self) -> R8 {
         R8((self.0 & 0x00ff) as u8)
     }
 

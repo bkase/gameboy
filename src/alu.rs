@@ -85,6 +85,63 @@ pub fn sub(flags: &mut Flags, left: u8, right: u8) -> u8 {
     r
 }
 
+/*
+    c i1 i2   o co
+    0 0  0    0 0
+    0 0  1    1 0
+    0 1  0    1 0
+    0 1  1    0 1
+    1 0  0    1 0
+    1 0  1    0 1
+    1 1  0    0 1
+    1 1  1    1 1
+*/
+// returns result, was there a carry at 3, and was there a carry at the end
+fn add_(left: u8, right: u8) -> (u8, bool, bool) {
+    use self::bits::{num, bits, unbits};
+
+    fn lookup(c: bool, i1: bool, i2: bool) -> (bool, bool) {
+        let lut =
+         [ (false, false)
+         , (true, false)
+         , (true, false)
+         , (false, true)
+         , (true, false)
+         , (false, true)
+         , (false, true)
+         , (true, true) ];
+        let idx = num(c) * 4 + num(i1) * 2 + num(i2);
+        lut[idx as usize]
+    }
+
+    let bits_left = bits(left);
+    let bits_right = bits(right);
+    let mut carry = false;
+    let mut carry_at_3 = false;
+    let mut result = [true, true, true, true, true, true, true, true];
+
+    for i in 0 .. 8 {
+        let (o, co) = lookup(carry, bits_left[i], bits_right[i]);
+        println!("Out {}, co {} at {}", o, co, i);
+        carry = co;
+        if i == 3 {
+            carry_at_3 = co;
+        };
+        result[i] = o;
+    };
+
+    (unbits(result), carry_at_3, carry)
+}
+
+pub fn add(flags: &mut Flags, left: u8, right: u8) -> u8 {
+    let (r, carry_at_3, carry_at_end) = add_(left, right);
+    flags.z = r == 0;
+    flags.n = false;
+    flags.h = carry_at_3;
+    flags.c = carry_at_end;
+    r
+}
+
 pub fn xor(flags: &mut Flags, left: u8, right: u8) -> u8 {
     let r = left ^ right;
     flags.reset();
@@ -149,6 +206,18 @@ mod tests {
         assert!(b);
     }
 
+    #[test]
+    fn carry_at_3() {
+        let (_, c3, _) = alu::add_(0b1000, 0b1000);
+        assert!(c3);
+    }
+
+    #[test]
+    fn carry_at_end() {
+        let (_, _, c) = alu::add_(0xff, 0xff);
+        assert!(c);
+    }
+
     proptest! {
         #[test]
         fn bits_unbits_selfinverse(x : u8) {
@@ -159,6 +228,12 @@ mod tests {
         fn subtraction_works(left : u8, right: u8) {
             let (r, _, _) = alu::sub_(left, right);
             assert_eq!(left.wrapping_sub(right), r)
+        }
+
+        #[test]
+        fn addition_works(left: u8, right: u8) {
+            let (r, _, _) = alu::add_(left, right);
+            assert_eq!(left.wrapping_add(right), r)
         }
     }
 }
