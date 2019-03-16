@@ -1,25 +1,26 @@
-use register::{Registers, Flags, R8, R16};
-use register_kind::{RegisterKind16, RegisterKind8};
-use instr::{Instr, HasDuration, InstrPointer, Ld, Arith, Rotate, Jump};
-use mem::{Memory, Addr, Direction};
 use alu;
+use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, Rotate};
+use mem::{Addr, Direction, Memory};
+use register::{Flags, Registers, R16, R8};
+use register_kind::{RegisterKind16, RegisterKind8};
 
 pub struct Cpu {
-    registers : Registers,
-    memory : Memory,
-    ip : InstrPointer,
+    registers: Registers,
+    memory: Memory,
+    ip: InstrPointer,
 }
 
 enum BranchAction {
-    Take, Skip
+    Take,
+    Skip,
 }
 
 impl Cpu {
     fn create() -> Cpu {
         Cpu {
-            registers : Registers::create(),
-            memory : Memory::create(),
-            ip : InstrPointer::create(),
+            registers: Registers::create(),
+            memory: Memory::create(),
+            ip: InstrPointer::create(),
         }
     }
 
@@ -41,106 +42,104 @@ impl Cpu {
             RGetsR(r1, r2) => {
                 let n = self.registers.read8(r2);
                 self.registers.write8r(r1, n);
-            },
+            }
             RGetsN(r, n) => self.registers.write8n(r, n),
             RGetsHlInd(r) => {
                 let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(r, n);
-            },
+            }
             HlIndGetsR(r) => {
                 let n = self.registers.read8(r);
                 self.indirect_st(RegisterKind16::Hl, n.0)
-            },
-            HlIndGetsN(n) => {
-                self.indirect_st(RegisterKind16::Hl, n)
-            },
+            }
+            HlIndGetsN(n) => self.indirect_st(RegisterKind16::Hl, n),
             AGetsBcInd => {
                 let (n, _) = self.indirect_ld(RegisterKind16::Bc);
                 self.registers.write8n(RegisterKind8::A, n);
-            },
+            }
             AGetsDeInd => {
                 let (n, _) = self.indirect_ld(RegisterKind16::De);
                 self.registers.write8n(RegisterKind8::A, n);
-            },
+            }
             AGetsNnInd(nn) => {
                 let n = self.memory.ld8(nn);
                 self.registers.write8n(RegisterKind8::A, n);
-            },
+            }
             BcIndGetsA => {
                 let n = self.registers.a;
                 self.indirect_st(RegisterKind16::Bc, n.0)
-            },
+            }
             DeIndGetsA => {
                 let n = self.registers.a;
                 self.indirect_st(RegisterKind16::De, n.0)
-            },
+            }
             NnIndGetsA(nn) => {
                 let n = self.registers.a;
                 self.memory.st8(nn, n.0);
-            },
+            }
             AGetsIOOffset(offset) => {
                 let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
                 let n = self.memory.ld8(addr);
                 self.registers.write8n(RegisterKind8::A, n)
-            },
+            }
             IOOffsetGetsA(offset) => {
                 let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
                 let n = self.registers.read8(RegisterKind8::A);
                 self.memory.st8(addr, n.0);
-            },
+            }
             AGetsIOOffsetByC => {
                 let offset = self.registers.c();
                 let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
                 let n = self.memory.ld8(addr);
                 self.registers.write8n(RegisterKind8::A, n)
-            },
+            }
             IOOffsetByCGetsA => {
                 let offset = self.registers.c();
                 let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
                 let n = self.registers.read8(RegisterKind8::A);
                 self.memory.st8(addr, n.0);
-            },
+            }
             HlIndGetsAInc => {
                 let n = self.registers.read8(RegisterKind8::A);
                 self.indirect_st(RegisterKind16::Hl, n.0);
                 self.registers.hl.inc()
-            },
+            }
             AGetsHlIndInc => {
                 let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(RegisterKind8::A, n);
                 self.registers.hl.inc()
-            },
+            }
             HlIndGetsADec => {
                 let (n, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.registers.write8n(RegisterKind8::A, n);
                 self.registers.hl.dec()
-            },
+            }
             AGetsHlIndDec => {
-              let n = self.registers.read8(RegisterKind8::A);
-              self.indirect_st(RegisterKind16::Hl, n.0);
-              self.registers.hl.dec()
-            },
+                let n = self.registers.read8(RegisterKind8::A);
+                self.indirect_st(RegisterKind16::Hl, n.0);
+                self.registers.hl.dec()
+            }
             SpGetsAddr(addr) => {
-              self.registers.sp = addr.into_register();
-            },
+                self.registers.sp = addr.into_register();
+            }
             HlGetsAddr(addr) => {
-              self.registers.hl = addr.into_register();
-            },
+                self.registers.hl = addr.into_register();
+            }
             DeGetsAddr(addr) => {
-              self.registers.hl = addr.into_register();
-            },
+                self.registers.hl = addr.into_register();
+            }
         };
         BranchAction::Take
     }
 
     fn execute_alu_binop<F>(&mut self, f: F, operand: u8) -> u8
-         where F: FnOnce(&mut Flags, u8, u8) -> u8 {
-             let old_a = self.registers.a.0;
-             let result = f(&mut self.registers.flags,
-                            old_a,
-                            operand);
-             self.registers.write8n(RegisterKind8::A, result);
-             result
+    where
+        F: FnOnce(&mut Flags, u8, u8) -> u8,
+    {
+        let old_a = self.registers.a.0;
+        let result = f(&mut self.registers.flags, old_a, operand);
+        self.registers.write8n(RegisterKind8::A, result);
+        result
     }
 
     fn execute_arith(&mut self, arith: Arith) -> BranchAction {
@@ -150,53 +149,53 @@ impl Cpu {
             Xor(r) => {
                 let operand = self.registers.read8(r).0;
                 self.execute_alu_binop(alu::xor, operand);
-            },
+            }
             XorHlInd => {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::xor, operand);
-            },
+            }
             Sub(r) => {
                 let operand = self.registers.read8(r).0;
                 self.execute_alu_binop(alu::sub, operand);
-            },
+            }
             SubHlInd => {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::sub, operand);
-            },
+            }
             AddH1Ind => {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::add, operand);
-            },
+            }
             Inc8(r) => {
                 let operand = self.registers.read8(r);
                 let result = alu::inc(&mut self.registers.flags, operand.0);
                 self.registers.write8n(r, result);
-            },
+            }
             Inc16(r16) => {
                 let operand = self.registers.read16(r16);
                 let result = alu::inc16(&mut self.registers.flags, operand.0);
                 self.registers.write16n(r16, result);
-            },
+            }
             IncHlInd => {
                 let (operand, addr) = self.indirect_ld(RegisterKind16::Hl);
                 let result = alu::inc(&mut self.registers.flags, operand);
                 self.memory.st8(addr, result);
-            },
+            }
             Dec8(r) => {
                 let operand = self.registers.read8(r);
                 let result = alu::dec(&mut self.registers.flags, operand.0);
                 self.registers.write8n(r, result);
-            },
+            }
             Dec16(r16) => {
                 let operand = self.registers.read16(r16);
                 let result = alu::dec16(&mut self.registers.flags, operand.0);
                 self.registers.write16n(r16, result);
-            },
+            }
             DecHlInd => {
                 let (operand, addr) = self.indirect_ld(RegisterKind16::Hl);
                 let result = alu::dec(&mut self.registers.flags, operand);
                 self.memory.st8(addr, result);
-            },
+            }
         };
         BranchAction::Take
     }
@@ -209,7 +208,7 @@ impl Cpu {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rl(&mut self.registers.flags, n.0);
                 self.registers.write8n(RegisterKind8::A, result);
-            },
+            }
             Rl(r) => {
                 let n = self.registers.read8(r);
                 let result = alu::rl(&mut self.registers.flags, n.0);
@@ -235,7 +234,6 @@ impl Cpu {
         self.push(n.hi());
     }
 
-
     fn execute_jump(&mut self, jump: Jump) -> BranchAction {
         use self::Jump::*;
 
@@ -243,7 +241,7 @@ impl Cpu {
             Jr(offset) => {
                 self.ip.offset_by(offset);
                 BranchAction::Take
-            },
+            }
             JrNz(offset) => {
                 if !self.registers.flags.z {
                     self.ip.offset_by(offset);
@@ -251,7 +249,7 @@ impl Cpu {
                 } else {
                     BranchAction::Skip
                 }
-            },
+            }
             JrZ(offset) => {
                 if self.registers.flags.z {
                     self.ip.offset_by(offset);
@@ -273,44 +271,44 @@ impl Cpu {
         use self::Instr::*;
 
         match instr {
-          Ld(ld) => self.execute_ld(ld),
-          Arith(arith) => self.execute_arith(arith),
-          Rotate(rotate) => self.execute_rotate(rotate),
-          Jump(jump) => self.execute_jump(jump),
-          Bit7h => {
-            let x = self.registers.read8(RegisterKind8::H);
-            alu::bit(&mut self.registers.flags, x.0, 7);
-            BranchAction::Take
-          },
-          CpHlInd => {
-            let x = self.registers.read8(RegisterKind8::A);
-            let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
-            let _ = alu::sub(&mut self.registers.flags, x.0, operand);
-            BranchAction::Take
-          },
-          Cp(n) => {
-            let x = self.registers.read8(RegisterKind8::A);
-            let _ = alu::sub(&mut self.registers.flags, x.0, n);
-            BranchAction::Take
-          },
-          PopBc => {
-            // TODO: Are we pushing and popping the stack in the right order
-            let x0 = self.pop();
-            let x1 = self.pop();
-            self.registers.bc = x0.concat(x1);
-            BranchAction::Take
-          },
-          PushBc => {
-            let bc = self.registers.bc;
-            self.push16(bc);
-            BranchAction::Take
-          },
-          Ret => {
-            let x0 = self.pop();
-            let x1 = self.pop();
-            self.ip.jump(Addr::directly(x0.concat(x1).0));
-            BranchAction::Take
-          }
+            Ld(ld) => self.execute_ld(ld),
+            Arith(arith) => self.execute_arith(arith),
+            Rotate(rotate) => self.execute_rotate(rotate),
+            Jump(jump) => self.execute_jump(jump),
+            Bit7h => {
+                let x = self.registers.read8(RegisterKind8::H);
+                alu::bit(&mut self.registers.flags, x.0, 7);
+                BranchAction::Take
+            }
+            CpHlInd => {
+                let x = self.registers.read8(RegisterKind8::A);
+                let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
+                let _ = alu::sub(&mut self.registers.flags, x.0, operand);
+                BranchAction::Take
+            }
+            Cp(n) => {
+                let x = self.registers.read8(RegisterKind8::A);
+                let _ = alu::sub(&mut self.registers.flags, x.0, n);
+                BranchAction::Take
+            }
+            PopBc => {
+                // TODO: Are we pushing and popping the stack in the right order
+                let x0 = self.pop();
+                let x1 = self.pop();
+                self.registers.bc = x0.concat(x1);
+                BranchAction::Take
+            }
+            PushBc => {
+                let bc = self.registers.bc;
+                self.push16(bc);
+                BranchAction::Take
+            }
+            Ret => {
+                let x0 = self.pop();
+                let x1 = self.pop();
+                self.ip.jump(Addr::directly(x0.concat(x1).0));
+                BranchAction::Take
+            }
         }
     }
 
@@ -318,7 +316,7 @@ impl Cpu {
     // we pretend is div 4 since all instrs are multiple of 4
     // 1.04858 MHz
     // 1048.58 ticks per millisecond
-    pub fn run(&mut self, dt : f64) {
+    pub fn run(&mut self, dt: f64) {
         let mut clocks_to_tick = (dt * 1048.58) as u32;
 
         let mut instr = self.ip.peek(&self.memory);
@@ -326,14 +324,11 @@ impl Cpu {
 
         // TODO: Is this off-by-one frame?
         while clocks_to_tick > take_duration {
-            let action = {
-                self.execute(instr)
+            let action = { self.execute(instr) };
+            let duration = match action {
+                BranchAction::Take => take_duration,
+                BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
             };
-            let duration =
-                match action {
-                    BranchAction::Take => take_duration,
-                    BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration)
-                };
             clocks_to_tick -= duration;
 
             let _ = self.ip.read(&self.memory);
@@ -344,5 +339,3 @@ impl Cpu {
         }
     }
 }
-
-

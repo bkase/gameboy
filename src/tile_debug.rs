@@ -1,13 +1,13 @@
-use wasm_bindgen::{JsCast, Clamped};
+use wasm_bindgen::{Clamped, JsCast};
 
 use packed_struct::prelude::*;
 
-use web_utils::*;
 use ppu;
+use web_utils::*;
 
 // 8x2 -> 2x8
 //
-// 
+//
 fn bit_transpose(x: u8, y: u8) -> [u8; 8] {
     let p0 = ((x & (1 << 7)) >> 6) | ((y & (1 << 7)) >> 7);
     let p1 = ((x & (1 << 6)) >> 5) | ((y & (1 << 6)) >> 6);
@@ -17,24 +17,25 @@ fn bit_transpose(x: u8, y: u8) -> [u8; 8] {
     let p5 = ((x & (1 << 2)) >> 1) | ((y & (1 << 2)) >> 2);
     let p6 = ((x & (1 << 1)) >> 0) | ((y & (1 << 1)) >> 1);
     let p7 = ((x & (1 << 0)) << 1) | ((y & (1 << 0)) >> 0);
-    log(&format!("p0 {}, p1 {}, p2 {}, p3 {}, p4 {}, p5 {}, p6 {}, p7 {}", p0, p1, p2, p3, p4, p5, p6, p7));
-    [p0, p1, p2, p3,
-     p4, p5, p6, p7]
+    log(&format!(
+        "p0 {}, p1 {}, p2 {}, p3 {}, p4 {}, p5 {}, p6 {}, p7 {}",
+        p0, p1, p2, p3, p4, p5, p6, p7
+    ));
+    [p0, p1, p2, p3, p4, p5, p6, p7]
 }
 
 #[derive(PackedStruct, Debug)]
-#[packed_struct(size_bytes="1", bit_numbering="lsb0")]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Pixels {
-    #[packed_field(bits="0:1")]
+    #[packed_field(bits = "0:1")]
     pub p4: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="2:3")]
+    #[packed_field(bits = "2:3")]
     pub p3: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="4:5")]
+    #[packed_field(bits = "4:5")]
     pub p2: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="6:7")]
+    #[packed_field(bits = "6:7")]
     pub p1: Integer<u8, packed_bits::Bits2>,
 }
-
 
 fn draw_tiles(data: &mut Vec<u8>, width: u32, pallette: ppu::Palette, tiles: Vec<[u8; 16]>) {
     // TODO: figure out iterators
@@ -50,30 +51,26 @@ fn draw_tiles(data: &mut Vec<u8>, width: u32, pallette: ppu::Palette, tiles: Vec
         out
     }
 
-    let pixel_lut: [(u8, u8, u8); 4] =
-        [ (0, 0, 0)
-        , (220, 176, 181)
-        , (98, 78, 81)
-        , (255, 255, 255) ];
+    let pixel_lut: [(u8, u8, u8); 4] = [(0, 0, 0), (220, 176, 181), (98, 78, 81), (255, 255, 255)];
 
     let mut row = 0;
     let mut col = 0;
     for tile in tiles {
         for pixel in pixels(tile) {
-            let idx : u8 =
-                match pixel {
-                    0b00 => pallette.dot00,
-                    0b01 => pallette.dot01,
-                    0b10 => pallette.dot10,
-                    0b11 => pallette.dot11,
-                        _ => panic!("unexpected")
-                }.into();
+            let idx: u8 = match pixel {
+                0b00 => pallette.dot00,
+                0b01 => pallette.dot01,
+                0b10 => pallette.dot10,
+                0b11 => pallette.dot11,
+                _ => panic!("unexpected"),
+            }
+            .into();
             let (r, g, b) = pixel_lut[idx as usize];
-            let i = (row*width*4 + col*4) as usize;
-            data[i+0] = r;
-            data[i+1] = g;
-            data[i+2] = b;
-            data[i+3] = 255;
+            let i = (row * width * 4 + col * 4) as usize;
+            data[i + 0] = r;
+            data[i + 1] = g;
+            data[i + 2] = b;
+            data[i + 3] = 255;
             // update
             log(&format!("Drawing {} at row:{}, col: {}", idx, row, col));
             col += 1;
@@ -102,9 +99,9 @@ pub fn draw_tile_debug() {
     let tiles_height = tiles_canvas.height() as u32;
 
     let mut data_ = Vec::new();
-    for _ in 0 .. tiles_height {
-        for _ in 0 .. tiles_width {
-            for _ in 0 .. 4 {
+    for _ in 0..tiles_height {
+        for _ in 0..tiles_width {
+            for _ in 0..4 {
                 data_.push(128);
             }
         }
@@ -146,15 +143,27 @@ pub fn draw_tile_debug() {
         ret
     }*/
 
-    let sample_tile =
-        vec![[0x02, 0xFF, 0x73, 0x8c, 0x65, 0x9a, 0x48, 0xb6, 0x12, 0xec, 0x26, 0xd8, 0xce, 0xb0, 0x60, 0x80]];
+    let sample_tile = vec![[
+        0x02, 0xFF, 0x73, 0x8c, 0x65, 0x9a, 0x48, 0xb6, 0x12, 0xec, 0x26, 0xd8, 0xce, 0xb0, 0x60,
+        0x80,
+    ]];
 
     /*let pokemon_house =
-        vec![[0xFF, 0x00, 0x7E, 0xFF, 0x85, 0x81, 0x89, 0x83, 0x93, 0x85, 0xA5, 0x8B, 0xC9, 0x97, 0x7E, 0xFF]];*/
+    vec![[0xFF, 0x00, 0x7E, 0xFF, 0x85, 0x81, 0x89, 0x83, 0x93, 0x85, 0xA5, 0x8B, 0xC9, 0x97, 0x7E, 0xFF]];*/
 
-    draw_tiles(&mut data_, tiles_width as u32, ppu::Palette::create(), sample_tile);
-    let imgdata_ = web_sys::ImageData::new_with_u8_clamped_array_and_sh(Clamped(&mut data_), tiles_width, tiles_height).expect("u8 clamped array");
-    tiles_ctx.put_image_data(&imgdata_, 0.0, 0.0).expect("put_image_data");
+    draw_tiles(
+        &mut data_,
+        tiles_width as u32,
+        ppu::Palette::create(),
+        sample_tile,
+    );
+    let imgdata_ = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+        Clamped(&mut data_),
+        tiles_width,
+        tiles_height,
+    )
+    .expect("u8 clamped array");
+    tiles_ctx
+        .put_image_data(&imgdata_, 0.0, 0.0)
+        .expect("put_image_data");
 }
-
-

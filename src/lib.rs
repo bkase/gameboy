@@ -2,40 +2,41 @@ extern crate console_error_panic_hook;
 extern crate wasm_bindgen;
 
 extern crate packed_struct;
-#[macro_use] extern crate packed_struct_codegen;
+#[macro_use]
+extern crate packed_struct_codegen;
 
 #[cfg(test)]
 pub mod test {
     pub extern crate proptest;
 }
 
-mod register_kind;
-mod instr;
-mod register;
-mod ppu;
 mod alu;
 mod cpu;
+mod instr;
 mod mem;
-mod utils;
+mod ppu;
+mod register;
+mod register_kind;
 mod tile_debug;
+mod utils;
 mod web_utils;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::{JsCast, Clamped};
+use wasm_bindgen::{Clamped, JsCast};
 
 use web_utils::*;
 
 fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
     for row in 0..height {
         for col in 0..width {
-            let idx : usize = (row*width*4 + col*4) as usize;
-            data[idx+0] = (i + row + col) as u8;
-            data[idx+1] = (i + row + col) as u8;
-            data[idx+2] = (i + row + col) as u8;
-            data[idx+3] = 255;
+            let idx: usize = (row * width * 4 + col * 4) as usize;
+            data[idx + 0] = (i + row + col) as u8;
+            data[idx + 1] = (i + row + col) as u8;
+            data[idx + 2] = (i + row + col) as u8;
+            data[idx + 3] = 255;
         }
     }
 }
@@ -70,7 +71,7 @@ pub fn run() -> Result<(), JsValue> {
     let g = f.clone();
 
     let mut i = 0;
-    let mut data = vec![0; (height*width*4) as usize];
+    let mut data = vec![0; (height * width * 4) as usize];
 
     let mut last = performance_now();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
@@ -82,7 +83,6 @@ pub fn run() -> Result<(), JsValue> {
             return;
         }
 
-
         // Measure time delta
         let now = performance_now();
         let diff = now - last;
@@ -91,12 +91,15 @@ pub fn run() -> Result<(), JsValue> {
         draw_frame(&mut data, width, height, i);
 
         // Blit bytes
-        let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(Clamped(&mut data), width, height).expect("u8 clamped array");
+        let data =
+            web_sys::ImageData::new_with_u8_clamped_array_and_sh(Clamped(&mut data), width, height)
+                .expect("u8 clamped array");
         ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
 
         // Show fps
         ctx.set_font("bold 12px Monaco");
-        ctx.fill_text(&format!("FPS {}", (1000.0 / diff).ceil()), 10.0, 50.0).expect("fill_text");
+        ctx.fill_text(&format!("FPS {}", (1000.0 / diff).ceil()), 10.0, 50.0)
+            .expect("fill_text");
 
         // Increment once per call
         i += 1;
@@ -108,4 +111,3 @@ pub fn run() -> Result<(), JsValue> {
     request_animation_frame(g.borrow().as_ref().unwrap());
     Ok(())
 }
-

@@ -2,30 +2,35 @@ use register::Flags;
 
 mod bits {
     pub fn num(b: bool) -> u8 {
-        if b { 1 } else { 0 }
+        if b {
+            1
+        } else {
+            0
+        }
     }
 
     pub fn bits(x: u8) -> [bool; 8] {
-        [ x & 0x01 == 0x01,
-          x & 0x02 == 0x02,
-          x & 0x04 == 0x04,
-          x & 0x08 == 0x08,
-          x & 0x10 == 0x10,
-          x & 0x20 == 0x20,
-          x & 0x40 == 0x40,
-          x & 0x80 == 0x80,
+        [
+            x & 0x01 == 0x01,
+            x & 0x02 == 0x02,
+            x & 0x04 == 0x04,
+            x & 0x08 == 0x08,
+            x & 0x10 == 0x10,
+            x & 0x20 == 0x20,
+            x & 0x40 == 0x40,
+            x & 0x80 == 0x80,
         ]
     }
 
     pub fn unbits(b: [bool; 8]) -> u8 {
-        num(b[7]) * 0x80 +
-        num(b[6]) * 0x40 +
-        num(b[5]) * 0x20 +
-        num(b[4]) * 0x10 +
-        num(b[3]) * 0x08 +
-        num(b[2]) * 0x04 +
-        num(b[1]) * 0x02 +
-        num(b[0]) * 0x01
+        num(b[7]) * 0x80
+            + num(b[6]) * 0x40
+            + num(b[5]) * 0x20
+            + num(b[4]) * 0x10
+            + num(b[3]) * 0x08
+            + num(b[2]) * 0x04
+            + num(b[1]) * 0x02
+            + num(b[0]) * 0x01
     }
 }
 
@@ -42,18 +47,19 @@ mod bits {
 */
 // returns result, was there a borrow at 4, and was there a borrow at the end
 fn sub_(left: u8, right: u8) -> (u8, bool, bool) {
-    use self::bits::{num, bits, unbits};
+    use self::bits::{bits, num, unbits};
 
     fn lookup(b: bool, i1: bool, i2: bool) -> (bool, bool) {
-        let lut =
-         [ (false, false)
-         , (true, true)
-         , (true, false)
-         , (false, false)
-         , (true, true)
-         , (false, true)
-         , (false, false)
-         , (true, true) ];
+        let lut = [
+            (false, false),
+            (true, true),
+            (true, false),
+            (false, false),
+            (true, true),
+            (false, true),
+            (false, false),
+            (true, true),
+        ];
         let idx = num(b) * 4 + num(i1) * 2 + num(i2);
         lut[idx as usize]
     }
@@ -64,14 +70,14 @@ fn sub_(left: u8, right: u8) -> (u8, bool, bool) {
     let mut borrow_at_4 = false;
     let mut result = [true, true, true, true, true, true, true, true];
 
-    for i in 0 .. 8 {
+    for i in 0..8 {
         let (o, bo) = lookup(borrow, bits_left[i], bits_right[i]);
         borrow = bo;
         if i == 3 {
             borrow_at_4 = bo;
         };
         result[i] = o;
-    };
+    }
 
     (unbits(result), borrow_at_4, borrow)
 }
@@ -98,18 +104,19 @@ pub fn sub(flags: &mut Flags, left: u8, right: u8) -> u8 {
 */
 // returns result, was there a carry at 3, and was there a carry at the end
 fn add_(left: u8, right: u8) -> (u8, bool, bool) {
-    use self::bits::{num, bits, unbits};
+    use self::bits::{bits, num, unbits};
 
     fn lookup(c: bool, i1: bool, i2: bool) -> (bool, bool) {
-        let lut =
-         [ (false, false)
-         , (true, false)
-         , (true, false)
-         , (false, true)
-         , (true, false)
-         , (false, true)
-         , (false, true)
-         , (true, true) ];
+        let lut = [
+            (false, false),
+            (true, false),
+            (true, false),
+            (false, true),
+            (true, false),
+            (false, true),
+            (false, true),
+            (true, true),
+        ];
         let idx = num(c) * 4 + num(i1) * 2 + num(i2);
         lut[idx as usize]
     }
@@ -120,7 +127,7 @@ fn add_(left: u8, right: u8) -> (u8, bool, bool) {
     let mut carry_at_3 = false;
     let mut result = [true, true, true, true, true, true, true, true];
 
-    for i in 0 .. 8 {
+    for i in 0..8 {
         let (o, co) = lookup(carry, bits_left[i], bits_right[i]);
         println!("Out {}, co {} at {}", o, co, i);
         carry = co;
@@ -128,7 +135,7 @@ fn add_(left: u8, right: u8) -> (u8, bool, bool) {
             carry_at_3 = co;
         };
         result[i] = o;
-    };
+    }
 
     (unbits(result), carry_at_3, carry)
 }
@@ -237,5 +244,3 @@ mod tests {
         }
     }
 }
-
-

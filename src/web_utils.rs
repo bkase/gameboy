@@ -27,5 +27,3 @@ pub fn document() -> web_sys::Document {
         .document()
         .expect("should have a document on window")
 }
-
-

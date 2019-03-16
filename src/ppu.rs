@@ -1,11 +1,11 @@
-use packed_struct::prelude::*;
 use mem::{Addr, Direction};
+use packed_struct::prelude::*;
 
 pub trait ReadViewU8 {
     fn read(&self) -> u8;
 }
 
-pub trait ViewU8 : ReadViewU8 {
+pub trait ViewU8: ReadViewU8 {
     fn set(&mut self, n: u8);
 }
 
@@ -21,20 +21,25 @@ impl ViewU8 for u8 {
 }
 
 #[derive(PackedStruct)]
-#[packed_struct(size_bytes="1", bit_numbering="lsb0")]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Palette {
-    #[packed_field(bits="0:1")]
+    #[packed_field(bits = "0:1")]
     pub dot00: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="2:3")]
+    #[packed_field(bits = "2:3")]
     pub dot01: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="4:5")]
+    #[packed_field(bits = "4:5")]
     pub dot10: Integer<u8, packed_bits::Bits2>,
-    #[packed_field(bits="6:7")]
+    #[packed_field(bits = "6:7")]
     pub dot11: Integer<u8, packed_bits::Bits2>,
 }
 impl Palette {
     pub fn create() -> Palette {
-        Palette { dot00: 0.into(), dot01: 0b01.into(), dot10: 0b10.into(), dot11: 0b11.into() }
+        Palette {
+            dot00: 0.into(),
+            dot01: 0b01.into(),
+            dot10: 0b10.into(),
+            dot11: 0b11.into(),
+        }
     }
 }
 impl ReadViewU8 for Palette {
@@ -83,23 +88,23 @@ impl BgWindowTileData {
 }
 
 #[derive(PackedStruct)]
-#[packed_struct(size_bytes="1", bit_numbering="lsb0")]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Lcdc {
-    #[packed_field(bits="0")]
+    #[packed_field(bits = "0")]
     bg_and_window_display: bool,
-    #[packed_field(bits="1")]
+    #[packed_field(bits = "1")]
     obj_display: bool,
-    #[packed_field(bits="2", ty="enum")]
+    #[packed_field(bits = "2", ty = "enum")]
     obj_size: ObjSize,
-    #[packed_field(bits="3", ty="enum")]
+    #[packed_field(bits = "3", ty = "enum")]
     bg_tile_map_display: TileMapDisplay,
-    #[packed_field(bits="4", ty="enum")]
+    #[packed_field(bits = "4", ty = "enum")]
     bg_window_tile_data: BgWindowTileData,
-    #[packed_field(bits="5")]
+    #[packed_field(bits = "5")]
     window_display: bool,
-    #[packed_field(bits="6", ty="enum")]
+    #[packed_field(bits = "6", ty = "enum")]
     window_tile_map_data: TileMapDisplay,
-    #[packed_field(bits="7")]
+    #[packed_field(bits = "7")]
     lcd_control_operation: bool,
 }
 // 0x91
@@ -138,7 +143,6 @@ impl PpuRegisters {
             bgp: Palette::create(),
         }
     }
-
 }
 
 use std::collections::VecDeque;
@@ -146,25 +150,25 @@ use std::collections::VecDeque;
 #[derive(Copy, Clone, Debug)]
 pub enum PixelSource {
     Bg,
-    Sprite(u8)
+    Sprite(u8),
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Pixel {
-    value : Integer<u8, packed_bits::Bits2>,
-    source : PixelSource
+    value: Integer<u8, packed_bits::Bits2>,
+    source: PixelSource,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Position {
-    row : u8,
-    col : u8
+    row: u8,
+    col: u8,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Draw {
     pixel: Pixel,
-    position: Position
+    position: Position,
 }
 
 /*
@@ -201,7 +205,6 @@ enum PixelFetcherMode {
     Sleep,
 }*/
 
-
 /*
  *
  *  TileMap Data (256 tiles total)
@@ -227,13 +230,12 @@ enum PixelFetcherMode {
  *  ------------------------------
  */
 
-
 /*struct PixelFetcher<'a> {
     memory: &'a Memory,
 
     // increments each round of the pixel fetching
     tile_map_col: u16,
-    tile_map_row: 
+    tile_map_row:
 
     // increments each step
     mode: PixelFetcherMode
@@ -294,11 +296,11 @@ impl Ppu {
 #[cfg(test)]
 mod test {
     use ppu::*;
-  #[test]
-  fn i_understand_lsb() {
-    let bgp = Palette::create();
-    let x = bgp.pack()[0];
-    assert_eq!(x, 0b11100100 as u8)
-  }
+    #[test]
+    fn i_understand_lsb() {
+        let bgp = Palette::create();
+        let x = bgp.pack()[0];
+        assert_eq!(x, 0b11100100 as u8)
+    }
 
 }

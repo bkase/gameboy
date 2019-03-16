@@ -1,4 +1,4 @@
-use register_kind::{RegisterKind8, RegisterKind16};
+use register_kind::{RegisterKind16, RegisterKind8};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct R16(pub u16);
@@ -26,18 +26,18 @@ impl R16 {
 }
 
 impl R8 {
-    pub fn concat(self, lo : R8) -> R16 {
+    pub fn concat(self, lo: R8) -> R16 {
         R16(((self.0 as u16) << 8) | lo.0 as u16)
     }
 
     pub fn inc(&mut self) {
         let old = self.0;
-        (*self).0 = old +& 1;
+        (*self).0 = old + &1;
     }
 
     pub fn dec(&mut self) {
         let old = self.0;
-        (*self).0 = old -& 1;
+        (*self).0 = old - &1;
     }
 }
 
@@ -88,12 +88,12 @@ impl Flags {
 }
 
 pub struct Registers {
-    pub bc : R16,
-    pub de : R16,
-    pub hl : R16,
-    pub a : R8, // acc
-    pub sp : R16, // stack pointer
-    pub flags : Flags,
+    pub bc: R16,
+    pub de: R16,
+    pub hl: R16,
+    pub a: R8,   // acc
+    pub sp: R16, // stack pointer
+    pub flags: Flags,
 }
 
 // accessors for registers and flags
@@ -105,24 +105,53 @@ impl Registers {
             hl: R16(0x0000),
             a: R8(0x0000),
             sp: R16(0x0000),
-            flags: Flags{ z: false, n: false, h: false, c: false },
+            flags: Flags {
+                z: false,
+                n: false,
+                h: false,
+                c: false,
+            },
         }
     }
 
-    pub fn b(&self) -> R8 { self.bc.hi() }
-    pub fn c(&self) -> R8 { self.bc.lo() }
-    pub fn set_b(&mut self, n: R8) { self.bc.set_hi(n); }
-    pub fn set_c(&mut self, n: R8) { self.bc.set_lo(n) }
+    pub fn b(&self) -> R8 {
+        self.bc.hi()
+    }
+    pub fn c(&self) -> R8 {
+        self.bc.lo()
+    }
+    pub fn set_b(&mut self, n: R8) {
+        self.bc.set_hi(n);
+    }
+    pub fn set_c(&mut self, n: R8) {
+        self.bc.set_lo(n)
+    }
 
-    pub fn d(&self) -> R8 { self.de.hi() }
-    pub fn e(&self) -> R8 { self.de.lo() }
-    pub fn set_d(&mut self, n: R8) { self.de.set_hi(n); }
-    pub fn set_e(&mut self, n: R8) { self.de.set_lo(n) }
+    pub fn d(&self) -> R8 {
+        self.de.hi()
+    }
+    pub fn e(&self) -> R8 {
+        self.de.lo()
+    }
+    pub fn set_d(&mut self, n: R8) {
+        self.de.set_hi(n);
+    }
+    pub fn set_e(&mut self, n: R8) {
+        self.de.set_lo(n)
+    }
 
-    pub fn h(&self) -> R8 { self.hl.hi() }
-    pub fn l(&self) -> R8 { self.hl.lo() }
-    pub fn set_h(&mut self, n: R8) { self.hl.set_hi(n); }
-    pub fn set_l(&mut self, n: R8) { self.hl.set_lo(n) }
+    pub fn h(&self) -> R8 {
+        self.hl.hi()
+    }
+    pub fn l(&self) -> R8 {
+        self.hl.lo()
+    }
+    pub fn set_h(&mut self, n: R8) {
+        self.hl.set_hi(n);
+    }
+    pub fn set_l(&mut self, n: R8) {
+        self.hl.set_lo(n)
+    }
 
     pub fn read8(&self, kind: RegisterKind8) -> R8 {
         match kind {
