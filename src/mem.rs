@@ -83,8 +83,8 @@ impl Addr {
 impl Addr {
     pub fn offset(&self, by: u16, direction: Direction) -> Addr {
         let new_val = match direction {
-            Direction::Pos => self.0 + by,
-            Direction::Neg => self.0 - by,
+            Direction::Pos => self.0.wrapping_add(by),
+            Direction::Neg => self.0.wrapping_sub(by),
         };
         Addr(new_val)
     }
