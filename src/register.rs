@@ -32,12 +32,12 @@ impl R8 {
 
     pub fn inc(&mut self) {
         let old = self.0;
-        (*self).0 = old + &1;
+        (*self).0 = old.wrapping_add(1);
     }
 
     pub fn dec(&mut self) {
         let old = self.0;
-        (*self).0 = old - &1;
+        (*self).0 = old.wrapping_sub(1);
     }
 }
 
@@ -103,7 +103,7 @@ impl Registers {
             bc: R16(0x0000),
             de: R16(0x0000),
             hl: R16(0x0000),
-            a: R8(0x0000),
+            a: R8(0x00),
             sp: R16(0x0000),
             flags: Flags {
                 z: false,
