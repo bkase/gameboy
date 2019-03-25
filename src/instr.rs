@@ -54,8 +54,8 @@ pub trait HasDuration {
 
 #[derive(Debug, Clone)]
 pub enum Ld {
-    RGetsR(RegisterKind8, RegisterKind8),
     RGetsN(RegisterKind8, u8),
+    RGetsR(RegisterKind8, RegisterKind8),
     RGetsHlInd(RegisterKind8),
     HlIndGetsR(RegisterKind8),
     HlIndGetsN(u8),
