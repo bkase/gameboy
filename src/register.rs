@@ -57,7 +57,7 @@ impl R16 {
 
 #[cfg(test)]
 mod r_tests {
-    use register::{R16, R8};
+    use register::R16;
     use test::proptest::prelude::*;
 
     proptest! {
