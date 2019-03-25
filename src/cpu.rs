@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use alu;
 use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, Rotate};
 use mem::{Addr, Direction, Memory};
@@ -78,24 +80,24 @@ impl Cpu {
                 self.memory.st8(nn, n.0);
             }
             AGetsIOOffset(offset) => {
-                let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
+                let addr = Addr::io_memory().offset(u16::from(offset), Direction::Pos);
                 let n = self.memory.ld8(addr);
                 self.registers.write8n(RegisterKind8::A, n)
             }
             IOOffsetGetsA(offset) => {
-                let addr = Addr::io_memory().offset(offset as u16, Direction::Pos);
+                let addr = Addr::io_memory().offset(u16::from(offset), Direction::Pos);
                 let n = self.registers.read8(RegisterKind8::A);
                 self.memory.st8(addr, n.0);
             }
             AGetsIOOffsetByC => {
                 let offset = self.registers.c();
-                let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
+                let addr = Addr::io_memory().offset(u16::from(offset.0), Direction::Pos);
                 let n = self.memory.ld8(addr);
                 self.registers.write8n(RegisterKind8::A, n)
             }
             IOOffsetByCGetsA => {
                 let offset = self.registers.c();
-                let addr = Addr::io_memory().offset(offset.0 as u16, Direction::Pos);
+                let addr = Addr::io_memory().offset(u16::from(offset.0), Direction::Pos);
                 let n = self.registers.read8(RegisterKind8::A);
                 self.memory.st8(addr, n.0);
             }

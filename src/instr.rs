@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use mem::{Addr, Direction, Memory};
 use register_kind::{RegisterKind16, RegisterKind8};
 use std::error::Error;
@@ -242,7 +244,7 @@ impl InstrPointer {
         let (offset, direction) = if n > 0 {
             (n as u16, Direction::Pos)
         } else {
-            ((n * (-1)) as u16, Direction::Neg)
+            ((-n) as u16, Direction::Neg)
         };
 
         let new_val = self.0.offset(offset, direction);

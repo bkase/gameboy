@@ -30,7 +30,7 @@ mod bits {
             + num(b[3]) * 0x08
             + num(b[2]) * 0x04
             + num(b[1]) * 0x02
-            + num(b[0]) * 0x01
+            + num(b[0])
     }
 }
 
@@ -172,11 +172,11 @@ pub fn dec(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
-pub fn inc16(flags: &mut Flags, x: u16) -> u16 {
+pub fn inc16(_flags: &mut Flags, x: u16) -> u16 {
     x.wrapping_add(1)
 }
 
-pub fn dec16(flags: &mut Flags, x: u16) -> u16 {
+pub fn dec16(_flags: &mut Flags, x: u16) -> u16 {
     x.wrapping_sub(1)
 }
 

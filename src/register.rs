@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use register_kind::{RegisterKind16, RegisterKind8};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -6,11 +8,11 @@ pub struct R16(pub u16);
 pub struct R8(pub u8);
 
 impl R16 {
-    pub fn hi(&self) -> R8 {
+    pub fn hi(self) -> R8 {
         R8(((self.0 & 0xff00) >> 8) as u8)
     }
 
-    pub fn lo(&self) -> R8 {
+    pub fn lo(self) -> R8 {
         R8((self.0 & 0x00ff) as u8)
     }
 
@@ -27,7 +29,7 @@ impl R16 {
 
 impl R8 {
     pub fn concat(self, lo: R8) -> R16 {
-        R16(((self.0 as u16) << 8) | lo.0 as u16)
+        R16((u16::from(self.0) << 8) | u16::from(lo.0))
     }
 
     pub fn inc(&mut self) {

@@ -1,4 +1,6 @@
-use mem::{Addr, Direction};
+#![allow(dead_code)]
+
+use mem::Addr;
 use packed_struct::prelude::*;
 
 pub trait ReadViewU8 {
@@ -65,10 +67,10 @@ pub enum TileMapDisplay {
     _9c00_9fff = 1,
 }
 impl TileMapDisplay {
-    pub fn base_addr(&self) -> Addr {
+    pub fn base_addr(self) -> Addr {
         match self {
-            _9800_9bff => Addr::directly(0x9800),
-            _9c00_9fff => Addr::directly(0x9c00),
+            TileMapDisplay::_9800_9bff => Addr::directly(0x9800),
+            TileMapDisplay::_9c00_9fff => Addr::directly(0x9c00),
         }
     }
 }
@@ -79,10 +81,10 @@ pub enum BgWindowTileData {
     _8000_8fff = 1, // same area as OBJ
 }
 impl BgWindowTileData {
-    pub fn base_addr(&self) -> Addr {
+    pub fn base_addr(self) -> Addr {
         match self {
-            _8800_97ff => Addr::directly(0x8800),
-            _8000_8fff => Addr::directly(0x8000),
+            BgWindowTileData::_8800_97ff => Addr::directly(0x8800),
+            BgWindowTileData::_8000_8fff => Addr::directly(0x8000),
         }
     }
 }
@@ -144,8 +146,6 @@ impl PpuRegisters {
         }
     }
 }
-
-use std::collections::VecDeque;
 
 #[derive(Copy, Clone, Debug)]
 pub enum PixelSource {

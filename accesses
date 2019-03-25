@@ -1,0 +1,71 @@
+$FF11 -- sound mode (disable for now)
+$FF47
+
+ Name - BGP
+ Contents - BG & Window Palette Data (R/W)
+ Bit 7-6 - Data for Dot Data 11
+ (Normally darkest color)
+ Bit 5-4 - Data for Dot Data 10
+ Bit 3-2 - Data for Dot Data 01
+ Bit 1-0 - Data for Dot Data 00
+ (Normally lightest color)
+ This selects the shade of grays to use
+ for the background (BG) & window pixels.
+ Since each pixel uses 2 bits, the
+ corresponding shade will be selected from
+ here.
+
+$FF42
+
+ Name - SCY
+ Contents - Scroll Y (R/W)
+ 8 Bit value $00-$FF to scroll BG Y screen
+ position.
+
+$FF40
+
+ Name - LCDC (value $91 at reset)
+ Contents - LCD Control (R/W)
+ Bit 7 - LCD Control Operation *
+ 0: Stop completely (no picture on screen)
+ 1: operation
+ Bit 6 - Window Tile Map Display Select
+ 0: $9800-$9BFF
+ 1: $9C00-$9FFF
+ Bit 5 - Window Display
+ 0: off
+ 1: on
+ Bit 4 - BG & Window Tile Data Select
+ 0: $8800-$97FF
+ 1: $8000-$8FFF <- Same area as OBJ
+ Bit 3 - BG Tile Map Display Select
+ 0: $9800-$9BFF
+ 1: $9C00-$9FFF
+ Bit 2 - OBJ (Sprite) Size
+ 0: 8*8
+ 1: 8*16 (width*height)
+ Bit 1 - OBJ (Sprite) Display
+ 0: off
+ 1: on
+ Bit 0 - BG & Window Display
+ 0: off
+ 1: on
+ * - Stopping LCD operation (bit 7 from 1 to 0) must
+ be performed during V-blank to work properly. V-
+ blank can be confirmed when the value of LY is
+ greater than or equal to 144.
+
+$FF44
+
+ Name - LY
+ Contents - LCDC Y-Coordinate (R)
+ The LY indicates the vertical line to which
+ the present data is transferred to the LCD
+ Driver. The LY can take on any value
+ between 0 through 153. The values between
+ 144 and 153 indicate the V-Blank period.
+ Writing will reset the counter.
+
+$FF13 -- sound (disable for now)
+$FF50 -- last instruction so it doesn't really matter
+

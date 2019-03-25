@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use ppu::{PpuRegisters, ReadViewU8, ViewU8};
 use register::R16;
 
@@ -81,7 +83,7 @@ impl Addr {
 }
 
 impl Addr {
-    pub fn offset(&self, by: u16, direction: Direction) -> Addr {
+    pub fn offset(self, by: u16, direction: Direction) -> Addr {
         let new_val = match direction {
             Direction::Pos => self.0.wrapping_add(by),
             Direction::Neg => self.0.wrapping_sub(by),
@@ -89,7 +91,7 @@ impl Addr {
         Addr(new_val)
     }
 
-    pub fn into_register(&self) -> R16 {
+    pub fn into_register(self) -> R16 {
         R16(self.0)
     }
 }
@@ -104,6 +106,7 @@ impl Memory {
         }
     }
 
+    #[allow(clippy::match_overlapping_arm)]
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
             0xffff => panic!("interrupt enable register"),
@@ -155,8 +158,8 @@ impl Memory {
     }
 
     pub fn ld16(&self, Addr(addr): Addr) -> u16 {
-        fn u16read(vec: &Vec<u8>, addr: u16) -> u16 {
-            ((vec[(addr + 1) as usize] as u16) << 8) | vec[addr as usize] as u16
+        fn u16read(vec: &[u8], addr: u16) -> u16 {
+            (u16::from(vec[(addr + 1) as usize]) << 8) | u16::from(vec[addr as usize])
         }
 
         match addr {
@@ -189,6 +192,7 @@ impl Memory {
         }
     }
 
+    #[allow(clippy::match_overlapping_arm)]
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
         match addr {
             0xffff => panic!("interrupt enable register"),

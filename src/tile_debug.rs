@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use wasm_bindgen::{Clamped, JsCast};
 
 use packed_struct::prelude::*;
@@ -15,8 +17,8 @@ fn bit_transpose(x: u8, y: u8) -> [u8; 8] {
     let p3 = ((x & (1 << 4)) >> 3) | ((y & (1 << 4)) >> 4);
     let p4 = ((x & (1 << 3)) >> 2) | ((y & (1 << 3)) >> 3);
     let p5 = ((x & (1 << 2)) >> 1) | ((y & (1 << 2)) >> 2);
-    let p6 = ((x & (1 << 1)) >> 0) | ((y & (1 << 1)) >> 1);
-    let p7 = ((x & (1 << 0)) << 1) | ((y & (1 << 0)) >> 0);
+    let p6 = (x & (1 << 1)) | ((y & (1 << 1)) >> 1);
+    let p7 = ((x & 1) << 1) | (y & 1);
     log(&format!(
         "p0 {}, p1 {}, p2 {}, p3 {}, p4 {}, p5 {}, p6 {}, p7 {}",
         p0, p1, p2, p3, p4, p5, p6, p7
@@ -67,7 +69,7 @@ fn draw_tiles(data: &mut Vec<u8>, width: u32, pallette: ppu::Palette, tiles: Vec
             .into();
             let (r, g, b) = pixel_lut[idx as usize];
             let i = (row * width * 4 + col * 4) as usize;
-            data[i + 0] = r;
+            data[i] = r;
             data[i + 1] = g;
             data[i + 2] = b;
             data[i + 3] = 255;

@@ -33,7 +33,7 @@ fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
     for row in 0..height {
         for col in 0..width {
             let idx: usize = (row * width * 4 + col * 4) as usize;
-            data[idx + 0] = (i + row + col) as u8;
+            data[idx] = (i + row + col) as u8;
             data[idx + 1] = (i + row + col) as u8;
             data[idx + 2] = (i + row + col) as u8;
             data[idx + 3] = 255;
