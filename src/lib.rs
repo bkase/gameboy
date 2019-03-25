@@ -1,5 +1,13 @@
+// hello world
+
+#![feature(proc_macro_hygiene)]
+
 extern crate console_error_panic_hook;
+extern crate css_rs_macro;
+extern crate futures;
+extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
+extern crate web_sys;
 
 extern crate packed_struct;
 #[macro_use]
@@ -12,6 +20,7 @@ pub mod test {
 
 mod alu;
 mod cpu;
+mod debug_gui;
 mod instr;
 mod mem;
 mod ppu;
@@ -26,6 +35,11 @@ use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
+
+use futures::stream::Stream;
+use futures::sync::mpsc;
+use futures::Future;
+use futures::Sink;
 
 use web_utils::*;
 
@@ -73,8 +87,15 @@ pub fn run() -> Result<(), JsValue> {
     let mut i = 0;
     let mut data = vec![0; (height * width * 4) as usize];
 
+    let (tx, rx) = mpsc::channel::<u32>(1);
+    let (mut app, stream) = debug_gui::App::new(rx);
+    tx.send(i);
+
     let mut last = performance_now();
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+    let x = move || {
+        let _ = app;
+        tx.send(i);
+        // let _ = stream.into_future().poll();
         // Stop after 500 frames
         if i > 500 {
             // Drop our handle to this closure so that it will get cleaned
@@ -106,8 +127,10 @@ pub fn run() -> Result<(), JsValue> {
 
         // Schedule ourself for another requestAnimationFrame callback.
         request_animation_frame(f.borrow().as_ref().unwrap());
-    }) as Box<FnMut()>));
+    };
+    *g.borrow_mut() = Some(Closure::wrap(Box::new(x) as Box<FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
+
     Ok(())
 }
