@@ -1,13 +1,14 @@
 use css_rs_macro::css;
 use futures::stream::Stream;
 use futures::Future;
+use futures_signals::signal::{Signal, SignalExt};
 use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
 use web_sys;
 
 struct SampleView {}
 impl SampleView {
-    fn main<In: Stream<Item = u32>>(model: In) -> impl Stream<Item = VirtualNode> {
+    fn main<In: Signal<Item = u32>>(model: In) -> impl Signal<Item = VirtualNode> {
         return model.map(|m| {
             let greetings = format!("Hello, World! {}", m);
             html! { <div> { greetings } </div> }
@@ -44,7 +45,7 @@ impl App {
         self.dom_updater.update(end_view);
     }*/
 
-    pub fn new<In: Stream<Item = u32>>(rx: In) -> (App, impl Stream<Item = ()>) {
+    pub fn new<In: Signal<Item = u32>>(rx: In) -> (App, impl Signal<Item = ()>) {
         let start_view = html! { <div> Hello </div> };
 
         let window = web_sys::window().unwrap();

@@ -1,10 +1,14 @@
 // hello world
 
 #![feature(proc_macro_hygiene)]
+#![feature(futures_api)]
 
 extern crate console_error_panic_hook;
 extern crate css_rs_macro;
 extern crate futures;
+extern crate futures_signals;
+extern crate futures_util;
+extern crate js_sys;
 extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
 extern crate web_sys;
@@ -21,6 +25,7 @@ pub mod test {
 mod alu;
 mod cpu;
 mod debug_gui;
+mod futures_bridge;
 mod instr;
 mod mem;
 mod ppu;
@@ -37,9 +42,9 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
 
 use futures::stream::Stream;
-use futures::sync::mpsc;
-use futures::Future;
-use futures::Sink;
+use futures::FutureExt;
+use futures_bridge::spawn_local;
+use futures_signals::signal::{Mutable, SignalExt, SignalFuture};
 
 use web_utils::*;
 
@@ -54,6 +59,26 @@ fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
         }
     }
 }
+
+/*
+struct MyClosure {
+    app: debug_gui::App,
+    tx: mpsc::Sender<u32>,
+}
+
+impl FnMut<()> for MyClosure {
+    extern "rust-call" fn call_mut(&mut self, args: ()) {
+        let _ = self.app;
+        let tx_ = self.tx.clone();
+    }
+}
+impl FnOnce<()> for MyClosure {
+    type Output = ();
+    extern "rust-call" fn call_once(mut self, args: ()) {
+        self.call_mut(args)
+    }
+}
+*/
 
 // This function is automatically invoked after the wasm module is instantiated.
 #[wasm_bindgen(start)]
@@ -87,15 +112,20 @@ pub fn run() -> Result<(), JsValue> {
     let mut i = 0;
     let mut data = vec![0; (height * width * 4) as usize];
 
-    let (tx, rx) = mpsc::channel::<u32>(1);
-    let (mut app, stream) = debug_gui::App::new(rx);
-    tx.send(i);
+    let state: Mutable<u32> = Mutable::new(0);
+    let (mut app, signal) = debug_gui::App::new(state.signal());
+    //let _ = tx.send(i + 1);
+    let mut signal_future = signal.to_future().map(|_| ());
+    futures_bridge::spawn_local(signal_future);
 
     let mut last = performance_now();
     let x = move || {
-        let _ = app;
-        tx.send(i);
-        // let _ = stream.into_future().poll();
+        // let _ = app;
+        // tx_rc.borrow_mut().send(i);
+        // tx_rc.borrow_mut().send(i);
+        let mut lock = state.lock_mut();
+        *lock = i;
+
         // Stop after 500 frames
         if i > 500 {
             // Drop our handle to this closure so that it will get cleaned

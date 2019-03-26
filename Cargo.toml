@@ -12,13 +12,14 @@ default = ["console_error_panic_hook"]
 [dependencies]
 cfg-if = "0.1.2"
 wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.3.17"
 packed_struct = "0.3"
 packed_struct_codegen = "0.3"
 js-sys = "0.3.17"
 virtual-dom-rs = "0.6.7"
 css-rs-macro = "0.1"
-futures = "0.1.25"
+futures-preview = "0.3.0-alpha.13"
+futures-util-preview = "0.3.0-alpha.13"
+futures-signals = "0.3.4"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
