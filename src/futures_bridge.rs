@@ -321,8 +321,9 @@ fn _future_to_promise(future: Box<Future<Output = JsValue>>) -> Promise {
                 }
 
                 let waker = futures_util::task::noop_waker();
+                let mut fut = futures::future::LocalFutureObj::from(me.spawn.borrow_mut());
 
-                let (val, f) = match me.spawn.borrow_mut().poll(&waker) {
+                let (val, f) = match fut.poll_unpin(&waker) {
                     // If the future is ready, immediately call the
                     // resolve/reject callback and then return as we're done.
                     Poll::Ready(value) => (value, &me.resolve),
