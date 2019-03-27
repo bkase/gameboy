@@ -25,7 +25,7 @@ pub mod test {
 mod alu;
 mod cpu;
 mod debug_gui;
-mod futures_bridge;
+mod future_driver;
 mod instr;
 mod mem;
 mod ppu;
@@ -35,17 +35,12 @@ mod tile_debug;
 mod utils;
 mod web_utils;
 
+use futures::task::Poll;
+use futures_signals::signal::Mutable;
 use std::cell::RefCell;
 use std::rc::Rc;
-
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
-
-use futures::stream::Stream;
-use futures::FutureExt;
-use futures_bridge::spawn_local;
-use futures_signals::signal::{Mutable, SignalExt, SignalFuture};
-
 use web_utils::*;
 
 fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
@@ -59,26 +54,6 @@ fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
         }
     }
 }
-
-/*
-struct MyClosure {
-    app: debug_gui::App,
-    tx: mpsc::Sender<u32>,
-}
-
-impl FnMut<()> for MyClosure {
-    extern "rust-call" fn call_mut(&mut self, args: ()) {
-        let _ = self.app;
-        let tx_ = self.tx.clone();
-    }
-}
-impl FnOnce<()> for MyClosure {
-    type Output = ();
-    extern "rust-call" fn call_once(mut self, args: ()) {
-        self.call_mut(args)
-    }
-}
-*/
 
 // This function is automatically invoked after the wasm module is instantiated.
 #[wasm_bindgen(start)]
@@ -113,24 +88,23 @@ pub fn run() -> Result<(), JsValue> {
     let mut data = vec![0; (height * width * 4) as usize];
 
     let state: Mutable<u32> = Mutable::new(0);
-    let (mut app, signal) = debug_gui::App::new(state.signal());
-    //let _ = tx.send(i + 1);
-    let mut signal_future = signal.to_future().map(|_| ());
-    futures_bridge::spawn_local(signal_future);
+    let signal_future = Rc::new(RefCell::new(debug_gui::run(state.signal())));
 
     let mut last = performance_now();
-    let x = move || {
-        // let _ = app;
-        // tx_rc.borrow_mut().send(i);
-        // tx_rc.borrow_mut().send(i);
-        let mut lock = state.lock_mut();
-        *lock = i;
+    let closure = move || {
+        {
+            // Change the state
+            let mut lock = state.lock_mut();
+            *lock = i;
+        }
 
         // Stop after 500 frames
         if i > 500 {
             // Drop our handle to this closure so that it will get cleaned
             // up once we return.
             let _ = f.borrow_mut().take();
+            // TODO: Does this free the memory properly?
+            let _ = signal_future.borrow_mut();
             return;
         }
 
@@ -155,12 +129,17 @@ pub fn run() -> Result<(), JsValue> {
         // Increment once per call
         i += 1;
 
+        // Drive our GUI
+        match future_driver::tick(signal_future.clone()) {
+            Poll::Pending => (),
+            Poll::Ready(()) => panic!("The signal should never end!"),
+        };
+
         // Schedule ourself for another requestAnimationFrame callback.
         request_animation_frame(f.borrow().as_ref().unwrap());
     };
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(x) as Box<FnMut()>));
+    *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
-
     Ok(())
 }
