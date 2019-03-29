@@ -6,6 +6,7 @@
 extern crate console_error_panic_hook;
 extern crate css_rs_macro;
 extern crate futures;
+#[macro_use]
 extern crate futures_signals;
 extern crate futures_util;
 extern crate js_sys;
@@ -23,9 +24,12 @@ pub mod test {
 }
 
 mod alu;
+mod app;
 mod cpu;
 mod debug_gui;
 mod future_driver;
+mod game;
+mod hack_vdom;
 mod instr;
 mod mem;
 mod ppu;
@@ -60,6 +64,21 @@ fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
 pub fn run() -> Result<(), JsValue> {
     utils::set_panic_hook();
 
+    // Rc is used to do a closure dance so we can stop the
+    // request_animation_frame loop
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
+
+    let app_state: app::AppState = app::AppState {
+        globals: app::Globals {
+            unit: Mutable::new(()),
+            frames: Mutable::new(0),
+        },
+    };
+    let signal_future = Rc::new(RefCell::new(app::run(&app_state)));
+    // trigger the initial render
+    let _ = future_driver::tick(signal_future.clone());
+
     let canvas = document().get_element_by_id("canvas").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
@@ -79,22 +98,14 @@ pub fn run() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
-    // Rc is used to do a closure dance so we can stop the
-    // request_animation_frame loop
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
-
     let mut i = 0;
     let mut data = vec![0; (height * width * 4) as usize];
-
-    let state: Mutable<u32> = Mutable::new(0);
-    let signal_future = Rc::new(RefCell::new(debug_gui::run(state.signal())));
 
     let mut last = performance_now();
     let closure = move || {
         {
             // Change the state
-            let mut lock = state.lock_mut();
+            let mut lock = app_state.globals.frames.lock_mut();
             *lock = i;
         }
 
@@ -120,8 +131,9 @@ pub fn run() -> Result<(), JsValue> {
         ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
 
         // Show fps
+        let fps = (1000.0 / diff).ceil();
         ctx.set_font("bold 12px Monaco");
-        ctx.fill_text(&format!("FPS {}", (1000.0 / diff).ceil()), 10.0, 50.0)
+        ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
             .expect("fill_text");
 
         // Increment once per call
@@ -139,5 +151,6 @@ pub fn run() -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
+
     Ok(())
 }
