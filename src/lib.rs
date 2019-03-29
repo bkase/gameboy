@@ -141,5 +141,6 @@ pub fn run() -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
+
     Ok(())
 }
