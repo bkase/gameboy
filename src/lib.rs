@@ -6,6 +6,7 @@
 extern crate console_error_panic_hook;
 extern crate css_rs_macro;
 extern crate futures;
+#[macro_use]
 extern crate futures_signals;
 extern crate futures_util;
 extern crate js_sys;
@@ -23,9 +24,11 @@ pub mod test {
 }
 
 mod alu;
+mod app;
 mod cpu;
 mod debug_gui;
 mod future_driver;
+mod game;
 mod instr;
 mod mem;
 mod ppu;
@@ -87,14 +90,20 @@ pub fn run() -> Result<(), JsValue> {
     let mut i = 0;
     let mut data = vec![0; (height * width * 4) as usize];
 
-    let state: Mutable<u32> = Mutable::new(0);
-    let signal_future = Rc::new(RefCell::new(debug_gui::run(state.signal())));
+    let appState: app::AppState = app::AppState {
+        globals: app::Globals {
+            unit: Mutable::new(()),
+            frames: Mutable::new(0),
+        },
+    };
+
+    let signal_future = Rc::new(RefCell::new(app::run(&appState)));
 
     let mut last = performance_now();
     let closure = move || {
         {
             // Change the state
-            let mut lock = state.lock_mut();
+            let mut lock = appState.globals.frames.lock_mut();
             *lock = i;
         }
 
