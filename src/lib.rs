@@ -103,8 +103,6 @@ pub fn run() -> Result<(), JsValue> {
             // Drop our handle to this closure so that it will get cleaned
             // up once we return.
             let _ = f.borrow_mut().take();
-            // TODO: Does this free the memory properly?
-            let _ = signal_future.borrow_mut();
             return;
         }
 
