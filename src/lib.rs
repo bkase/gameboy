@@ -1,5 +1,17 @@
+// hello world
+
+#![feature(proc_macro_hygiene)]
+#![feature(futures_api)]
+
 extern crate console_error_panic_hook;
+extern crate css_rs_macro;
+extern crate futures;
+extern crate futures_signals;
+extern crate futures_util;
+extern crate js_sys;
+extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
+extern crate web_sys;
 
 extern crate packed_struct;
 #[macro_use]
@@ -12,6 +24,8 @@ pub mod test {
 
 mod alu;
 mod cpu;
+mod debug_gui;
+mod future_driver;
 mod instr;
 mod mem;
 mod ppu;
@@ -21,12 +35,12 @@ mod tile_debug;
 mod utils;
 mod web_utils;
 
+use futures::task::Poll;
+use futures_signals::signal::Mutable;
 use std::cell::RefCell;
 use std::rc::Rc;
-
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
-
 use web_utils::*;
 
 fn draw_frame(data: &mut Vec<u8>, width: u32, height: u32, i: u32) {
@@ -73,8 +87,17 @@ pub fn run() -> Result<(), JsValue> {
     let mut i = 0;
     let mut data = vec![0; (height * width * 4) as usize];
 
+    let state: Mutable<u32> = Mutable::new(0);
+    let signal_future = Rc::new(RefCell::new(debug_gui::run(state.signal())));
+
     let mut last = performance_now();
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+    let closure = move || {
+        {
+            // Change the state
+            let mut lock = state.lock_mut();
+            *lock = i;
+        }
+
         // Stop after 500 frames
         if i > 500 {
             // Drop our handle to this closure so that it will get cleaned
@@ -104,9 +127,16 @@ pub fn run() -> Result<(), JsValue> {
         // Increment once per call
         i += 1;
 
+        // Drive our GUI
+        match future_driver::tick(signal_future.clone()) {
+            Poll::Pending => (),
+            Poll::Ready(()) => panic!("The signal should never end!"),
+        };
+
         // Schedule ourself for another requestAnimationFrame callback.
         request_animation_frame(f.borrow().as_ref().unwrap());
-    }) as Box<FnMut()>));
+    };
+    *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
     Ok(())
