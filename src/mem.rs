@@ -85,6 +85,10 @@ impl Memory {
         }
     }
 
+    pub fn ld_lots(&self, Addr(addr): Addr, length: u16) -> Vec<u8> {
+        (0..length).map(|i| self.ld8(Addr(addr + i))).collect()
+    }
+
     #[allow(clippy::match_overlapping_arm)]
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {

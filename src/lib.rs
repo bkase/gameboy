@@ -32,6 +32,8 @@ mod game;
 mod hack_vdom;
 mod instr;
 mod mem;
+mod mem_view;
+mod mutable_effect;
 mod ppu;
 mod register;
 mod register_kind;
@@ -41,6 +43,8 @@ mod web_utils;
 
 use futures::task::Poll;
 use futures_signals::signal::Mutable;
+use mem::Memory;
+use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -69,10 +73,22 @@ pub fn run() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
+    let mem = Rc::new(Memory::create());
+    let trigger = Mutable::new(());
+    let mem_effect = MutableEffect {
+        state: mem,
+        trigger: trigger.read_only(),
+    };
+
     let app_state: app::AppState = app::AppState {
         globals: app::Globals {
             unit: Mutable::new(()),
             frames: Mutable::new(0),
+        },
+        mem: Rc::new(mem_effect),
+        mem_view_state: mem_view::LocalState {
+            focus: Rc::new(RefCell::new(Mutable::new(0x0080))),
+            cursor: Rc::new(RefCell::new(Mutable::new(0x00e4))),
         },
     };
     let signal_future = Rc::new(RefCell::new(app::run(&app_state)));

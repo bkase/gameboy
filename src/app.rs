@@ -3,6 +3,11 @@ use futures_signals::map_ref;
 use futures_signals::signal::{Mutable, Signal, SignalExt};
 use game;
 use hack_vdom::InjectNode;
+use mem::Memory;
+use mem_view;
+use mutable_effect::MutableEffect;
+use std::cell::RefCell;
+use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
 use web_utils;
 
@@ -33,6 +38,8 @@ pub struct Globals {
  */
 pub struct AppState {
     pub globals: Globals,
+    pub mem: Rc<MutableEffect<Rc<Memory>>>,
+    pub mem_view_state: mem_view::LocalState<Rc<RefCell<Mutable<u16>>>>,
     // we could have one field per component that emits events
 }
 
@@ -41,15 +48,22 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
     let game = game::component(game::State {
         unit: Box::new(unit.signal()),
     });
+    let mem_view = mem_view::component(mem_view::State {
+        mem: state.mem.clone(),
+        local: state.mem_view_state.clone(),
+    });
 
     map_ref! {
         let _ = unit.signal(),
+        let mem_view_dom = mem_view,
         let game_dom = game => {
-            let inner_dom : InjectNode = InjectNode(game_dom.clone());
+            let game_dom : InjectNode = InjectNode(game_dom.clone());
+            let mem_view_dom : InjectNode = InjectNode(mem_view_dom.clone());
             html! {
                  <div class="flex">
                   <div class="mw7 ph4 mt2 w-60">
-                    { inner_dom }
+                    { game_dom }
+                    { mem_view_dom }
                 </div>
             }
         }
