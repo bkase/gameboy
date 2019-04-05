@@ -19,48 +19,84 @@ struct ViewModel {
 }
 
 fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
+    fn cursor_of_coord(focus: u16, row: usize, col: usize) -> u16 {
+        focus - (8 * 16) + ((row * 16) as u16) + (col as u16)
+    }
+
+    fn color(local: &LocalState<u16>, row: usize, col: usize) -> &'static str {
+        if local.cursor == cursor_of_coord(local.focus, row, col) {
+            "rgba(0,170,170,.2)"
+        } else {
+            "rgba(0,0,0,0)"
+        }
+    }
+
     let top_labels: Vec<VirtualNode> = (0..16)
         .map(|i| html! { <th> { format!("{:02x}", i) } </th> })
         .collect();
 
     let data_per_row = model.data.chunks(16);
 
-    let local_mutable = model.local_mutable.clone();
+    // data for the first closure
     let local = model.local.clone();
+    let local_mutable = model.local_mutable.clone();
 
-    let draw_row = |(i, row): (usize, &[u8])| {
+    let draw_row = move |(i, row): (usize, &[u8])| {
         let cols: Vec<VirtualNode> = row
             .iter()
             .enumerate()
-            .map(|(j, byte)| {
-                html! {
-                <td
-                 onclick=move |_event: MouseEvent| {
-                   web_sys::console::log_1(&format!("Cursor moved to ({},{})", i, j).into());
-                   /*let cursor = local_mutable.cursor.clone();
-                   {
-                       let cursor_borrow = cursor.borrow_mut();
-                       let mut lock = cursor_borrow.lock_mut();
-                       *lock = local.focus  - (8*16) + ((i*16) as u16) + (j as u16);
-                   }*/
-                }> { format!("{:02x}", byte) } </td> }
+            .map({
+                // data for the next closure
+                let local = local.clone();
+                let local_mutable = local_mutable.clone();
+                let i = i.clone();
+
+                move |(j, byte)| {
+                    let bg_color = color(&local, i, j);
+
+                    // data for the next closure
+                    let j = j.clone();
+                    let i = i.clone();
+                    let local = local.clone();
+                    let local_mutable = local_mutable.clone();
+
+                    html! {
+                         <td style={format!("background-color: {};", bg_color)}
+                             onclick=move |_event: MouseEvent| {
+                        web_sys::console::log_1(&format!("Cursor moved to ({},{})", i, j).into());
+                        let cursor = local_mutable.cursor.clone();
+                        {
+                            let cursor_borrow = cursor.borrow_mut();
+                            let mut lock = cursor_borrow.lock_mut();
+                            *lock = local.focus - (8 * 16) + ((i * 16) as u16) + (j as u16);
+                        }
+                    }> { format!("{:02x}", byte) } </td>
+                    }
+                }
             })
             .collect();
 
-        let ascii: String = row
+        let ascii: Vec<VirtualNode> = row
             .iter()
-            .map(|byte| {
-                if *byte >= 32 && *byte < 128 {
-                    *byte as char
+            .enumerate()
+            .map(|(j, byte)| {
+                let bg_color = color(&local, i, j);
+
+                let content = if *byte >= 32 && *byte < 128 {
+                    (*byte as char).to_string()
                 } else {
-                    '.'
+                    '.'.to_string()
+                };
+
+                html! {
+                    <span style={format!("background-color: {}", bg_color)}>{content}</span>
                 }
             })
             .collect();
 
         html! {
         <tr>
-            <th> { format!("${:04x}", model.local.focus + ((i*16) as u16) - (8*16)) } </th>
+            <th> { format!("${:04x}", local.focus + ((i*16) as u16) - (8*16)) } </th>
             { cols }
             <td> { ascii } </td>
         </tr>
@@ -71,7 +107,6 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
 
     Rc::new(html! {
         <div style="font-family: PragmataPro, monospace;">
-            <p>{ format!("Cursor: {}", model.local.cursor) } </p>
             <table>
                 <thead>
                     <tr>
@@ -99,7 +134,7 @@ pub struct State {
 }
 
 pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
-    let rows = 16;
+    let rows = 8;
     let cols = 16;
 
     let mem = state.mem.clone_data();

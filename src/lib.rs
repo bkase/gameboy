@@ -88,7 +88,7 @@ pub fn run() -> Result<(), JsValue> {
         mem: Rc::new(mem_effect),
         mem_view_state: mem_view::LocalState {
             focus: Rc::new(RefCell::new(Mutable::new(0x0080))),
-            cursor: Rc::new(RefCell::new(Mutable::new(0x00e4))),
+            cursor: Rc::new(RefCell::new(Mutable::new(0x0064))),
         },
     };
     let signal_future = Rc::new(RefCell::new(app::run(&app_state)));
@@ -125,8 +125,8 @@ pub fn run() -> Result<(), JsValue> {
             *lock = i;
         }
 
-        // Stop after 500 frames
-        if i > 500 {
+        // Stop after 50,000 frames
+        if i > 50_000 {
             // Drop our handle to this closure so that it will get cleaned
             // up once we return.
             let _ = f.borrow_mut().take();
