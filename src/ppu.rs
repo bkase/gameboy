@@ -300,7 +300,7 @@ mod test {
     fn i_understand_lsb() {
         let bgp = Palette::create();
         let x = bgp.pack()[0];
-        assert_eq!(x, 0b11100100 as u8)
+        assert_eq!(x, 0b1110_0100 as u8)
     }
 
 }

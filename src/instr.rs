@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn bootrom_roundtrip() {
-        let mut memory = Memory::create();
+        let memory = Memory::create();
         let mut ptr = InstrPointer::create();
 
         let mut acc = Vec::new();
@@ -679,7 +679,7 @@ mod tests {
             }
 
             let addr = ptr.0;
-            let (i, mut bytes) = ptr.read_(&mut memory);
+            let (i, mut bytes) = ptr.read_(&memory);
             println!("{:?} @ 0x{:x}", i, addr.into_register().0);
             acc.append(&mut bytes);
         }

@@ -1,14 +1,18 @@
 #![allow(dead_code)]
 
 use futures_signals::map_ref;
-use futures_signals::signal::{Mutable, Signal, SignalExt};
+use futures_signals::signal::{Mutable, Signal};
 use mem::{Addr, Memory};
 use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
+#[allow(unused_imports)]
 use web_sys::MouseEvent;
 
 use virtual_dom_rs::prelude::*;
+
+const ROWS: u16 = 8;
+const COLS: u16 = 16;
 
 // supports only 16 cols for now
 #[derive(Debug, Clone)]
@@ -20,7 +24,7 @@ struct ViewModel {
 
 fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
     fn cursor_of_coord(focus: u16, row: usize, col: usize) -> u16 {
-        focus - (8 * 16) + ((row * 16) as u16) + (col as u16)
+        focus - ((ROWS / 2) * COLS) + ((row as u16) * COLS) + (col as u16)
     }
 
     fn color(local: &LocalState<u16>, row: usize, col: usize) -> &'static str {
@@ -49,15 +53,15 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
                 // data for the next closure
                 let local = local.clone();
                 let local_mutable = local_mutable.clone();
-                let i = i.clone();
 
                 move |(j, byte)| {
                     let bg_color = color(&local, i, j);
 
+                    // RLS and clippy aren't smart enough to understand html!
                     // data for the next closure
-                    let j = j.clone();
-                    let i = i.clone();
+                    #[allow(unused_variables)]
                     let local = local.clone();
+                    #[allow(unused_variables)]
                     let local_mutable = local_mutable.clone();
 
                     html! {
@@ -68,7 +72,7 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
                         {
                             let cursor_borrow = cursor.borrow_mut();
                             let mut lock = cursor_borrow.lock_mut();
-                            *lock = local.focus - (8 * 16) + ((i * 16) as u16) + (j as u16);
+                            *lock = cursor_of_coord(local.focus, i, j);
                         }
                     }> { format!("{:02x}", byte) } </td>
                     }
@@ -96,7 +100,7 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
 
         html! {
         <tr>
-            <th> { format!("${:04x}", local.focus + ((i*16) as u16) - (8*16)) } </th>
+            <th> { format!("${:04x}", local.focus + ((i as u16) * COLS) - ((ROWS/2)*COLS)) } </th>
             { cols }
             <td> { ascii } </td>
         </tr>
@@ -134,9 +138,6 @@ pub struct State {
 }
 
 pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
-    let rows = 8;
-    let cols = 16;
-
     let mem = state.mem.clone_data();
     let local = state.local.clone();
 
@@ -144,8 +145,8 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
         let focus = state.local.focus.borrow().signal(),
         let cursor = state.local.cursor.borrow().signal(),
         let _ = state.mem.trigger.signal() => move {
-            let start_addr = Addr::directly(focus - ((rows / 2) * cols));
-            let data = mem.ld_lots(start_addr, rows * cols);
+            let start_addr = Addr::directly(focus - ((ROWS / 2) * COLS));
+            let data = mem.ld_lots(start_addr, ROWS * COLS);
 
             mem_table_view(ViewModel { data, local_mutable: local.clone(), local: LocalState { cursor: *cursor, focus: *focus } } )
         }

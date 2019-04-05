@@ -1,4 +1,4 @@
-use futures_signals::signal::{ReadOnlyMutable, Signal, SignalExt};
+use futures_signals::signal::ReadOnlyMutable;
 
 // TODO: Put some impls on this
 /// A MutableEffect gives the illusion that you have a signal of something that

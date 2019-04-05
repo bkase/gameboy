@@ -60,11 +60,11 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
             let game_dom : InjectNode = InjectNode(game_dom.clone());
             let mem_view_dom : InjectNode = InjectNode(mem_view_dom.clone());
             html! {
-                <div class="mw6 ph4 mt2 w-60">
-                <div>
+                <div class="mw8 ph4 mt2">
+                <div class="mw6">
                     { game_dom }
                 </div>
-                <div class="mt2">
+                <div class="mw7 mt2">
                     { mem_view_dom }
                 </div>
             }

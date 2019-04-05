@@ -87,7 +87,7 @@ pub fn run() -> Result<(), JsValue> {
         },
         mem: Rc::new(mem_effect),
         mem_view_state: mem_view::LocalState {
-            focus: Rc::new(RefCell::new(Mutable::new(0x0080))),
+            focus: Rc::new(RefCell::new(Mutable::new(0x0040))),
             cursor: Rc::new(RefCell::new(Mutable::new(0x0064))),
         },
     };
