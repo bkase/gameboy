@@ -39,8 +39,6 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
         .map(|i| html! { <th> { format!("{:02x}", i) } </th> })
         .collect();
 
-    let data_per_row = model.data.chunks(16);
-
     // data for the first closure
     let local = model.local.clone();
     let local_mutable = model.local_mutable.clone();
@@ -107,6 +105,7 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
         }
     };
 
+    let data_per_row = model.data.chunks(COLS as usize);
     let all_data: Vec<VirtualNode> = data_per_row.enumerate().map(draw_row).collect();
 
     Rc::new(html! {
@@ -128,7 +127,7 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
 
 #[derive(Debug, Clone)]
 pub struct LocalState<T> {
-    pub focus: T,  // the row which is centered, invariant 0xXXX0 and >= 0x80
+    pub focus: T,  // the row which is centered, invariant 0xXXX0 and >= 0x40
     pub cursor: T, // invariant in the vec
 }
 
