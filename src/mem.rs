@@ -33,10 +33,11 @@ use register::R16;
 pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
 
 pub struct Memory {
+    zero: Vec<u8>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
-    ppu: PpuRegisters,
+    pub ppu: PpuRegisters,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -78,6 +79,7 @@ impl Addr {
 impl Memory {
     pub fn create() -> Memory {
         Memory {
+            zero: vec![0; 0x7f],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
             rom0: vec![0; 0x4000],
@@ -93,7 +95,7 @@ impl Memory {
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
             0xffff => panic!("interrupt enable register"),
-            0xff80...0xfffe => panic!("zero page"),
+            0xff80...0xfffe => self.zero[(addr - 0xff80) as usize],
             0xff4c...0xff7f => panic!("unusable"),
             0xff11 => {
                 println!("Sound mode change, not-implemented for now");
@@ -107,7 +109,11 @@ impl Memory {
             0xff42 => self.ppu.scy.read(),
             0xff44 => self.ppu.ly.read(),
             0xff47 => self.ppu.bgp.read(),
-            0xff00...0xff4b => panic!("rest of I/O ports"),
+            0xff00...0xff4b => {
+                println!("Passthrough...");
+                0
+            }
+            // panic!("rest of I/O ports"),
             0xfea0...0xfeff => panic!("unusable"),
             0xfe00...0xfe9f => panic!("sprite oam"),
             0xe000...0xfdff => panic!("echo ram"),
@@ -147,7 +153,7 @@ impl Memory {
 
         match addr {
             0xffff => panic!("interrupt enable register"),
-            0xff80...0xfffe => panic!("zero page"),
+            0xff80...0xfffe => u16read(&self.zero, addr - 0xff80),
             0xff4c...0xff7f => panic!("unusable"),
             0xff00...0xff4b => panic!("I/O ports"),
             0xfea0...0xfeff => panic!("unusable"),
@@ -179,7 +185,8 @@ impl Memory {
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
         match addr {
             0xffff => panic!("interrupt enable register"),
-            0xff80...0xfffe => panic!("zero page"),
+            0xff80...0xfffe => self.zero[(addr - 0xff80) as usize] = n,
+
             0xff4c...0xff7f => panic!("unusable"),
             0xff11 => println!("Sound mode change, not-implemented for now"),
             0xff13 => println!("Sound mode change, not-implemented for now"),
@@ -187,7 +194,8 @@ impl Memory {
             0xff42 => self.ppu.scy.set(n),
             0xff44 => panic!("Cannot write to LY register"),
             0xff47 => self.ppu.bgp.set(n),
-            0xff00...0xff4b => panic!("rest of I/O ports"),
+            0xff00...0xff4b => println!("Passthrough"),
+            // panic!("rest of I/O ports"),
             0xfea0...0xfeff => panic!("unusable"),
             0xfe00...0xfe9f => panic!("sprite oam"),
             0xe000...0xfdff => panic!("echo ram"),

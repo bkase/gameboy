@@ -5,10 +5,11 @@ use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, Rotate};
 use mem::{Addr, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
+use web_utils::log;
 
 pub struct Cpu {
     registers: Registers,
-    memory: Memory,
+    pub memory: Memory,
     ip: InstrPointer,
 }
 
@@ -18,7 +19,7 @@ enum BranchAction {
 }
 
 impl Cpu {
-    fn create() -> Cpu {
+    pub fn create() -> Cpu {
         Cpu {
             registers: Registers::create(),
             memory: Memory::create(),
@@ -269,7 +270,7 @@ impl Cpu {
         }
     }
 
-    fn execute(&mut self, instr: Instr) -> BranchAction {
+    fn execute_instr(&mut self, instr: Instr) -> BranchAction {
         use self::Instr::*;
 
         match instr {
@@ -326,7 +327,7 @@ impl Cpu {
 
         // TODO: Is this off-by-one frame?
         while clocks_to_tick > take_duration {
-            let action = { self.execute(instr) };
+            let action = { self.execute_instr(instr) };
             let duration = match action {
                 BranchAction::Take => take_duration,
                 BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
@@ -338,6 +339,28 @@ impl Cpu {
             let (take_duration_, skip_duration_) = instr.duration();
             take_duration = take_duration_;
             skip_duration = skip_duration_;
+        }
+    }
+
+    /// Peek at the next instruction to see how long it will take
+    pub fn peek_next(&mut self) -> u32 {
+        let mut instr = self.ip.peek(&self.memory);
+        // Assumption: Take duration is longer than skip duration (this seems to be true for all
+        // Gameboy instructions
+        let (take_duration, _) = instr.duration();
+        take_duration
+    }
+
+    /// Execute the current instruction returning the duration it did take. Note: This can be
+    /// different from the peeked duration as time taken differs based on branch takes or skips.
+    pub fn execute(&mut self) -> u32 {
+        let instr = self.ip.read(&self.memory);
+        log(&format!("Executing: {:?}", instr));
+        let (take_duration, skip_duration) = instr.duration();
+        let action = self.execute_instr(instr);
+        match action {
+            BranchAction::Take => take_duration,
+            BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
         }
     }
 }
