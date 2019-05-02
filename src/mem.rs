@@ -2,6 +2,7 @@
 
 use ppu::{PpuRegisters, ReadViewU8, ViewU8};
 use register::R16;
+use std::fmt;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -42,6 +43,11 @@ pub struct Memory {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Addr(u16);
+impl fmt::Display for Addr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "${:04x}", self.0)
+    }
+}
 
 pub enum Direction {
     Pos,
@@ -126,7 +132,12 @@ impl Memory {
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000...0xdfff => self.main[(addr - 0xc000) as usize],
-            0xa000...0xbfff => panic!("cartridge ram"),
+            0xa000...0xbfff => {
+                // cartridge ram
+                // not sure what to do here...
+                println!("Passthrough...");
+                0
+            }
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
@@ -222,7 +233,7 @@ impl Memory {
             {
                 panic!("Cannot write to ROM")
             }
-            0x0000...0x00ff => panic!("Cannot write to bootrom"),
+            0x0000...0x00ff => println!("Cannot write to bootrom"),
         }
     }
 }

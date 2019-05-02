@@ -1,10 +1,13 @@
 use cpu::Cpu;
 use ppu::Ppu;
+use web_utils::log;
 
 pub struct Hardware {
     pub cpu: Cpu,
     pub ppu: Ppu,
     pub paused: bool,
+    // dirty bit, aka we need to redraw things with this is true
+    pub dirty: bool,
 }
 
 impl Hardware {
@@ -13,6 +16,7 @@ impl Hardware {
             cpu: Cpu::create(),
             ppu: Ppu::create(),
             paused: true,
+            dirty: false,
         }
     }
 
@@ -26,8 +30,13 @@ impl Hardware {
 
     /// step the hardware forwards and repaint
     pub fn step(&mut self) {
+        log(&format!(
+            "Executing {:}",
+            self.cpu.ip.peek(&self.cpu.memory)
+        ));
         let _ = self.step_();
         self.ppu.repaint(&self.cpu.memory);
+        self.dirty = true;
     }
 
     // clock speed is 4.194304 MHz
@@ -54,5 +63,6 @@ impl Hardware {
         }
 
         self.ppu.repaint(&self.cpu.memory);
+        self.dirty = true;
     }
 }

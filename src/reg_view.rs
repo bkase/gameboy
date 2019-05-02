@@ -4,6 +4,7 @@ use futures_signals::map_ref;
 use futures_signals::signal::Signal;
 use hardware::Hardware;
 use mutable_effect::MutableEffect;
+use register::Flags;
 use register::{R16, R8};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -36,6 +37,14 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 </tr>
                 }
             }
+            fn draw_flags(name: &'static str, flags: &Flags) -> VirtualNode {
+                html! {
+                <tr>
+                  <th> { name } </th>
+                  <td> { format!("z={:} n={:} h={:} c={:}", flags.z, flags.n, flags.h, flags.c) } </td>
+                </tr>
+                }
+            }
 
             Rc::new(
             html! {
@@ -52,6 +61,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     { draw_r16("hl", registers.hl) }
                     { draw_r16("sp", registers.sp) }
                     { draw_r8("a", registers.a) }
+                    { draw_flags("flags", &registers.flags) }
                 </tbody>
             </table>
         </div>

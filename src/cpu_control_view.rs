@@ -112,7 +112,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     new_ip.read(&hardware.borrow().cpu.memory),
                     new_ip.read(&hardware.borrow().cpu.memory),
                 ].into_iter().map(|i| {
-                    html!{ <li> { format!("{:?}", i) } </li> }
+                    html!{ <li> { format!("{:}", i) } </li> }
                 }).collect()
             };
 

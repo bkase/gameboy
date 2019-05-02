@@ -112,13 +112,13 @@ impl Cpu {
                 self.registers.hl.inc()
             }
             HlIndGetsADec => {
-                let (n, _) = self.indirect_ld(RegisterKind16::Hl);
-                self.registers.write8n(RegisterKind8::A, n);
+                let n = self.registers.read8(RegisterKind8::A);
+                self.indirect_st(RegisterKind16::Hl, n.0);
                 self.registers.hl.dec()
             }
             AGetsHlIndDec => {
-                let n = self.registers.read8(RegisterKind8::A);
-                self.indirect_st(RegisterKind16::Hl, n.0);
+                let (n, _) = self.indirect_ld(RegisterKind16::Hl);
+                self.registers.write8n(RegisterKind8::A, n);
                 self.registers.hl.dec()
             }
             SpGetsAddr(addr) => {
@@ -164,7 +164,7 @@ impl Cpu {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::sub, operand);
             }
-            AddH1Ind => {
+            AddHlInd => {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::add, operand);
             }

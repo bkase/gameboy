@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use register_kind::{RegisterKind16, RegisterKind8};
+use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct R16(pub u16);
@@ -26,6 +27,11 @@ impl R16 {
         (*self).0 = old.wrapping_sub(1);
     }
 }
+impl fmt::Display for R16 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "${:04x}", self.0)
+    }
+}
 
 impl R8 {
     pub fn concat(self, lo: R8) -> R16 {
@@ -40,6 +46,11 @@ impl R8 {
     pub fn dec(&mut self) {
         let old = self.0;
         (*self).0 = old.wrapping_sub(1);
+    }
+}
+impl fmt::Display for R8 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "${:02x}", self.0)
     }
 }
 

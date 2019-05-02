@@ -739,8 +739,16 @@ impl Ppu {
         })
     }
 
-    pub fn advance(&mut self, _memory: &Memory, duration: u32) {
+    pub fn advance(&mut self, memory: &mut Memory, duration: u32) {
         let range = self.moment.advance(duration);
+        // HACK: we need this to be more accurate to have bootrom to be happy, but we can just set
+        // to 144 whenever it's around 144 and we should be good
+        memory.ppu.ly = if self.moment.line() >= 144 && self.moment.line() <= 149 {
+            144
+        } else {
+            self.moment.line()
+        };
+
         let mut hole = None;
         std::mem::swap(&mut self.dirty, &mut hole);
         self.dirty = hole.combine(Some(range));

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use mem::{Addr, Direction, Memory};
+use register::R8;
 use register_kind::{RegisterKind16, RegisterKind8};
 use std::error::Error;
 use std::fmt;
@@ -81,6 +82,37 @@ pub enum Ld {
 }
 use self::Ld::*;
 
+impl fmt::Display for Ld {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RGetsN(rk, v) => write!(f, "(LD) {:} <- {:}", rk, v),
+            RGetsR(rk1, rk2) => write!(f, "(LD) {:} <- {:}", rk1, rk2),
+            RGetsHlInd(rk) => write!(f, "(LD) {:} <- [HL]", rk),
+            HlIndGetsR(rk) => write!(f, "(LD) [HL] <- {:}", rk),
+            HlIndGetsN(n) => write!(f, "(LD) [HL] <- {:}", R8(*n)),
+            AGetsBcInd => write!(f, "(LD) A <- [BC]"),
+            AGetsDeInd => write!(f, "(LD) A <- [DE]"),
+            AGetsNnInd(nn) => write!(f, "(LD) A <- [{:}]", nn),
+            BcIndGetsA => write!(f, "(LD) [BC] <- A"),
+            DeIndGetsA => write!(f, "(LD) [DE] <- A"),
+            NnIndGetsA(addr) => write!(f, "(LD) [{:}] <- A", addr),
+            AGetsIOOffset(n) => write!(f, "(LD) A <- [$ff00+{:}]", R8(*n)),
+            IOOffsetGetsA(n) => write!(f, "(LD) [$ff00+{:}] <- A", R8(*n)),
+            AGetsIOOffsetByC => write!(f, "(LD) A <- [$ff00+C]"),
+            IOOffsetByCGetsA => write!(f, "(LD) [$ff00+C] <- A"),
+            // special instructions
+            HlIndGetsAInc => write!(f, "(LD) [HL]++ <- A"),
+            AGetsHlIndInc => write!(f, "(LD) A <- [HL]++"),
+            HlIndGetsADec => write!(f, "(LD) [HL]-- <- A"),
+            AGetsHlIndDec => write!(f, "(LD) A <- [HL]++"),
+
+            SpGetsAddr(addr) => write!(f, "(LD) SP <- {:}", addr),
+            HlGetsAddr(addr) => write!(f, "(LD) HL <- {:}", addr),
+            DeGetsAddr(addr) => write!(f, "(LD) DE <- {:}", addr),
+        }
+    }
+}
+
 impl HasDuration for Ld {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
@@ -116,7 +148,7 @@ pub enum Arith {
     XorHlInd,
     Sub(RegisterKind8),
     SubHlInd,
-    AddH1Ind,
+    AddHlInd,
     Inc8(RegisterKind8),
     Inc16(RegisterKind16),
     IncHlInd,
@@ -127,6 +159,24 @@ pub enum Arith {
 }
 use self::Arith::*;
 
+impl fmt::Display for Arith {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Xor(rk) => write!(f, "(XOR) A <- A ^ {:}", rk),
+            XorHlInd => write!(f, "(XOR) A <- A ^ [HL]"),
+            Sub(rk) => write!(f, "(SUB) A <- A - {:}", rk),
+            SubHlInd => write!(f, "(SUB) A <- A - [HL]"),
+            AddHlInd => write!(f, "(ADD) A <- A + [HL]"),
+            Inc8(rk) => write!(f, "(INC) {:}++", rk),
+            Inc16(rk) => write!(f, "(INC) {:}++", rk),
+            IncHlInd => write!(f, "(INC) [HL]++"),
+            Dec8(rk) => write!(f, "(DEC) {:}--", rk),
+            Dec16(rk) => write!(f, "(DEC) {:}--", rk),
+            DecHlInd => write!(f, "(DEC) [HL]--"),
+        }
+    }
+}
+
 impl HasDuration for Arith {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
@@ -134,7 +184,7 @@ impl HasDuration for Arith {
             XorHlInd => (2, None),
             Sub(_) => (1, None),
             SubHlInd => (2, None),
-            AddH1Ind => (2, None),
+            AddHlInd => (2, None),
             Inc8(_) => (1, None),
             Inc16(_) => (2, None),
             IncHlInd => (3, None),
@@ -151,6 +201,15 @@ pub enum Rotate {
     Rl(RegisterKind8),
 }
 use self::Rotate::*;
+
+impl fmt::Display for Rotate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Rla => write!(f, "(RLA) A <- A << 1"),
+            Rl(rk) => write!(f, "(RL n) {:} <- {:} << 1", rk, rk),
+        }
+    }
+}
 
 impl HasDuration for Rotate {
     fn duration(&self) -> (u32, Option<u32>) {
@@ -169,6 +228,17 @@ pub enum Jump {
     Call(Addr),
 }
 use self::Jump::*;
+
+impl fmt::Display for Jump {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Jr(n) => write!(f, "JR {:}", n),
+            JrNz(n) => write!(f, "JRNZ {:} (if != 0)", n),
+            JrZ(n) => write!(f, "JRZ {:} (if == 0)", n),
+            Call(addr) => write!(f, "CALL {:}", addr),
+        }
+    }
+}
 
 impl HasDuration for Jump {
     fn duration(&self) -> (u32, Option<u32>) {
@@ -196,6 +266,23 @@ pub enum Instr {
     Ret,
 }
 use self::Instr::*;
+
+impl fmt::Display for Instr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Ld(ld) => write!(f, "{:}", ld),
+            Arith(a) => write!(f, "{:}", a),
+            Rotate(r) => write!(f, "{:}", r),
+            Jump(j) => write!(f, "{:}", j),
+            Bit7h => write!(f, "BIT 7, H"),
+            CpHlInd => write!(f, "(CP) A ==? [HL]"),
+            Cp(n) => write!(f, "(CP) A ==? {:}", R8(*n)),
+            PopBc => write!(f, "POP BC"),
+            PushBc => write!(f, "PUSH BC"),
+            Ret => write!(f, "RET"),
+        }
+    }
+}
 
 impl HasDuration for Instr {
     fn duration(&self) -> (u32, Option<u32>) {
@@ -470,7 +557,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x83 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x84 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x85 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x86 => (Arith(AddH1Ind), vec![pos0]),
+            0x86 => (Arith(AddHlInd), vec![pos0]),
             0x87 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x88 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x89 => panic!(format!("unimplemented instruction ${:x}", pos0)),

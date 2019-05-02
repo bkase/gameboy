@@ -3,12 +3,13 @@
 use futures_signals::map_ref;
 use futures_signals::signal::{Mutable, Signal};
 use hardware::Hardware;
-use mem::Addr;
+use mem::{Addr, Direction};
 use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
 use web_sys::MouseEvent;
+use web_utils::log;
 
 use virtual_dom_rs::prelude::*;
 
@@ -21,6 +22,7 @@ struct ViewModel {
     data: Vec<u8>, // assumption: aligned to +0 of the first row
     local_mutable: LocalState<Rc<RefCell<Mutable<u16>>>>,
     local: LocalState<u16>,
+    local_cell: Rc<RefCell<LocalState<u16>>>,
 }
 
 fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
@@ -109,8 +111,67 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
     let data_per_row = model.data.chunks(COLS as usize);
     let all_data: Vec<VirtualNode> = data_per_row.enumerate().map(draw_row).collect();
 
+    fn arrow_button(
+        local: Rc<RefCell<LocalState<u16>>>,
+        local_mutable: LocalState<Rc<RefCell<Mutable<u16>>>>,
+        direction: Direction,
+    ) {
+        let cursor = local_mutable.cursor.clone();
+        let focus = local_mutable.cursor.clone();
+        let new_focus = ((local.borrow().focus as i32)
+            + (0x40
+                * match direction {
+                    Direction::Pos => 1,
+                    Direction::Neg => -1,
+                })) as u16;
+        {
+            let focus_borrow = focus.borrow_mut();
+            let mut lock = focus_borrow.lock_mut();
+            log(&format!(
+                "Writing new focus {:?} (old focus) {:?}",
+                new_focus,
+                local.borrow().focus
+            ));
+            *lock = new_focus;
+        }
+
+        let new_cursor = if local.borrow().cursor < cursor_of_coord(new_focus, 0, 0) {
+            cursor_of_coord(new_focus, 0, 0)
+        } else if local.borrow().cursor
+            > cursor_of_coord(new_focus, (ROWS - 1) as usize, (COLS - 1) as usize)
+        {
+            cursor_of_coord(new_focus, (ROWS - 1) as usize, (COLS - 1) as usize)
+        } else {
+            local.borrow().cursor
+        };
+
+        {
+            let cursor_borrow = cursor.borrow_mut();
+            let mut lock = cursor_borrow.lock_mut();
+            log(&format!("Writing new cursor {:?}", new_cursor));
+            *lock = new_cursor;
+        }
+    }
+
+    let local_mutable_up = model.local_mutable.clone();
+    let local_mutable_down = model.local_mutable.clone();
+    let local_up = model.local_cell.clone();
+    let local_down = model.local_cell.clone();
+
     Rc::new(html! {
         <div style="font-family: PragmataPro, monospace;">
+            <button onclick=move |_: MouseEvent| {
+        arrow_button(local_up.clone(), local_mutable_up.clone(), Direction::Pos)
+            }>
+        { "↑" }
+            </button>
+
+            <button onclick=move |_: MouseEvent| {
+               arrow_button(local_down.clone(), local_mutable_down.clone(), Direction::Neg)
+            }>
+            { "↓" }
+            </button>
+
             <table>
                 <thead>
                     <tr>
@@ -141,6 +202,11 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
     let hardware = state.hardware.clone_data();
     let local = state.local.clone();
 
+    let local_cell = Rc::new(RefCell::new(LocalState {
+        cursor: 0,
+        focus: 0,
+    }));
+
     map_ref! {
         let focus = state.local.focus.borrow().signal(),
         let cursor = state.local.cursor.borrow().signal(),
@@ -148,7 +214,10 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
             let start_addr = Addr::directly(focus - ((ROWS / 2) * COLS));
             let data = hardware.borrow().cpu.memory.ld_lots(start_addr, ROWS * COLS);
 
-            mem_table_view(ViewModel { data, local_mutable: local.clone(), local: LocalState { cursor: *cursor, focus: *focus } } )
+            let new_local = LocalState { cursor: *cursor, focus: *focus };
+            *local_cell.borrow_mut() = new_local.clone();
+
+            mem_table_view(ViewModel { data, local_mutable: local.clone(), local: new_local, local_cell: local_cell.clone() } )
         }
     }
 }

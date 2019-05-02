@@ -136,9 +136,15 @@ pub fn run() -> Result<(), JsValue> {
         // Execute our hardware!
         {
             hardware.borrow_mut().run(diff);
-            // Trigger hardware changes
-            let mut lock = trigger.lock_mut();
-            *lock = ();
+        }
+        let dirty = { hardware.borrow().dirty };
+        {
+            hardware.borrow_mut().dirty = false;
+            if dirty {
+                // Trigger hardware changes
+                let mut lock = trigger.lock_mut();
+                *lock = ();
+            }
         }
 
         // Blit bytes
