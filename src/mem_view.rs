@@ -2,7 +2,8 @@
 
 use futures_signals::map_ref;
 use futures_signals::signal::{Mutable, Signal};
-use mem::{Addr, Memory};
+use hardware::Hardware;
+use mem::Addr;
 use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +12,7 @@ use web_sys::MouseEvent;
 
 use virtual_dom_rs::prelude::*;
 
-const ROWS: u16 = 8;
+const ROWS: u16 = 16;
 const COLS: u16 = 16;
 
 // supports only 16 cols for now
@@ -132,20 +133,20 @@ pub struct LocalState<T> {
 }
 
 pub struct State {
-    pub mem: Rc<MutableEffect<Rc<Memory>>>,
+    pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
     pub local: LocalState<Rc<RefCell<Mutable<u16>>>>,
 }
 
 pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
-    let mem = state.mem.clone_data();
+    let hardware = state.hardware.clone_data();
     let local = state.local.clone();
 
     map_ref! {
         let focus = state.local.focus.borrow().signal(),
         let cursor = state.local.cursor.borrow().signal(),
-        let _ = state.mem.trigger.signal() => move {
+        let _ = state.hardware.trigger.signal() => move {
             let start_addr = Addr::directly(focus - ((ROWS / 2) * COLS));
-            let data = mem.ld_lots(start_addr, ROWS * COLS);
+            let data = hardware.borrow().cpu.memory.ld_lots(start_addr, ROWS * COLS);
 
             mem_table_view(ViewModel { data, local_mutable: local.clone(), local: LocalState { cursor: *cursor, focus: *focus } } )
         }

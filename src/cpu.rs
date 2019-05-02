@@ -7,9 +7,9 @@ use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
 
 pub struct Cpu {
-    registers: Registers,
+    pub registers: Registers,
     pub memory: Memory,
-    ip: InstrPointer,
+    pub ip: InstrPointer,
 }
 
 enum BranchAction {
@@ -221,9 +221,15 @@ impl Cpu {
     }
 
     fn pop(&mut self) -> R8 {
-        let (v, _) = self.indirect_ld(RegisterKind16::Sp);
         self.registers.sp.inc();
+        let (v, _) = self.indirect_ld(RegisterKind16::Sp);
         R8(v)
+    }
+
+    fn pop16(&mut self) -> R16 {
+        let hi = self.pop();
+        let lo = self.pop();
+        hi.concat(lo)
     }
 
     fn push(&mut self, n: R8) {
@@ -235,7 +241,29 @@ impl Cpu {
         self.push(n.lo());
         self.push(n.hi());
     }
+}
 
+#[cfg(test)]
+mod instr_tests {
+    use cpu::Cpu;
+    use register::R16;
+    use test::proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn push_pop_self_inverse(x : u16) {
+            let mut cpu = Cpu::create();
+            cpu.registers.sp = R16(0xff90);
+
+            let r16 = R16(x);
+            cpu.push16(r16);
+            let res = cpu.pop16();
+            assert_eq!(res, r16);
+        }
+    }
+}
+
+impl Cpu {
     fn execute_jump(&mut self, jump: Jump) -> BranchAction {
         use self::Jump::*;
 
@@ -295,9 +323,7 @@ impl Cpu {
             }
             PopBc => {
                 // TODO: Are we pushing and popping the stack in the right order
-                let x0 = self.pop();
-                let x1 = self.pop();
-                self.registers.bc = x0.concat(x1);
+                self.registers.bc = self.pop16();
                 BranchAction::Take
             }
             PushBc => {
@@ -306,38 +332,10 @@ impl Cpu {
                 BranchAction::Take
             }
             Ret => {
-                let x0 = self.pop();
-                let x1 = self.pop();
-                self.ip.jump(Addr::directly(x0.concat(x1).0));
+                let reg = self.pop16();
+                self.ip.jump(Addr::directly(reg.0));
                 BranchAction::Take
             }
-        }
-    }
-
-    // clock speed is 4.194304 MHz
-    // we pretend is div 4 since all instrs are multiple of 4
-    // 1.04858 MHz
-    // 1048.58 ticks per millisecond
-    pub fn run(&mut self, dt: f64) {
-        let mut clocks_to_tick = (dt * 1048.58) as u32;
-
-        let mut instr = self.ip.peek(&self.memory);
-        let (mut take_duration, mut skip_duration) = instr.duration();
-
-        // TODO: Is this off-by-one frame?
-        while clocks_to_tick > take_duration {
-            let action = { self.execute_instr(instr) };
-            let duration = match action {
-                BranchAction::Take => take_duration,
-                BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
-            };
-            clocks_to_tick -= duration;
-
-            let _ = self.ip.read(&self.memory);
-            instr = self.ip.peek(&self.memory);
-            let (take_duration_, skip_duration_) = instr.duration();
-            take_duration = take_duration_;
-            skip_duration = skip_duration_;
         }
     }
 

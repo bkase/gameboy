@@ -753,7 +753,6 @@ impl Ppu {
             None => (),
             Some(range) => {
                 range.into_iter().for_each(|row| self.paint(memory, row));
-                self.dirty = None;
             }
         }
     }

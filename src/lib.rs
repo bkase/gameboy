@@ -27,6 +27,7 @@ pub mod test {
 mod alu;
 mod app;
 mod cpu;
+mod cpu_control_view;
 mod debug_gui;
 mod future_driver;
 mod game;
@@ -38,6 +39,7 @@ mod mem_view;
 mod monoid;
 mod mutable_effect;
 mod ppu;
+mod reg_view;
 mod register;
 mod register_kind;
 mod screen;
@@ -48,7 +50,6 @@ mod web_utils;
 use futures::task::Poll;
 use futures_signals::signal::Mutable;
 use hardware::Hardware;
-use mem::Memory;
 use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -67,12 +68,11 @@ pub fn run() -> Result<(), JsValue> {
     let g = f.clone();
 
     // For now hardware has it's own memory
-    let mut hardware = Hardware::create();
+    let hardware = Rc::new(RefCell::new(Hardware::create()));
     // mem is for GUI
-    let mem = Rc::new(Memory::create());
     let trigger = Mutable::new(());
-    let mem_effect = MutableEffect {
-        state: mem,
+    let hardware_effect = MutableEffect {
+        state: hardware.clone(),
         trigger: trigger.read_only(),
     };
 
@@ -81,11 +81,12 @@ pub fn run() -> Result<(), JsValue> {
             unit: Mutable::new(()),
             frames: Mutable::new(0),
         },
-        mem: Rc::new(mem_effect),
+        hardware: Rc::new(hardware_effect),
         mem_view_state: mem_view::LocalState {
-            focus: Rc::new(RefCell::new(Mutable::new(0x0040))),
-            cursor: Rc::new(RefCell::new(Mutable::new(0x0064))),
+            focus: Rc::new(RefCell::new(Mutable::new(0xff80))),
+            cursor: Rc::new(RefCell::new(Mutable::new(0xff80))),
         },
+        cpu_control_view_state: Rc::new(RefCell::new(Mutable::new(cpu_control_view::Mode::Paused))),
     };
     let signal_future = Rc::new(RefCell::new(app::run(&app_state)));
     // trigger the initial render
@@ -133,11 +134,16 @@ pub fn run() -> Result<(), JsValue> {
         last = now;
 
         // Execute our hardware!
-        hardware.run(diff);
+        {
+            hardware.borrow_mut().run(diff);
+            // Trigger hardware changes
+            let mut lock = trigger.lock_mut();
+            *lock = ();
+        }
 
         // Blit bytes
         let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
-            Clamped(&mut hardware.ppu.screen.data),
+            Clamped(&mut hardware.borrow_mut().ppu.screen.data),
             width,
             height,
         )

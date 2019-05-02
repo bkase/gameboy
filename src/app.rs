@@ -1,11 +1,13 @@
+use cpu_control_view;
 use futures::{Future, FutureExt};
 use futures_signals::map_ref;
 use futures_signals::signal::{Mutable, Signal, SignalExt};
 use game;
 use hack_vdom::InjectNode;
-use mem::Memory;
+use hardware::Hardware;
 use mem_view;
 use mutable_effect::MutableEffect;
+use reg_view;
 use std::cell::RefCell;
 use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
@@ -38,8 +40,9 @@ pub struct Globals {
  */
 pub struct AppState {
     pub globals: Globals,
-    pub mem: Rc<MutableEffect<Rc<Memory>>>,
+    pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
     pub mem_view_state: mem_view::LocalState<Rc<RefCell<Mutable<u16>>>>,
+    pub cpu_control_view_state: Rc<RefCell<Mutable<cpu_control_view::Mode>>>,
     // we could have one field per component that emits events
 }
 
@@ -49,20 +52,39 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
         unit: Box::new(unit.signal()),
     });
     let mem_view = mem_view::component(mem_view::State {
-        mem: state.mem.clone(),
+        hardware: state.hardware.clone(),
         local: state.mem_view_state.clone(),
+    });
+    let reg_view = reg_view::component(reg_view::State {
+        hardware: state.hardware.clone(),
+    });
+    let cpu_control_view = cpu_control_view::component(cpu_control_view::State {
+        hardware: state.hardware.clone(),
+        mode: state.cpu_control_view_state.clone(),
     });
 
     map_ref! {
         let _ = unit.signal(),
         let mem_view_dom = mem_view,
+        let reg_view_dom = reg_view,
+        let cpu_control_view_dom = cpu_control_view,
         let game_dom = game => {
             let game_dom : InjectNode = InjectNode(game_dom.clone());
             let mem_view_dom : InjectNode = InjectNode(mem_view_dom.clone());
+            let reg_view_dom : InjectNode = InjectNode(reg_view_dom.clone());
+            let cpu_control_view_dom : InjectNode = InjectNode(cpu_control_view_dom.clone());
             html! {
                 <div class="mw8 ph4 mt2">
-                <div class="mw6">
-                    { game_dom }
+                <div class="flex">
+                    <div class="mw6">
+                        { game_dom }
+                    </div>
+                    <div class="mw4">
+                        { cpu_control_view_dom }
+                    </div>
+                </div>
+                <div class="mw5 mt2">
+                    { reg_view_dom }
                 </div>
                 <div class="mw7 mt2">
                     { mem_view_dom }

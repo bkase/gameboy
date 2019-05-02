@@ -94,9 +94,15 @@ impl Memory {
     #[allow(clippy::match_overlapping_arm)]
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
-            0xffff => panic!("interrupt enable register"),
+            0xffff => {
+                println!("ie register");
+                0
+            }
             0xff80...0xfffe => self.zero[(addr - 0xff80) as usize],
-            0xff4c...0xff7f => panic!("unusable"),
+            0xff4c...0xff7f => {
+                println!("unusable memory");
+                0
+            }
             0xff11 => {
                 println!("Sound mode change, not-implemented for now");
                 0
