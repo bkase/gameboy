@@ -1,12 +1,11 @@
 #![allow(dead_code)]
+#![allow(clippy::range_minus_one)]
 
 use mem::{Addr, Direction, Memory};
+use monoid::Monoid;
 use packed_struct::prelude::*;
 use screen::{Coordinate, Rgb, Screen};
-use std::cell::RefCell;
 use std::ops::RangeInclusive;
-use std::rc::Rc;
-use web_utils::log;
 
 pub trait ReadViewU8 {
     fn read(&self) -> u8;
@@ -198,7 +197,7 @@ pub enum Mode {
     Vblank,
 }
 impl Mode {
-    fn working(&self) -> bool {
+    fn working(self) -> bool {
         match self {
             Mode::OamSearch => true,
             Mode::PixelTransfer => true,
@@ -219,6 +218,26 @@ enum WrappingRange {
     Inverted(u8, RangeInclusive<u8>),
     Empty,
 }
+impl Monoid for WrappingRange {
+    fn combine(self, other: WrappingRange) -> WrappingRange {
+        match (self, other) {
+            (WrappingRange::Empty, v) | (v, WrappingRange::Empty) => v,
+            (WrappingRange::Regular(r1), WrappingRange::Regular(r2)) => {
+                WrappingRange::Regular(*r1.start()..=*r2.end())
+            }
+            (WrappingRange::Inverted(m1, r1), WrappingRange::Inverted(m2, r2)) => {
+                assert_eq!(m1, m2);
+                WrappingRange::Inverted(m1, *r1.start()..=*r2.end())
+            }
+            // be lazy and just invalidate everything when we hit an inverted and a regular
+            (WrappingRange::Regular(_), WrappingRange::Inverted(_, _))
+            | (WrappingRange::Inverted(_, _), WrappingRange::Regular(_)) => {
+                WrappingRange::Regular(0..=(SCREEN_ROWS - 1))
+            }
+        }
+    }
+}
+
 impl WrappingRange {
     fn entrypoint(&self) -> u8 {
         match self {
@@ -367,15 +386,15 @@ struct Moment(u16);
 
 impl Moment {
     /// Returns number between 0 and ROWS exclusive
-    fn line(&self) -> u8 {
-        (self.0 % (ROWS as u16)) as u8
+    fn line(self) -> u8 {
+        (self.0 % u16::from(ROWS)) as u8
     }
 
-    fn mode(&self) -> Mode {
-        assert!(self.0 <= (COLS as u16) * (ROWS as u16));
+    fn mode(self) -> Mode {
+        assert!(self.0 <= u16::from(COLS) * u16::from(ROWS));
 
-        if self.0 < (COLS as u16) * (SCREEN_ROWS as u16) {
-            let pos = self.0 % (COLS as u16);
+        if self.0 < u16::from(COLS) * u16::from(SCREEN_ROWS) {
+            let pos = self.0 % u16::from(COLS);
             match pos {
                 0..20 => Mode::OamSearch,
                 20..63 => Mode::PixelTransfer,
@@ -403,9 +422,9 @@ impl Moment {
 
         // we need to repaint everything
         // either because the amount is enormous
-        if amount >= (COLS as u32) * (ROWS as u32) ||
+        if amount >= u32::from(COLS) * u32::from(ROWS) ||
             // or the amount isn't quite the whole screen but it's bigger than vblank and
-            (amount >= (VBLANK_ROWS as u32) * (COLS as u32) &&
+            (amount >= u32::from(VBLANK_ROWS) * u32::from(COLS) &&
              // we start in or near vblank
              (start_mode == Mode::Vblank ||
                 (start_line == SCREEN_ROWS-1 && start_mode == Mode::Hblank)) &&
@@ -415,7 +434,7 @@ impl Moment {
         {
             WrappingRange::Regular(0..=(SCREEN_ROWS - 1))
         // we need to repaint either zero or one lines
-        } else if amount < COLS as u32 && start_line == end_line {
+        } else if amount < u32::from(COLS) && start_line == end_line {
             match (start_mode, end_mode) {
                 (Mode::PixelTransfer, Mode::Hblank) | (Mode::OamSearch, Mode::Hblank) => {
                     WrappingRange::Regular(start_line..=start_line)
@@ -495,7 +514,9 @@ impl Moment {
             self.mode()
         };
 
-        *self = Moment(((self.0 as u32).wrapping_add(amount) % (COLS as u32 * ROWS as u32)) as u16);
+        *self = Moment(
+            (u32::from(self.0).wrapping_add(amount) % (u32::from(COLS) * u32::from(ROWS))) as u16,
+        );
         let end_line = self.line();
         let end_mode =
             // TODO: Fix my mode calculation
@@ -628,6 +649,7 @@ mod moments_test {
 pub struct Ppu {
     pub screen: Screen,
     moment: Moment,
+    dirty: Option<WrappingRange>,
 }
 
 const TILES_PER_ROW: u8 = 32;
@@ -637,6 +659,7 @@ impl Ppu {
         Ppu {
             screen: Screen::create(160, 144),
             moment: Moment(0),
+            dirty: None,
         }
     }
 
@@ -674,16 +697,16 @@ impl Ppu {
         // for each of the 32 tiles on the row
         (0..32).for_each(|i| {
             let tile_number = memory.ld8(tiles_base_addr.offset(
-                (effective_row / 8) as u16 * (TILES_PER_ROW as u16) + i,
+                u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + i,
                 Direction::Pos,
             ));
 
             let b0 = memory.ld8(map_base_addr.offset(
-                tile_number as u16 * 16 + ((effective_row % 8) as u16),
+                u16::from(tile_number) * 16 + u16::from(effective_row % 8),
                 Direction::Pos,
             ));
             let b1 = memory.ld8(map_base_addr.offset(
-                tile_number as u16 * 16 + ((effective_row % 8) as u16) + 1,
+                u16::from(tile_number) * 16 + u16::from(effective_row % 8) + 1,
                 Direction::Pos,
             ));
 
@@ -716,11 +739,23 @@ impl Ppu {
         })
     }
 
-    pub fn advance(&mut self, memory: &Memory, duration: u32) {
-        self.moment
-            .advance(duration)
-            .into_iter()
-            .for_each(|row| self.paint(memory, row))
+    pub fn advance(&mut self, _memory: &Memory, duration: u32) {
+        let range = self.moment.advance(duration);
+        let mut hole = None;
+        std::mem::swap(&mut self.dirty, &mut hole);
+        self.dirty = hole.combine(Some(range));
+    }
+
+    pub fn repaint(&mut self, memory: &Memory) {
+        let mut dirty = None;
+        std::mem::swap(&mut self.dirty, &mut dirty);
+        match dirty {
+            None => (),
+            Some(range) => {
+                range.into_iter().for_each(|row| self.paint(memory, row));
+                self.dirty = None;
+            }
+        }
     }
 }
 

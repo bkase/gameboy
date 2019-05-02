@@ -1,7 +1,7 @@
 pub struct Screen {
     pub data: Vec<u8>,
-    width: u32,
-    height: u32,
+    _width: u32,
+    _height: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -21,8 +21,8 @@ impl Screen {
     pub fn create(width: u32, height: u32) -> Screen {
         Screen {
             data: vec![0; (height * width * 4) as usize],
-            width,
-            height,
+            _width: width,
+            _height: height,
         }
     }
 

@@ -1,8 +1,5 @@
 use cpu::Cpu;
-use mem::{Addr, Direction};
 use ppu::Ppu;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub struct Hardware {
     pub cpu: Cpu,
@@ -24,7 +21,7 @@ impl Hardware {
     //
     // for PPU at least one part it does run at 4MHz
     pub fn run(&mut self, dt: f64) {
-        let mut clocks_to_tick = (dt * 1048.58 / 1000.0) as u32;
+        let mut clocks_to_tick = (dt * 1048.58) as u32;
 
         let mut duration = self.cpu.peek_next();
 
@@ -36,5 +33,7 @@ impl Hardware {
 
             duration = self.cpu.peek_next();
         }
+
+        self.ppu.repaint(&self.cpu.memory);
     }
 }

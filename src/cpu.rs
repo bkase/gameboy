@@ -5,7 +5,6 @@ use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, Rotate};
 use mem::{Addr, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
-use web_utils::log;
 
 pub struct Cpu {
     registers: Registers,
@@ -344,7 +343,7 @@ impl Cpu {
 
     /// Peek at the next instruction to see how long it will take
     pub fn peek_next(&mut self) -> u32 {
-        let mut instr = self.ip.peek(&self.memory);
+        let instr = self.ip.peek(&self.memory);
         // Assumption: Take duration is longer than skip duration (this seems to be true for all
         // Gameboy instructions
         let (take_duration, _) = instr.duration();
@@ -355,7 +354,6 @@ impl Cpu {
     /// different from the peeked duration as time taken differs based on branch takes or skips.
     pub fn execute(&mut self) -> u32 {
         let instr = self.ip.read(&self.memory);
-        log(&format!("Executing: {:?}", instr));
         let (take_duration, skip_duration) = instr.duration();
         let action = self.execute_instr(instr);
         match action {

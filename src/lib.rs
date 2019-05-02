@@ -35,6 +35,7 @@ mod hardware;
 mod instr;
 mod mem;
 mod mem_view;
+mod monoid;
 mod mutable_effect;
 mod ppu;
 mod register;
