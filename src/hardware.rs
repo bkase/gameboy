@@ -1,5 +1,7 @@
 use cpu::Cpu;
+use mem::Addr;
 use ppu::Ppu;
+use std::collections::HashSet;
 use web_utils::log;
 
 pub struct Hardware {
@@ -8,15 +10,20 @@ pub struct Hardware {
     pub paused: bool,
     // dirty bit, aka we need to redraw things with this is true
     pub dirty: bool,
+    pub breakpoints: HashSet<Addr>,
 }
 
 impl Hardware {
     pub fn create() -> Hardware {
+        let mut set = HashSet::new();
+        set.insert(Addr::directly(0x00e0));
+        //set.insert(Addr::directly(0x00fe));
         Hardware {
             cpu: Cpu::create(),
             ppu: Ppu::create(),
             paused: true,
             dirty: false,
+            breakpoints: set,
         }
     }
 
@@ -50,7 +57,7 @@ impl Hardware {
             return;
         }
 
-        let mut clocks_to_tick = (dt * 1048.58) as u32;
+        let mut clocks_to_tick = (dt * 1048.58 / 15.0) as u32;
         let mut duration = self.cpu.peek_next();
 
         // TODO: Protection for taking too long snowball
@@ -60,9 +67,18 @@ impl Hardware {
             clocks_to_tick -= elapsed_duration;
 
             duration = self.cpu.peek_next();
+            // hit a breakpoint?
+            if self.breakpoints.contains(&self.cpu.ip.0) {
+                self.paused = true;
+                break;
+            }
         }
 
         self.ppu.repaint(&self.cpu.memory);
         self.dirty = true;
+    }
+
+    pub fn force_repaint(&mut self) {
+        self.ppu.force_repaint(&self.cpu.memory);
     }
 }

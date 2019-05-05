@@ -128,7 +128,7 @@ impl Cpu {
                 self.registers.hl = addr.into_register();
             }
             DeGetsAddr(addr) => {
-                self.registers.hl = addr.into_register();
+                self.registers.de = addr.into_register();
             }
         };
         BranchAction::Take
@@ -301,6 +301,7 @@ impl Cpu {
         use self::Instr::*;
 
         match instr {
+            Nop => BranchAction::Take,
             Ld(ld) => self.execute_ld(ld),
             Arith(arith) => self.execute_arith(arith),
             Rotate(rotate) => self.execute_rotate(rotate),

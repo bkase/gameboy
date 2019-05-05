@@ -6,6 +6,7 @@ use monoid::Monoid;
 use packed_struct::prelude::*;
 use screen::{Coordinate, Rgb, Screen};
 use std::ops::RangeInclusive;
+use web_utils::log;
 
 pub trait ReadViewU8 {
     fn read(&self) -> u8;
@@ -87,6 +88,7 @@ pub enum BgWindowTileData {
 impl BgWindowTileData {
     pub fn base_addr(self) -> Addr {
         match self {
+            // HACK: do it wrong on purpose
             BgWindowTileData::_8800_97ff => Addr::directly(0x8800),
             BgWindowTileData::_8000_8fff => Addr::directly(0x8000),
         }
@@ -136,6 +138,7 @@ impl ViewU8 for Lcdc {
 pub struct PpuRegisters {
     pub lcdc: Lcdc,
     pub scy: u8,
+    pub scx: u8,
     pub ly: u8, // read/only
     pub bgp: Palette,
 }
@@ -145,6 +148,7 @@ impl PpuRegisters {
         PpuRegisters {
             lcdc: Lcdc::create(),
             scy: 0,
+            scx: 0,
             ly: 0,
             bgp: Palette::create(),
         }
@@ -688,31 +692,31 @@ impl Ppu {
     }
 
     pub fn paint(&mut self, memory: &Memory, row: u8) {
+        let scx = memory.ppu.scx;
         let scy = memory.ppu.scy;
-        let effective_row = row.wrapping_add(scy);
+        let effective_row = row.wrapping_sub(scy);
 
         let tiles_base_addr = memory.ppu.lcdc.bg_window_tile_data.base_addr();
         let map_base_addr = memory.ppu.lcdc.bg_tile_map_display.base_addr();
-
-        // for each of the 32 tiles on the row
-        (0..32).for_each(|i| {
-            let tile_number = memory.ld8(tiles_base_addr.offset(
-                u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + i,
+        // for each of the 18 tiles on screen on the row
+        ((0 + scx)..(18 + scx)).for_each(|i| {
+            let tile_number = memory.ld8(map_base_addr.offset(
+                u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
                 Direction::Pos,
             ));
 
-            let b0 = memory.ld8(map_base_addr.offset(
-                u16::from(tile_number) * 16 + u16::from(effective_row % 8),
+            let b0 = memory.ld8(tiles_base_addr.offset(
+                u16::from(tile_number) * 16 + 2 * (u16::from(effective_row % 8)),
                 Direction::Pos,
             ));
-            let b1 = memory.ld8(map_base_addr.offset(
-                u16::from(tile_number) * 16 + u16::from(effective_row % 8) + 1,
+            let b1 = memory.ld8(tiles_base_addr.offset(
+                u16::from(tile_number) * 16 + 2 * (u16::from(effective_row % 8)) + 1,
                 Direction::Pos,
             ));
 
             let pixels = self.tile_row(b0, b1);
             let pixel_lut: [(u8, u8, u8); 4] =
-                [(0, 0, 0), (220, 176, 181), (98, 78, 81), (255, 255, 255)];
+                [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
 
             // TODO: Don't recreate pallette here
             let pallette = Palette::create();
@@ -731,8 +735,8 @@ impl Ppu {
                 self.screen.bang(
                     Rgb { r, g, b },
                     Coordinate {
-                        x: j as u8,
-                        y: i as u8,
+                        x: ((i as u8) * 8 + (j as u8)) as u8,
+                        y: effective_row,
                     },
                 )
             });
@@ -763,6 +767,11 @@ impl Ppu {
                 range.into_iter().for_each(|row| self.paint(memory, row));
             }
         }
+    }
+
+    pub fn force_repaint(&mut self, memory: &Memory) {
+        self.dirty = Some(WrappingRange::Regular(0..=SCREEN_ROWS - 1));
+        self.repaint(memory);
     }
 }
 

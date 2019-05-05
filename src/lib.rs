@@ -82,10 +82,16 @@ pub fn run() -> Result<(), JsValue> {
             frames: Mutable::new(0),
         },
         hardware: Rc::new(hardware_effect),
-        mem_view_state: mem_view::LocalState {
-            focus: Rc::new(RefCell::new(Mutable::new(0xff80))),
-            cursor: Rc::new(RefCell::new(Mutable::new(0xff80))),
-        },
+        mem_view_state: vec![
+            mem_view::LocalState {
+                focus: Rc::new(RefCell::new(Mutable::new(0x9910))),
+                cursor: Rc::new(RefCell::new(Mutable::new(0x9910))),
+            },
+            mem_view::LocalState {
+                focus: Rc::new(RefCell::new(Mutable::new(0x8080))),
+                cursor: Rc::new(RefCell::new(Mutable::new(0x8080))),
+            },
+        ],
         cpu_control_view_state: Rc::new(RefCell::new(Mutable::new(cpu_control_view::Mode::Paused))),
     };
     let signal_future = Rc::new(RefCell::new(app::run(&app_state)));

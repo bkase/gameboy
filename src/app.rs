@@ -41,7 +41,7 @@ pub struct Globals {
 pub struct AppState {
     pub globals: Globals,
     pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
-    pub mem_view_state: mem_view::LocalState<Rc<RefCell<Mutable<u16>>>>,
+    pub mem_view_state: Vec<mem_view::LocalState<Rc<RefCell<Mutable<u16>>>>>,
     pub cpu_control_view_state: Rc<RefCell<Mutable<cpu_control_view::Mode>>>,
     // we could have one field per component that emits events
 }
@@ -51,9 +51,14 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
     let game = game::component(game::State {
         unit: Box::new(unit.signal()),
     });
-    let mem_view = mem_view::component(mem_view::State {
+    //TODO: How do I traverse?
+    let mem_view1 = mem_view::component(mem_view::State {
         hardware: state.hardware.clone(),
-        local: state.mem_view_state.clone(),
+        local: state.mem_view_state[0].clone(),
+    });
+    let mem_view2 = mem_view::component(mem_view::State {
+        hardware: state.hardware.clone(),
+        local: state.mem_view_state[1].clone(),
     });
     let reg_view = reg_view::component(reg_view::State {
         hardware: state.hardware.clone(),
@@ -65,18 +70,20 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
 
     map_ref! {
         let _ = unit.signal(),
-        let mem_view_dom = mem_view,
+        let mem_view_dom1 = mem_view1,
+        let mem_view_dom2 = mem_view2,
         let reg_view_dom = reg_view,
         let cpu_control_view_dom = cpu_control_view,
         let game_dom = game => {
             let game_dom : InjectNode = InjectNode(game_dom.clone());
-            let mem_view_dom : InjectNode = InjectNode(mem_view_dom.clone());
+            let mem_view_dom1 : InjectNode = InjectNode(mem_view_dom1.clone());
+            let mem_view_dom2 : InjectNode = InjectNode(mem_view_dom2.clone());
             let reg_view_dom : InjectNode = InjectNode(reg_view_dom.clone());
             let cpu_control_view_dom : InjectNode = InjectNode(cpu_control_view_dom.clone());
             html! {
                 <div class="mw8 ph4 mt2">
                 <div class="flex">
-                    <div class="mw6">
+                    <div class="mw6 w-100">
                         { game_dom }
                     </div>
                     <div class="mw4">
@@ -87,8 +94,12 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
                     { reg_view_dom }
                 </div>
                 <div class="mw7 mt2">
-                    { mem_view_dom }
+                    { mem_view_dom1 }
                 </div>
+                <div class="mw7 mt2">
+                    { mem_view_dom2 }
+                </div>
+
             }
         }
     }

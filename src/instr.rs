@@ -264,6 +264,7 @@ pub enum Instr {
     PopBc,
     PushBc,
     Ret,
+    Nop,
 }
 use self::Instr::*;
 
@@ -280,6 +281,7 @@ impl fmt::Display for Instr {
             PopBc => write!(f, "POP BC"),
             PushBc => write!(f, "PUSH BC"),
             Ret => write!(f, "RET"),
+            Nop => write!(f, "NOP"),
         }
     }
 }
@@ -297,6 +299,7 @@ impl HasDuration for Instr {
             PopBc => (3, None),
             PushBc => (4, None),
             Ret => (4, None),
+            Nop => (1, None),
         }
     }
 }
@@ -378,7 +381,7 @@ impl<'a> LiveInstrPointer<'a> {
 
         let pos0 = self.read8();
         match pos0 {
-            0x00 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x00 => (Nop, vec![pos0]),
             0x01 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x02 => (Ld(BcIndGetsA), vec![pos0]),
             0x03 => (Arith(Inc16(RegisterKind16::Bc)), vec![pos0]),

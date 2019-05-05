@@ -41,7 +41,7 @@ pub struct Memory {
     pub ppu: PpuRegisters,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Addr(u16);
 impl fmt::Display for Addr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -119,6 +119,7 @@ impl Memory {
             }
             0xff40 => self.ppu.lcdc.read(),
             0xff42 => self.ppu.scy.read(),
+            0xff43 => self.ppu.scx.read(),
             0xff44 => self.ppu.ly.read(),
             0xff47 => self.ppu.bgp.read(),
             0xff00...0xff4b => {
@@ -149,6 +150,11 @@ impl Memory {
             // rom bank 0
             {
                 self.rom0[addr as usize]
+            }
+            // HACK: cartridge header with Nintendo logo
+            0x0104...0x0134 => {
+                // redirect to nintendo logo inside bootrom
+                BOOTROM[(addr as usize) - 0x0104 + 0x00a8]
             }
             0x0100...0x014f =>
             // cartridge header
@@ -209,6 +215,7 @@ impl Memory {
             0xff13 => println!("Sound mode change, not-implemented for now"),
             0xff40 => self.ppu.lcdc.set(n),
             0xff42 => self.ppu.scy.set(n),
+            0xff43 => self.ppu.scx.set(n),
             0xff44 => panic!("Cannot write to LY register"),
             0xff47 => self.ppu.bgp.set(n),
             0xff00...0xff4b => println!("Passthrough"),

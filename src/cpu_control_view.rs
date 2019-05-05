@@ -101,6 +101,17 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 }
             }
 
+            fn repaint_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode) -> VirtualNode {
+                html! {
+                <button onclick=move |_: MouseEvent| {
+                    hardware.borrow_mut().force_repaint();
+                    log("Force repainting");
+                }>
+                {children}
+                </button>
+                }
+            }
+
             let instrs: Vec<VirtualNode> = {
                 let ip_addr = hardware.borrow().cpu.ip.0;
                 let mut new_ip = InstrPointer(ip_addr);
@@ -122,6 +133,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 { run_button(hardware.clone(), html! { Run }, Mode::Running, disabled1, mode_mutable.clone()) }
                 { run_button(hardware.clone(), html! { Pause }, Mode::Paused, disabled2, mode_mutable.clone()) }
                 { step_button(hardware.clone(), html! { Step }, disabled1) }
+                { repaint_button(hardware.clone(), html! { Repaint }) }
                 <ol style="font-family: PragmataPro, monospace;">
                 //{ if disabled1 { vec![VirtualNode::text("")] } else { instrs } }
                 { instrs }
