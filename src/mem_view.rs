@@ -118,7 +118,7 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
     ) {
         let cursor = local_mutable.cursor.clone();
         let focus = local_mutable.cursor.clone();
-        let new_focus = ((local.borrow().focus as i32)
+        let new_focus = (i32::from(local.borrow().focus)
             + (0x40
                 * match direction {
                     Direction::Pos => 1,
@@ -153,9 +153,13 @@ fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
         }
     }
 
+    #[allow(unused_variables)]
     let local_mutable_up = model.local_mutable.clone();
+    #[allow(unused_variables)]
     let local_mutable_down = model.local_mutable.clone();
+    #[allow(unused_variables)]
     let local_up = model.local_cell.clone();
+    #[allow(unused_variables)]
     let local_down = model.local_cell.clone();
 
     Rc::new(html! {

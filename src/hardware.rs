@@ -15,7 +15,7 @@ pub struct Hardware {
 
 impl Hardware {
     pub fn create() -> Hardware {
-        let mut set = HashSet::new();
+        let mut _set = HashSet::new();
         //set.insert(Addr::directly(0x0021));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
@@ -23,7 +23,7 @@ impl Hardware {
             ppu: Ppu::create(),
             paused: true,
             dirty: false,
-            breakpoints: set,
+            breakpoints: _set,
         }
     }
 
@@ -32,9 +32,11 @@ impl Hardware {
     fn step_(&mut self) -> u32 {
         let elapsed_duration = self.cpu.execute();
         self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
-        return elapsed_duration;
+        elapsed_duration
     }
 
+    // html! macro makes this not dead
+    #[allow(dead_code)]
     /// step the hardware forwards and repaint
     pub fn step(&mut self) {
         log(&format!(
@@ -78,6 +80,8 @@ impl Hardware {
         self.dirty = true;
     }
 
+    // html! macro makes this not dead
+    #[allow(dead_code)]
     pub fn force_repaint(&mut self) {
         self.ppu.force_repaint(&self.cpu.memory);
     }

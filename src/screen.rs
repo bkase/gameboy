@@ -1,5 +1,3 @@
-use web_utils::log;
-
 pub struct Screen {
     pub data: Vec<u8>,
     width: u32,
@@ -35,10 +33,10 @@ impl Screen {
         // (y * width * 4) + (x * 4)
         // assert y < height && x < width
 
-        assert!((coord.y as u32) < self.height);
-        assert!((coord.x as u32) < self.width);
+        assert!(u32::from(coord.y) < self.height);
+        assert!(u32::from(coord.x) < self.width);
 
-        let idx: usize = ((coord.y as u32) * self.width * 4 + (coord.x as u32) * 4) as usize;
+        let idx: usize = (u32::from(coord.y) * self.width * 4 + u32::from(coord.x) * 4) as usize;
         self.data[idx] = rgb.r;
         self.data[idx + 1] = rgb.g;
         self.data[idx + 2] = rgb.b;

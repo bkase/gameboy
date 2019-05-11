@@ -10,7 +10,6 @@ use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
 #[allow(unused_imports)]
 use web_sys::MouseEvent;
-use web_utils::log;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Mode {
@@ -46,6 +45,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
 
             // Note: Due to a bug in percy, we have to manually write out the onclick twice
             // (onclicks don't get updated by the vdom)
+            #[allow(unused_variables)]
             fn run_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode, switch_to: Mode, disabled: bool, mode_mutable: Rc<RefCell<Mutable<Mode>>>) -> VirtualNode {
                 if disabled {
                         html! { <button disabled="" onclick=
@@ -83,6 +83,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 }
             }
 
+            #[allow(unused_variables)]
             fn step_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode, disabled: bool) -> VirtualNode {
                 if disabled {
                     html! {
@@ -101,6 +102,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 }
             }
 
+            #[allow(unused_variables)]
             fn repaint_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode) -> VirtualNode {
                 html! {
                 <button onclick=move |_: MouseEvent| {

@@ -2,11 +2,8 @@
 #![allow(clippy::range_minus_one)]
 
 use mem::{Addr, Direction, Memory};
-use monoid::Monoid;
 use packed_struct::prelude::*;
 use screen::{Coordinate, Rgb, Screen};
-use std::ops::RangeInclusive;
-use web_utils::log;
 
 pub trait ReadViewU8 {
     fn read(&self) -> u8;
@@ -253,6 +250,16 @@ mod moments_test {
     use ppu::*;
 
     const BIG: u32 = (ROWS as u32) * (COLS as u32);
+
+    #[test]
+    fn moment_advance() {
+        let mut moment = Moment(2 * u16::from(COLS) + 24);
+        assert_eq!(moment.line(), 2);
+        assert_eq!(moment.mode(), Mode::PixelTransfer);
+        moment.advance(BIG);
+        assert_eq!(moment.line(), 2);
+        assert_eq!(moment.mode(), Mode::PixelTransfer);
+    }
 }
 
 pub struct Ppu {
@@ -305,7 +312,7 @@ impl Ppu {
         let tiles_base_addr = memory.ppu.lcdc.bg_window_tile_data.base_addr();
         let map_base_addr = memory.ppu.lcdc.bg_tile_map_display.base_addr();
         // for each of the 18 tiles on screen on the row
-        ((0 + scx)..(18 + scx)).for_each(|i| {
+        (scx..(18 + scx)).for_each(|i| {
             let tile_number = memory.ld8(map_base_addr.offset(
                 u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
                 Direction::Pos,
@@ -355,9 +362,7 @@ impl Ppu {
     pub fn repaint(&mut self, memory: &Memory) {
         if self.dirty {
             self.dirty = false;
-            (0..=SCREEN_ROWS - 1)
-                .into_iter()
-                .for_each(|row| self.paint(memory, row));
+            (0..=SCREEN_ROWS - 1).for_each(|row| self.paint(memory, row));
         }
     }
 
