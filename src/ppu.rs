@@ -88,7 +88,6 @@ pub enum BgWindowTileData {
 impl BgWindowTileData {
     pub fn base_addr(self) -> Addr {
         match self {
-            // HACK: do it wrong on purpose
             BgWindowTileData::_8800_97ff => Addr::directly(0x8800),
             BgWindowTileData::_8000_8fff => Addr::directly(0x8000),
         }
@@ -216,174 +215,6 @@ const ROWS: u8 = 154;
 const SCREEN_ROWS: u8 = 144;
 const VBLANK_ROWS: u8 = 10;
 
-#[derive(Clone, Debug, PartialEq)]
-enum WrappingRange {
-    Regular(RangeInclusive<u8>),
-    Inverted(u8, RangeInclusive<u8>),
-    Empty,
-}
-impl Monoid for WrappingRange {
-    fn combine(self, other: WrappingRange) -> WrappingRange {
-        match (self, other) {
-            (WrappingRange::Empty, v) | (v, WrappingRange::Empty) => v,
-            (WrappingRange::Regular(r1), WrappingRange::Regular(r2)) => {
-                WrappingRange::Regular(*r1.start()..=*r2.end())
-            }
-            (WrappingRange::Inverted(m1, r1), WrappingRange::Inverted(m2, r2)) => {
-                assert_eq!(m1, m2);
-                WrappingRange::Inverted(m1, *r1.start()..=*r2.end())
-            }
-            // be lazy and just invalidate everything when we hit an inverted and a regular
-            (WrappingRange::Regular(_), WrappingRange::Inverted(_, _))
-            | (WrappingRange::Inverted(_, _), WrappingRange::Regular(_)) => {
-                WrappingRange::Regular(0..=(SCREEN_ROWS - 1))
-            }
-        }
-    }
-}
-
-impl WrappingRange {
-    fn entrypoint(&self) -> u8 {
-        match self {
-            WrappingRange::Empty => 0,
-            WrappingRange::Regular(r) => *r.start(),
-            WrappingRange::Inverted(_, r) => *r.end() + 1,
-        }
-    }
-
-    fn of(max: u8, lower: Option<u8>, upper: Option<u8>) -> WrappingRange {
-        assert!(lower.unwrap_or_else(|| 0) <= max);
-        assert!(upper.unwrap_or_else(|| 0) <= max);
-
-        match (lower, upper) {
-            (None, None) => WrappingRange::Empty,
-            (Some(lower), None) => WrappingRange::Regular(lower..=max),
-            (None, Some(upper)) => WrappingRange::Regular(0..=upper),
-            (Some(lower), Some(upper)) => {
-                if upper < lower {
-                    if lower - upper > 1 {
-                        WrappingRange::Inverted(max, (upper + 1)..=(lower - 1))
-                    } else {
-                        WrappingRange::Regular(0..=max)
-                    }
-                } else {
-                    WrappingRange::Regular(lower..=upper)
-                }
-            }
-        }
-    }
-}
-
-struct WrappingRangeIterator {
-    cursor: u8,
-    v: WrappingRange,
-    wrapped: bool,
-}
-impl Iterator for WrappingRangeIterator {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<u8> {
-        match &self.v {
-            WrappingRange::Empty => None,
-            WrappingRange::Regular(r) => {
-                if self.cursor <= *r.end() {
-                    let last = self.cursor;
-                    self.cursor += 1;
-                    Some(last)
-                } else {
-                    None
-                }
-            }
-            WrappingRange::Inverted(max, r) => {
-                // -1 is safe because we +1 when we create from `of`
-                if self.cursor < *r.start() || !self.wrapped {
-                    let last = self.cursor;
-                    if self.cursor < *max {
-                        self.cursor += 1;
-                        Some(last)
-                    } else {
-                        assert_eq!(self.cursor, *max);
-                        if *r.start() == 0 {
-                            None
-                        } else {
-                            self.wrapped = true;
-                            self.cursor = 0;
-                            Some(last)
-                        }
-                    }
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
-impl IntoIterator for WrappingRange {
-    type Item = u8;
-    type IntoIter = WrappingRangeIterator;
-    fn into_iter(self) -> WrappingRangeIterator {
-        let entry = self.entrypoint();
-        WrappingRangeIterator {
-            wrapped: false,
-            cursor: entry,
-            v: self,
-        }
-    }
-}
-
-#[cfg(test)]
-mod wrapping_test {
-    use ppu::*;
-    #[test]
-    fn wrapping_of() {
-        // simple
-        assert_eq!(
-            WrappingRange::of(10, Some(1), Some(4)),
-            WrappingRange::Regular(1..=4)
-        );
-        // overflow/underflow upper
-        assert_eq!(
-            WrappingRange::of(10, Some(1), None),
-            WrappingRange::Regular(1..=10)
-        );
-        // overflow lower
-        assert_eq!(
-            WrappingRange::of(10, None, Some(4)),
-            WrappingRange::Regular(0..=4)
-        );
-        // overflow both
-        assert_eq!(WrappingRange::of(10, None, None), WrappingRange::Empty);
-        // inverted
-        assert_eq!(
-            WrappingRange::of(10, Some(4), Some(1)),
-            WrappingRange::Inverted(10, 2..=3)
-        );
-        // oneline-inversion is empty
-        assert_eq!(
-            WrappingRange::of(10, Some(3), Some(2)),
-            WrappingRange::Regular(0..=10)
-        );
-    }
-
-    #[test]
-    fn wrapping_iterator() {
-        // empty is empty
-        let empty: Vec<u8> = WrappingRange::Empty.into_iter().collect();
-        assert_eq!(empty, vec![]);
-
-        // regular
-        let regular: Vec<u8> = WrappingRange::Regular(3..=10).into_iter().collect();
-        let expected: Vec<u8> = (3..=10).into_iter().collect();
-        assert_eq!(regular, expected);
-
-        // inverted
-        let inverted: Vec<u8> = WrappingRange::Inverted(10, 2..=3).into_iter().collect();
-        assert_eq!(inverted, vec![4, 5, 6, 7, 8, 9, 10, 0, 1]);
-    }
-
-}
-
 #[derive(Copy, Clone, Debug)]
 /// Invariant: .0 <= COLS * ROWS
 struct Moment(u16);
@@ -391,7 +222,7 @@ struct Moment(u16);
 impl Moment {
     /// Returns number between 0 and ROWS exclusive
     fn line(self) -> u8 {
-        (self.0 % u16::from(ROWS)) as u8
+        (self.0 / u16::from(COLS)) as u8
     }
 
     fn mode(self) -> Mode {
@@ -410,127 +241,10 @@ impl Moment {
         }
     }
 
-    // I wrote this on an airplane, sorry for the grossness
-    //
-    // TODO: there's an off-by-one in this case, but worst cast we accidentally just draw a frame twice. The off-by-one is because we can start at the row before blank and end the row after and only sometimes do we want to redraw all.
-    fn determine_repaints(
-        amount: u32,
-        start_line: u8,
-        start_mode: Mode,
-        end_line: u8,
-        end_mode: Mode,
-    ) -> WrappingRange {
-        // sanity
-        assert!(start_line < ROWS);
-        assert!(end_line < ROWS);
-
-        // we need to repaint everything
-        // either because the amount is enormous
-        if amount >= u32::from(COLS) * u32::from(ROWS) ||
-            // or the amount isn't quite the whole screen but it's bigger than vblank and
-            (amount >= u32::from(VBLANK_ROWS) * u32::from(COLS) &&
-             // we start in or near vblank
-             (start_mode == Mode::Vblank ||
-                (start_line == SCREEN_ROWS-1 && start_mode == Mode::Hblank)) &&
-             // we end in or near vlank
-             (end_mode == Mode::Vblank ||
-                (end_line == 0 && end_mode.working())))
-        {
-            WrappingRange::Regular(0..=(SCREEN_ROWS - 1))
-        // we need to repaint either zero or one lines
-        } else if amount < u32::from(COLS) && start_line == end_line {
-            match (start_mode, end_mode) {
-                (Mode::PixelTransfer, Mode::Hblank) | (Mode::OamSearch, Mode::Hblank) => {
-                    WrappingRange::Regular(start_line..=start_line)
-                }
-                (_, _) => WrappingRange::Empty,
-            }
-        // we started and ended at the same line, but we wrapped around
-        } else if start_line == end_line {
-            match start_mode {
-                // if we started before hblank, we can repaint everything
-                Mode::OamSearch | Mode::PixelTransfer => {
-                    WrappingRange::Regular(0..=(SCREEN_ROWS - 1))
-                }
-                // if we're in hblank, we need to skip just this line
-                Mode::Hblank => WrappingRange::Inverted(SCREEN_ROWS - 1, start_line..=start_line),
-                // if we're in vblank we should do nothing
-                Mode::Vblank => WrappingRange::Empty,
-            }
-        } else {
-            // we started and stopped at different lines
-            assert_ne!(start_line, end_line);
-            // start either on this line or on the next depending on which mode we're in
-            let start_point = match start_mode {
-                Mode::OamSearch | Mode::PixelTransfer => Some(start_line),
-                Mode::Hblank => {
-                    if start_line + 1 < SCREEN_ROWS {
-                        Some(start_line + 1)
-                    } else {
-                        None // overflow
-                    }
-                }
-                Mode::Vblank => {
-                    if start_line == ROWS - 1 {
-                        Some(0)
-                    } else {
-                        None // overflow
-                    }
-                }
-            };
-            // end on either this line or the prior depending on which mode we're in
-            let end_point = match end_mode {
-                Mode::OamSearch | Mode::PixelTransfer => {
-                    if end_line == 0 {
-                        None // underflow
-                    } else {
-                        Some(end_line - 1)
-                    }
-                }
-                Mode::Hblank => Some(end_line),
-                Mode::Vblank => {
-                    if end_line == SCREEN_ROWS {
-                        Some(SCREEN_ROWS - 1)
-                    } else {
-                        None // overflow
-                    }
-                }
-            };
-
-            // if start_line and end_line were next to each other
-            // but the point edge cases causes them to cross, we want empty
-            if start_line + 1 == end_line && start_point > end_point {
-                WrappingRange::Empty
-            } else {
-                WrappingRange::of(SCREEN_ROWS - 1, start_point, end_point)
-            }
-        }
-    }
-
-    /// Returns a range of lines onto which we need to repaint
-    /// Bounds: 0..SCREEN_ROWS
-    fn advance(&mut self, amount: u32) -> WrappingRange {
-        let start_line = self.line();
-        // TODO: Fix my mode calculation
-        let start_mode = if start_line > 143 {
-            Mode::Vblank
-        } else {
-            self.mode()
-        };
-
+    fn advance(&mut self, amount: u32) {
         *self = Moment(
             (u32::from(self.0).wrapping_add(amount) % (u32::from(COLS) * u32::from(ROWS))) as u16,
         );
-        let end_line = self.line();
-        let end_mode =
-            // TODO: Fix my mode calculation
-            if end_line > 143 {
-                Mode::Vblank
-            } else {
-                self.mode()
-            };
-
-        Self::determine_repaints(amount, start_line, start_mode, end_line, end_mode)
     }
 }
 
@@ -539,121 +253,12 @@ mod moments_test {
     use ppu::*;
 
     const BIG: u32 = (ROWS as u32) * (COLS as u32);
-
-    #[test]
-    fn large_simple() {
-        assert_eq!(
-            Moment::determine_repaints(BIG, 0, Mode::Hblank, 3, Mode::Hblank),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-        assert_eq!(
-            Moment::determine_repaints(BIG, 0, Mode::OamSearch, 100, Mode::Hblank),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-    }
-
-    #[test]
-    fn vblank_larges() {
-        // normal
-        assert_eq!(
-            Moment::determine_repaints(BIG - 2, 146, Mode::Vblank, 148, Mode::Vblank),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-
-        // inverted
-        assert_eq!(
-            Moment::determine_repaints(BIG - 2, 148, Mode::Vblank, 146, Mode::Vblank),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-
-        // near vblank lower
-        assert_eq!(
-            Moment::determine_repaints(BIG - 2, SCREEN_ROWS - 1, Mode::Hblank, 146, Mode::Vblank),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-
-        // near vblank upper
-        assert_eq!(
-            Moment::determine_repaints(BIG - 2, 148, Mode::Vblank, 0, Mode::OamSearch),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-
-        // near vblank upper/lower
-        assert_eq!(
-            Moment::determine_repaints(BIG - 1, SCREEN_ROWS - 1, Mode::Hblank, 0, Mode::OamSearch),
-            WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-        );
-    }
-
-    #[test]
-    fn zero_or_one() {
-        // same region (working)
-        assert_eq!(
-            Moment::determine_repaints(5, 135, Mode::OamSearch, 135, Mode::OamSearch),
-            WrappingRange::Empty
-        );
-
-        // same region (not working)
-        assert_eq!(
-            Moment::determine_repaints(5, 135, Mode::Hblank, 135, Mode::Hblank),
-            WrappingRange::Empty
-        );
-
-        // different region
-        assert_eq!(
-            Moment::determine_repaints(5, 135, Mode::OamSearch, 135, Mode::Hblank),
-            WrappingRange::Regular(135..=135)
-        );
-    }
-
-    // TODO: More of these tests
-    #[test]
-    fn different_lines() {
-        // begin oam, end oam
-        assert_eq!(
-            Moment::determine_repaints(
-                (COLS as u32) * 2,
-                136,
-                Mode::OamSearch,
-                138,
-                Mode::OamSearch
-            ),
-            WrappingRange::Regular(136..=137)
-        );
-
-        // begin hblank, end oam
-        assert_eq!(
-            Moment::determine_repaints((COLS as u32) * 2, 136, Mode::Hblank, 138, Mode::OamSearch),
-            WrappingRange::Regular(137..=137)
-        );
-
-        // begin hblank, end oam, oneline
-        assert_eq!(
-            Moment::determine_repaints(COLS as u32 - 50, 137, Mode::Hblank, 138, Mode::OamSearch),
-            WrappingRange::Empty
-        );
-
-        // begin hblank, end hblank
-        assert_eq!(
-            Moment::determine_repaints((COLS as u32) * 2, 136, Mode::Hblank, 138, Mode::Hblank),
-            WrappingRange::Regular(137..=138)
-        );
-    }
-
-    #[test]
-    fn inversion() {
-        // begin oam, end hblank
-        assert_eq!(
-            Moment::determine_repaints((COLS as u32) * 30, 136, Mode::OamSearch, 26, Mode::Hblank),
-            WrappingRange::Inverted(SCREEN_ROWS - 1, 27..=135)
-        );
-    }
 }
 
 pub struct Ppu {
     pub screen: Screen,
     moment: Moment,
-    dirty: Option<WrappingRange>,
+    dirty: bool,
 }
 
 const TILES_PER_ROW: u8 = 32;
@@ -663,7 +268,7 @@ impl Ppu {
         Ppu {
             screen: Screen::create(160, 144),
             moment: Moment(0),
-            dirty: None,
+            dirty: false,
         }
     }
 
@@ -694,6 +299,7 @@ impl Ppu {
     pub fn paint(&mut self, memory: &Memory, row: u8) {
         let scx = memory.ppu.scx;
         let scy = memory.ppu.scy;
+        let pallette = &memory.ppu.bgp;
         let effective_row = row.wrapping_add(scy);
 
         let tiles_base_addr = memory.ppu.lcdc.bg_window_tile_data.base_addr();
@@ -718,9 +324,6 @@ impl Ppu {
             let pixel_lut: [(u8, u8, u8); 4] =
                 [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
 
-            // TODO: Don't recreate pallette here
-            let pallette = Palette::create();
-
             pixels.into_iter().enumerate().for_each(|(j, pixel)| {
                 let idx: u8 = match pixel.value.into() {
                     0b00 => pallette.dot00,
@@ -744,35 +347,22 @@ impl Ppu {
     }
 
     pub fn advance(&mut self, memory: &mut Memory, duration: u32) {
-        let range = self.moment.advance(duration);
-        // HACK: we need this to be more accurate to have bootrom to be happy, but we can just set
-        // to 144 whenever it's around 144 and we should be good
-        memory.ppu.ly = if self.moment.line() >= 144 && self.moment.line() <= 149 {
-            144
-        } else {
-            self.moment.line()
-        };
-
-        let mut hole = None;
-        std::mem::swap(&mut self.dirty, &mut hole);
-        self.dirty = hole.combine(Some(range));
+        self.moment.advance(duration);
+        memory.ppu.ly = self.moment.line();
+        self.dirty = true;
     }
 
     pub fn repaint(&mut self, memory: &Memory) {
-        let mut dirty = None;
-        std::mem::swap(&mut self.dirty, &mut dirty);
-        match dirty {
-            None => (),
-            Some(_range) => {
-                WrappingRange::Regular(0..=SCREEN_ROWS - 1)
-                    .into_iter()
-                    .for_each(|row| self.paint(memory, row));
-            }
+        if self.dirty {
+            self.dirty = false;
+            (0..=SCREEN_ROWS - 1)
+                .into_iter()
+                .for_each(|row| self.paint(memory, row));
         }
     }
 
     pub fn force_repaint(&mut self, memory: &Memory) {
-        self.dirty = Some(WrappingRange::Regular(0..=SCREEN_ROWS - 1));
+        self.dirty = true;
         self.repaint(memory);
     }
 }
@@ -818,69 +408,6 @@ mod tiles {
  *  |                            |
  *  ------------------------------
  */
-
-/*struct PixelFetcher<'a> {
-    memory: &'a Memory,
-
-    // increments each round of the pixel fetching
-    tile_map_col: u16,
-    tile_map_row:
-
-    // increments each step
-    mode: PixelFetcherMode
-}
-// clocked at 2MHz
-impl<'a> PixelFetcher<'a> {
-    fn create<'b>(memory: &'b Memory) -> PixelFetcher<'b> {
-        PixelFetcher {
-            memory,
-            tile_map_offset: 0,
-            mode: PixelFetcherMode::ReadTile,
-            tile_number: None,
-            data0: None,
-        }
-    }
-
-    fn read_tile(&mut self) {
-        assert_eq!(self.mode, PixelFetcherMode::ReadTile);
-
-        let base_addr = self.memory.ppu.lcdc.bg_window_tile_data.base_addr();
-        let tile_number =
-            self.memory.ld8(base_addr.offset_by(tile_map_offset, Direction::Pos));
-        self.mode = PixelFetcherMode::ReadData0(tile_number);
-    }
-
-    fn step(&mut self) -> Option<[Pixel; 8]> {
-        match self.mode {
-            PixelFetcherMode::ReadTile =>  {
-                let base_addr = self.memory.ppu.lcdc.bg_window_tile_data.base_addr();
-                let tile_number =
-                    self.memory.ld8(base_addr.offset_by(tile_map_offset, Direction::Pos));
-                self.mode = PixelFetcherMode::ReadData0(tile_number);
-            },
-            PixelFetcherMode::ReadData0(tile_number) => {
-                // TODO: How do we get tile_number to an address?
-                let base_addr = self.memory.ppu.lcdc.bg_tile_map_display.base_addr();
-                let data0 = self.memory.ld8(base_addr.offset_by(tile_number * 16, Direction::Pos));
-                self.mode = PixelFetcherMode::ReadData1(tile_number, data0);
-            },
-        }
-    }
-}
-
-
-pub struct Ppu {
-    pixel_fifo: PixelFifo,
-    pixel_fetcher: PixelFetcher,
-
-    ppu_section_ticks: u32
-}
-impl Ppu {
-    pub fn forwards(&mut self, duration: u32) {
-        self.ppu_section_ticks += duration*4;
-        self.ppu_section_ticks %= 17_556*4; // for now hardcoded
-    }
-}*/
 
 #[cfg(test)]
 mod test {

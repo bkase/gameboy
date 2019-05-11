@@ -30,19 +30,11 @@ impl Screen {
 
     #[inline]
     pub fn bang(&mut self, rgb: Rgb, coord: Coordinate) {
-        //if (rgb != Rgb { r: 0, g: 0, b: 0 }) {
-        //log(&format!("Non-zero at: {:?}", coord));
-        //}
-
         // Total size = height * width * 4
         //
         // (y * width * 4) + (x * 4)
         // assert y < height && x < width
-        if (coord.y as u32) >= self.height {
-            // HACK because something is wrong in my repaint logic
-            //      we'll get an index-out-of-bounds without this
-            return;
-        }
+
         assert!((coord.y as u32) < self.height);
         assert!((coord.x as u32) < self.width);
 
