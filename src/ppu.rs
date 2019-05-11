@@ -694,7 +694,7 @@ impl Ppu {
     pub fn paint(&mut self, memory: &Memory, row: u8) {
         let scx = memory.ppu.scx;
         let scy = memory.ppu.scy;
-        let effective_row = row.wrapping_sub(scy);
+        let effective_row = row.wrapping_add(scy);
 
         let tiles_base_addr = memory.ppu.lcdc.bg_window_tile_data.base_addr();
         let map_base_addr = memory.ppu.lcdc.bg_tile_map_display.base_addr();
@@ -736,7 +736,7 @@ impl Ppu {
                     Rgb { r, g, b },
                     Coordinate {
                         x: ((i as u8) * 8 + (j as u8)) as u8,
-                        y: effective_row,
+                        y: row,
                     },
                 )
             });
@@ -763,8 +763,10 @@ impl Ppu {
         std::mem::swap(&mut self.dirty, &mut dirty);
         match dirty {
             None => (),
-            Some(range) => {
-                range.into_iter().for_each(|row| self.paint(memory, row));
+            Some(_range) => {
+                WrappingRange::Regular(0..=SCREEN_ROWS - 1)
+                    .into_iter()
+                    .for_each(|row| self.paint(memory, row));
             }
         }
     }

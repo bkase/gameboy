@@ -214,7 +214,7 @@ impl Cpu {
             Rl(r) => {
                 let n = self.registers.read8(r);
                 let result = alu::rl(&mut self.registers.flags, n.0);
-                self.registers.write8n(RegisterKind8::A, result);
+                self.registers.write8n(r, result);
             }
         };
         BranchAction::Take

@@ -181,7 +181,7 @@ pub fn dec16(_flags: &mut Flags, x: u16) -> u16 {
 }
 
 pub fn rl(flags: &mut Flags, x: u8) -> u8 {
-    let r = x << 1;
+    let r = (x << 1) | (if flags.c { 1 } else { 0 });
     flags.reset();
     flags.z = r == 0;
     flags.c = x & 0x80 == 0x80;

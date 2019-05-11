@@ -16,7 +16,7 @@ pub struct Hardware {
 impl Hardware {
     pub fn create() -> Hardware {
         let mut set = HashSet::new();
-        set.insert(Addr::directly(0x00e0));
+        //set.insert(Addr::directly(0x0021));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
             cpu: Cpu::create(),
@@ -57,7 +57,7 @@ impl Hardware {
             return;
         }
 
-        let mut clocks_to_tick = (dt * 1048.58 / 15.0) as u32;
+        let mut clocks_to_tick = (dt * 1048.58) as u32;
         let mut duration = self.cpu.peek_next();
 
         // TODO: Protection for taking too long snowball
