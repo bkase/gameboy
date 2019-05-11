@@ -168,6 +168,9 @@ impl Cpu {
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 self.execute_alu_binop(alu::add, operand);
             }
+            AddN(n) => {
+                self.execute_alu_binop(alu::add, n);
+            }
             Inc8(r) => {
                 let operand = self.registers.read8(r);
                 let result = alu::inc(&mut self.registers.flags, operand.0);
@@ -264,6 +267,12 @@ mod instr_tests {
 }
 
 impl Cpu {
+    fn do_call(&mut self, addr: Addr) {
+        let r16 = self.ip.0.into_register();
+        self.push16(r16);
+        self.ip.jump(addr);
+    }
+
     fn execute_jump(&mut self, jump: Jump) -> BranchAction {
         use self::Jump::*;
 
@@ -289,10 +298,16 @@ impl Cpu {
                 }
             }
             Call(addr) => {
-                let r16 = self.ip.0.into_register();
-                self.push16(r16);
-                self.ip.jump(addr);
+                self.do_call(addr);
                 BranchAction::Take
+            }
+            CallZ(addr) => {
+                if self.registers.flags.z {
+                    self.do_call(addr);
+                    BranchAction::Take
+                } else {
+                    BranchAction::Skip
+                }
             }
         }
     }

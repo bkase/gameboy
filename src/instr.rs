@@ -149,6 +149,7 @@ pub enum Arith {
     Sub(RegisterKind8),
     SubHlInd,
     AddHlInd,
+    AddN(u8),
     Inc8(RegisterKind8),
     Inc16(RegisterKind16),
     IncHlInd,
@@ -167,6 +168,7 @@ impl fmt::Display for Arith {
             Sub(rk) => write!(f, "(SUB) A <- A - {:}", rk),
             SubHlInd => write!(f, "(SUB) A <- A - [HL]"),
             AddHlInd => write!(f, "(ADD) A <- A + [HL]"),
+            AddN(n) => write!(f, "(ADD) A <- A + {:}", R8(*n)),
             Inc8(rk) => write!(f, "(INC) {:}++", rk),
             Inc16(rk) => write!(f, "(INC) {:}++", rk),
             IncHlInd => write!(f, "(INC) [HL]++"),
@@ -185,6 +187,7 @@ impl HasDuration for Arith {
             Sub(_) => (1, None),
             SubHlInd => (2, None),
             AddHlInd => (2, None),
+            AddN(_) => (2, None),
             Inc8(_) => (1, None),
             Inc16(_) => (2, None),
             IncHlInd => (3, None),
@@ -226,6 +229,7 @@ pub enum Jump {
     JrNz(i8),
     JrZ(i8),
     Call(Addr),
+    CallZ(Addr),
 }
 use self::Jump::*;
 
@@ -236,6 +240,7 @@ impl fmt::Display for Jump {
             JrNz(n) => write!(f, "JRNZ {:} (if != 0)", n),
             JrZ(n) => write!(f, "JRZ {:} (if == 0)", n),
             Call(addr) => write!(f, "CALL {:}", addr),
+            CallZ(addr) => write!(f, "CALLZ {:}", addr),
         }
     }
 }
@@ -247,6 +252,7 @@ impl HasDuration for Jump {
             JrNz(_) => (3, Some(2)),
             JrZ(_) => (3, Some(2)),
             Call(_) => (6, None),
+            CallZ(_) => (6, Some(3)),
         }
     }
 }
@@ -637,13 +643,20 @@ impl<'a> LiveInstrPointer<'a> {
                     _ => panic!(format!("unimplemented instruction {}", pos1)),
                 }
             }
-            0xcc => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xcc => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (Jump(CallZ(Addr::directly(addr))), vec![pos0, lo, hi])
+            }
             0xcd => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Jump(Call(Addr::directly(addr))), vec![pos0, lo, hi])
             }
-            0xce => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xce => {
+                let pos1 = self.read8();
+                (Arith(AddN(pos1)), vec![pos0, pos1])
+            }
             0xcf => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd1 => panic!(format!("unimplemented instruction ${:x}", pos0)),

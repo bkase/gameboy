@@ -67,6 +67,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     { draw_flags("flags", &registers.flags) }
                     { draw_r8("scx", R8(ppu_regs.scx)) }
                     { draw_r8("scy", R8(ppu_regs.scy)) }
+                    { draw_r8("ly", R8(ppu_regs.ly)) }
                     { draw_r8("lcdc", R8(ppu_regs.lcdc.read())) }
                 </tbody>
             </table>
