@@ -4,7 +4,7 @@ use futures_signals::map_ref;
 use futures_signals::signal::Signal;
 use hardware::Hardware;
 use mutable_effect::MutableEffect;
-use ppu::ReadViewU8;
+use read_view_u8::*;
 use register::Flags;
 use register::{R16, R8};
 use std::cell::RefCell;
@@ -21,6 +21,8 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
     map_ref! {
         let _ = state.hardware.trigger.signal() => move {
             let ppu_regs_hardware = hardware.clone();
+            let sound_regs_hardware = hardware.clone();
+            let pulse_a = &sound_regs_hardware.borrow().cpu.memory.sound.pulse_a;
             let ppu_regs = &ppu_regs_hardware.borrow().cpu.memory.ppu;
             let registers = &hardware.borrow().cpu.registers;
 
@@ -65,6 +67,11 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     { draw_r16("sp", registers.sp) }
                     { draw_r8("a", registers.a) }
                     { draw_flags("flags", &registers.flags) }
+                    { draw_r8("pa:control", R8(pulse_a.control.read())) }
+                    { draw_r8("pa:frequency", R8(pulse_a.frequency.read())) }
+                    { draw_r8("pa:volume", R8(pulse_a.volume.read())) }
+                    { draw_r8("pa:length", R8(pulse_a.length.read())) }
+                    { draw_r8("pa:sweep", R8(pulse_a.sweep.read())) }
                     { draw_r8("scx", R8(ppu_regs.scx)) }
                     { draw_r8("scy", R8(ppu_regs.scy)) }
                     { draw_r8("ly", R8(ppu_regs.ly)) }

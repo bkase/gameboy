@@ -1,12 +1,14 @@
 use cpu::Cpu;
 use mem::Addr;
 use ppu::Ppu;
+use sound::Sound;
 use std::collections::HashSet;
 use web_utils::log;
 
 pub struct Hardware {
     pub cpu: Cpu,
     pub ppu: Ppu,
+    pub sound: Sound,
     pub paused: bool,
     // dirty bit, aka we need to redraw things with this is true
     pub dirty: bool,
@@ -16,11 +18,12 @@ pub struct Hardware {
 impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
-        //set.insert(Addr::directly(0x0021));
+        //_set.insert(Addr::directly(0x0080));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
             cpu: Cpu::create(),
             ppu: Ppu::create(),
+            sound: Sound::create(),
             paused: true,
             dirty: false,
             breakpoints: _set,
@@ -32,6 +35,7 @@ impl Hardware {
     fn step_(&mut self) -> u32 {
         let elapsed_duration = self.cpu.execute();
         self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
+        self.sound.advance(&mut self.cpu.memory, elapsed_duration);
         elapsed_duration
     }
 

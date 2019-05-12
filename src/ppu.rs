@@ -3,26 +3,8 @@
 
 use mem::{Addr, Direction, Memory};
 use packed_struct::prelude::*;
+use read_view_u8::*;
 use screen::{Coordinate, Rgb, Screen};
-
-pub trait ReadViewU8 {
-    fn read(&self) -> u8;
-}
-
-pub trait ViewU8: ReadViewU8 {
-    fn set(&mut self, n: u8);
-}
-
-impl ReadViewU8 for u8 {
-    fn read(&self) -> u8 {
-        *self
-    }
-}
-impl ViewU8 for u8 {
-    fn set(&mut self, n: u8) {
-        *self = n
-    }
-}
 
 #[derive(PackedStruct)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]

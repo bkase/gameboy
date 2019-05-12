@@ -39,10 +39,12 @@ mod mem_view;
 mod monoid;
 mod mutable_effect;
 mod ppu;
+mod read_view_u8;
 mod reg_view;
 mod register;
 mod register_kind;
 mod screen;
+mod sound;
 mod tile_debug;
 mod utils;
 mod web_utils;
@@ -117,6 +119,17 @@ pub fn run() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
+    let audio_ctx = web_sys::AudioContext::new().unwrap();
+    let primary = audio_ctx.create_oscillator().unwrap();
+    let gain = audio_ctx.create_gain().unwrap();
+    primary.set_type(web_sys::OscillatorType::Square);
+    primary.frequency().set_value(440.0); // A4 note
+    gain.gain().set_value(0.0); // starts muted
+    primary.connect_with_audio_node(&gain).unwrap();
+    gain.connect_with_audio_node(&audio_ctx.destination())
+        .unwrap();
+    primary.start().unwrap();
+
     let mut i = 0;
     let mut last = performance_now();
     let closure = move || {
@@ -131,6 +144,7 @@ pub fn run() -> Result<(), JsValue> {
             // Drop our handle to this closure so that it will get cleaned
             // up once we return.
             let _ = f.borrow_mut().take();
+            audio_ctx.close().unwrap();
             return;
         }
 
@@ -161,6 +175,21 @@ pub fn run() -> Result<(), JsValue> {
         )
         .expect("u8 clamped array");
         ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
+
+        // play sound
+        match hardware.borrow().sound.audio {
+            None => {
+                //gain.gain().set_value(0.0);
+            }
+            Some(ref audio) => {
+                log(&format!(
+                    "Settings audio gain: {:?}, frequency: {:?}",
+                    audio.channel.gain, audio.channel.frequency
+                ));
+                gain.gain().set_value(audio.channel.gain);
+                primary.frequency().set_value(audio.channel.frequency);
+            }
+        }
 
         // Show fps
         let fps = (1000.0 / diff).ceil();

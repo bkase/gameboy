@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
-use ppu::{PpuRegisters, ReadViewU8, ViewU8};
+use ppu::PpuRegisters;
+use read_view_u8::*;
 use register::R16;
+use sound;
 use std::fmt;
 
 /* 5.1. General memory map
@@ -39,6 +41,7 @@ pub struct Memory {
     video: Vec<u8>,
     rom0: Vec<u8>,
     pub ppu: PpuRegisters,
+    pub sound: sound::Registers,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -90,6 +93,7 @@ impl Memory {
             video: vec![0; 0x2000],
             rom0: vec![0; 0x4000],
             ppu: PpuRegisters::create(),
+            sound: sound::Registers::create(),
         }
     }
 
@@ -109,14 +113,11 @@ impl Memory {
                 println!("unusable memory");
                 0
             }
-            0xff11 => {
-                println!("Sound mode change, not-implemented for now");
-                0
-            }
-            0xff13 => {
-                println!("Sound mode change, not-implemented for now");
-                0
-            }
+            0xff10 => self.sound.pulse_a.sweep.read(),
+            0xff11 => self.sound.pulse_a.length.read(),
+            0xff12 => self.sound.pulse_a.volume.read(),
+            0xff13 => self.sound.pulse_a.frequency.read(),
+            0xff14 => self.sound.pulse_a.control.read(),
             0xff40 => self.ppu.lcdc.read(),
             0xff42 => self.ppu.scy.read(),
             0xff43 => self.ppu.scx.read(),
@@ -211,8 +212,11 @@ impl Memory {
             0xff80...0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
             0xff4c...0xff7f => panic!("unusable"),
-            0xff11 => println!("Sound mode change, not-implemented for now"),
-            0xff13 => println!("Sound mode change, not-implemented for now"),
+            0xff10 => self.sound.pulse_a.sweep.set(n),
+            0xff11 => self.sound.pulse_a.length.set(n),
+            0xff12 => self.sound.pulse_a.volume.set(n),
+            0xff13 => self.sound.pulse_a.frequency.set(n),
+            0xff14 => self.sound.pulse_a.control.set(n),
             0xff40 => self.ppu.lcdc.set(n),
             0xff42 => self.ppu.scy.set(n),
             0xff43 => self.ppu.scx.set(n),

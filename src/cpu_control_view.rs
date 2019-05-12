@@ -10,6 +10,7 @@ use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
 #[allow(unused_imports)]
 use web_sys::MouseEvent;
+use web_utils::log;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Mode {

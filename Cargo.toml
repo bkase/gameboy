@@ -47,6 +47,15 @@ features = [
   'ImageData',
   'Node',
   'Window',
+
+# audio
+  'AudioContext',
+  'AudioDestinationNode',
+  'AudioNode',
+  'AudioParam',
+  'GainNode',
+  'OscillatorNode',
+  'OscillatorType',
 ]
 
 [dev-dependencies]
