@@ -223,14 +223,14 @@ pub enum Oscillator {
     Pulse(PulseKind),
 }
 
-const GAIN_EPSLION: f32 = 0.00001;
+const GAIN_EPSLION: f32 = 0.00000001;
 pub struct Channel {
     pub gain: f32,
     pub oscillator: Oscillator,
     pub frequency: f32,
 }
 
-const ONE_SIXTY_FOURTH_SECS_IN_TICKS: u32 = 163840; // 16384;
+const ONE_SIXTY_FOURTH_SECS_IN_TICKS: u32 = 16384;
 pub enum Behavior {
     Decaying(u32), // decrease gain by one unit every u32 ticks
 }
@@ -277,16 +277,16 @@ impl Sound {
                         assert!(audio.ticksPassed < ticks);
                         if audio.ticksPassed + duration > ticks {
                             audio.ticksPassed = (audio.ticksPassed + duration) % ticks;
-                            audio.channel.gain -= 1.0 / 16.0;
+                            audio.channel.gain -= 1.0 / 64.0;
                             if audio.channel.gain < GAIN_EPSLION
-                                || -1.0 * audio.channel.gain < GAIN_EPSLION
+                                || -1.0 * audio.channel.gain > -1. * GAIN_EPSLION
                             {
                                 audio.channel.gain = 0.0;
                                 // DROP the audio here once gain hits zero (we're done)
-                                //should_drop = true;
+                                should_drop = true;
                             }
                         } else {
-                            audio.ticksPassed += duration;
+                            audio.ticksPassed = (audio.ticksPassed + duration) % ticks;
                         }
                     }
                 }
@@ -304,7 +304,7 @@ impl Sound {
                 channel: Channel {
                     gain: {
                         let initial: u8 = memory.sound.pulse_a.volume.initial_volume.into();
-                        (initial as f32) / 16.0
+                        (initial as f32) / 64.0
                     },
                     oscillator: Oscillator::Pulse(PulseKind::ofInteger2(
                         memory.sound.pulse_a.length.wave_duty,

@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use virtual_dom_rs::prelude::*;
 #[allow(unused_imports)]
-use web_sys::MouseEvent;
+use web_sys::{AudioContext, MouseEvent};
 use web_utils::log;
 
 #[derive(Debug, Copy, Clone)]
@@ -29,11 +29,13 @@ impl Mode {
 pub struct State {
     pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
     pub mode: Rc<RefCell<Mutable<Mode>>>,
+    pub audio_ctx: Rc<AudioContext>,
 }
 
 pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
     let hardware = state.hardware.clone_data();
     let mode_mutable = state.mode.clone();
+    let audio_ctx = state.audio_ctx.clone();
 
     map_ref! {
         let mode = state.mode.borrow().signal(),
@@ -47,7 +49,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
             // Note: Due to a bug in percy, we have to manually write out the onclick twice
             // (onclicks don't get updated by the vdom)
             #[allow(unused_variables)]
-            fn run_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode, switch_to: Mode, disabled: bool, mode_mutable: Rc<RefCell<Mutable<Mode>>>) -> VirtualNode {
+            fn run_button(audio_ctx: Rc<AudioContext>, hardware: Rc<RefCell<Hardware>>, children: VirtualNode, switch_to: Mode, disabled: bool, mode_mutable: Rc<RefCell<Mutable<Mode>>>) -> VirtualNode {
                 if disabled {
                         html! { <button disabled="" onclick=
                             move |_e: MouseEvent| {
@@ -56,6 +58,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                                     let mode_borrow = mode_mutable.borrow_mut();
                                     let mut lock = mode_borrow.lock_mut();
                                     *lock = switch_to;
+                                    audio_ctx.resume();
                                     hardware.borrow_mut().paused = match switch_to {
                                         Mode::Paused => true,
                                         Mode::Running => false,
@@ -71,6 +74,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                                     let mode_borrow = mode_mutable.borrow_mut();
                                     let mut lock = mode_borrow.lock_mut();
                                     *lock = switch_to;
+                                    audio_ctx.resume();
                                     hardware.borrow_mut().paused = match switch_to {
                                         Mode::Paused => true,
                                         Mode::Running => false,
@@ -133,8 +137,8 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
             Rc::new(
             html! {
                 <div>
-                { run_button(hardware.clone(), html! { Run }, Mode::Running, disabled1, mode_mutable.clone()) }
-                { run_button(hardware.clone(), html! { Pause }, Mode::Paused, disabled2, mode_mutable.clone()) }
+                { run_button(audio_ctx.clone(), hardware.clone(), html! { Run }, Mode::Running, disabled1, mode_mutable.clone()) }
+                { run_button(audio_ctx.clone(), hardware.clone(), html! { Pause }, Mode::Paused, disabled2, mode_mutable.clone()) }
                 { step_button(hardware.clone(), html! { Step }, disabled1) }
                 { repaint_button(hardware.clone(), html! { Repaint }) }
                 <ol style="font-family: PragmataPro, monospace;">

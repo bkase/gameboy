@@ -78,6 +78,11 @@ pub fn run() -> Result<(), JsValue> {
         trigger: trigger.read_only(),
     };
 
+    // Note: Safari refuses to play any audio unless it's resumed from a
+    //       callstack originating at a button press, so we also hook it into
+    //       the "run" button press in our GUI.
+    let audio_ctx = Rc::new(web_sys::AudioContext::new().unwrap());
+
     let app_state: app::AppState = app::AppState {
         globals: app::Globals {
             unit: Mutable::new(()),
@@ -95,6 +100,7 @@ pub fn run() -> Result<(), JsValue> {
             },
         ],
         cpu_control_view_state: Rc::new(RefCell::new(Mutable::new(cpu_control_view::Mode::Paused))),
+        cpu_control_view_audio_ctx: audio_ctx.clone(),
     };
     let signal_future = Rc::new(RefCell::new(app::run(&app_state)));
     // trigger the initial render
@@ -119,7 +125,6 @@ pub fn run() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
-    let audio_ctx = web_sys::AudioContext::new().unwrap();
     let primary = audio_ctx.create_oscillator().unwrap();
     let gain = audio_ctx.create_gain().unwrap();
     primary.set_type(web_sys::OscillatorType::Square);
@@ -179,7 +184,7 @@ pub fn run() -> Result<(), JsValue> {
         // play sound
         match hardware.borrow().sound.audio {
             None => {
-                //gain.gain().set_value(0.0);
+                gain.gain().set_value(0.0);
             }
             Some(ref audio) => {
                 log(&format!(

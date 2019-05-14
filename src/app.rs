@@ -43,6 +43,7 @@ pub struct AppState {
     pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
     pub mem_view_state: Vec<mem_view::LocalState<Rc<RefCell<Mutable<u16>>>>>,
     pub cpu_control_view_state: Rc<RefCell<Mutable<cpu_control_view::Mode>>>,
+    pub cpu_control_view_audio_ctx: Rc<web_sys::AudioContext>,
     // we could have one field per component that emits events
 }
 
@@ -66,6 +67,7 @@ fn component(state: &AppState) -> impl Signal<Item = VirtualNode> {
     let cpu_control_view = cpu_control_view::component(cpu_control_view::State {
         hardware: state.hardware.clone(),
         mode: state.cpu_control_view_state.clone(),
+        audio_ctx: state.cpu_control_view_audio_ctx.clone(),
     });
 
     map_ref! {
