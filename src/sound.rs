@@ -1,7 +1,6 @@
 use mem::Memory;
 use packed_struct::prelude::*;
 use read_view_u8::*;
-use web_utils::log;
 
 //          4       3         2         1        0
 // PulseA  Control Frequency  Volume  Length   Sweep
@@ -208,7 +207,7 @@ pub enum PulseKind {
     LastQuarter,  // 11
 }
 impl PulseKind {
-    fn ofInteger2(x: Integer<u8, packed_bits::Bits2>) -> PulseKind {
+    fn of_integer2(x: Integer<u8, packed_bits::Bits2>) -> PulseKind {
         match x.into() {
             0 => PulseKind::FirstEigth,
             1 => PulseKind::FirstQuarter,
@@ -223,7 +222,7 @@ pub enum Oscillator {
     Pulse(PulseKind),
 }
 
-const GAIN_EPSLION: f32 = 0.00000001;
+const GAIN_EPSLION: f32 = 0.000_000_01;
 pub struct Channel {
     pub gain: f32,
     pub oscillator: Oscillator,
@@ -238,7 +237,7 @@ pub enum Behavior {
 pub struct Audio {
     pub channel: Channel,
     pub behavior: Behavior,
-    pub ticksPassed: u32,
+    pub ticks_passed: u32,
 }
 
 pub struct Sound {
@@ -260,8 +259,10 @@ impl Sound {
         let high_bits: u8 = pulse_a.control.frequency_high_bits.into();
         let low_bits: u16 = u16::from(pulse_a.frequency.0);
         let raw_gb_frequency = (u16::from(high_bits) << 8) | low_bits;
-        assert!(raw_gb_frequency < 2048); // max 11bits
-        131072.0 / ((2048 - raw_gb_frequency) as f32)
+        // max 11bits
+        assert!(raw_gb_frequency < 2048);
+        // from GBCPUMan
+        131_072.0 / f32::from(2048 - raw_gb_frequency)
     }
 
     pub fn advance(&mut self, memory: &mut Memory, duration: u32) {
@@ -274,9 +275,9 @@ impl Sound {
                 audio.channel.frequency = Self::frequency_of_gb_frequency(&memory.sound.pulse_a);
                 match audio.behavior {
                     Behavior::Decaying(ticks) => {
-                        assert!(audio.ticksPassed < ticks);
-                        if audio.ticksPassed + duration > ticks {
-                            audio.ticksPassed = (audio.ticksPassed + duration) % ticks;
+                        assert!(audio.ticks_passed < ticks);
+                        if audio.ticks_passed + duration > ticks {
+                            audio.ticks_passed = (audio.ticks_passed + duration) % ticks;
                             audio.channel.gain -= 1.0 / 64.0;
                             if audio.channel.gain < GAIN_EPSLION
                                 || -1.0 * audio.channel.gain > -1. * GAIN_EPSLION
@@ -286,7 +287,7 @@ impl Sound {
                                 should_drop = true;
                             }
                         } else {
-                            audio.ticksPassed = (audio.ticksPassed + duration) % ticks;
+                            audio.ticks_passed = (audio.ticks_passed + duration) % ticks;
                         }
                     }
                 }
@@ -304,9 +305,9 @@ impl Sound {
                 channel: Channel {
                     gain: {
                         let initial: u8 = memory.sound.pulse_a.volume.initial_volume.into();
-                        (initial as f32) / 64.0
+                        f32::from(initial) / 64.0
                     },
-                    oscillator: Oscillator::Pulse(PulseKind::ofInteger2(
+                    oscillator: Oscillator::Pulse(PulseKind::of_integer2(
                         memory.sound.pulse_a.length.wave_duty,
                     )),
                     frequency: Self::frequency_of_gb_frequency(&memory.sound.pulse_a),
@@ -315,9 +316,9 @@ impl Sound {
                 behavior: Behavior::Decaying({
                     let sweep: u8 = memory.sound.pulse_a.volume.envelope_sweep.into();
                     assert!(sweep < 16 && sweep > 0);
-                    ONE_SIXTY_FOURTH_SECS_IN_TICKS * (sweep as u32)
+                    ONE_SIXTY_FOURTH_SECS_IN_TICKS * u32::from(sweep)
                 }),
-                ticksPassed: 0,
+                ticks_passed: 0,
             });
         } else {
             self.dirty = !pulse_a_on;
