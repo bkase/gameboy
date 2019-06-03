@@ -1,39 +1,5 @@
 use register::Flags;
 
-mod bits {
-    pub fn num(b: bool) -> u8 {
-        if b {
-            1
-        } else {
-            0
-        }
-    }
-
-    pub fn bits(x: u8) -> [bool; 8] {
-        [
-            x & 0x01 == 0x01,
-            x & 0x02 == 0x02,
-            x & 0x04 == 0x04,
-            x & 0x08 == 0x08,
-            x & 0x10 == 0x10,
-            x & 0x20 == 0x20,
-            x & 0x40 == 0x40,
-            x & 0x80 == 0x80,
-        ]
-    }
-
-    pub fn unbits(b: [bool; 8]) -> u8 {
-        num(b[7]) * 0x80
-            + num(b[6]) * 0x40
-            + num(b[5]) * 0x20
-            + num(b[4]) * 0x10
-            + num(b[3]) * 0x08
-            + num(b[2]) * 0x04
-            + num(b[1]) * 0x02
-            + num(b[0])
-    }
-}
-
 /*
     b i1 i2   o bo
     0 0  0    0 0
@@ -46,40 +12,20 @@ mod bits {
     1 1  1    1 1
 */
 // returns result, was there a borrow at 4, and was there a borrow at the end
+fn sbc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
+    let left16 = u16::from(left);
+    let right16 = u16::from(right);
+
+    let old_carry_num = if old_carry { 1 } else { 0 };
+    let bottom_nibble_approx = ((left16 & 0x0f) | 0x80) - ((right16 + old_carry_num) & 0x0f);
+
+    let borrow_at_4 = (bottom_nibble_approx & 0x10) == 0x10;
+    let borrow_at_end = ((left16 | 0x8000) - (right16 + old_carry_num)) & 0x100 == 0x100;
+    (left.wrapping_sub(right), borrow_at_4, borrow_at_end)
+}
+
 fn sub_(left: u8, right: u8) -> (u8, bool, bool) {
-    use self::bits::{bits, num, unbits};
-
-    fn lookup(b: bool, i1: bool, i2: bool) -> (bool, bool) {
-        let lut = [
-            (false, false),
-            (true, true),
-            (true, false),
-            (false, false),
-            (true, true),
-            (false, true),
-            (false, false),
-            (true, true),
-        ];
-        let idx = num(b) * 4 + num(i1) * 2 + num(i2);
-        lut[idx as usize]
-    }
-
-    let bits_left = bits(left);
-    let bits_right = bits(right);
-    let mut borrow = false;
-    let mut borrow_at_4 = false;
-    let mut result = [true, true, true, true, true, true, true, true];
-
-    for i in 0..8 {
-        let (o, bo) = lookup(borrow, bits_left[i], bits_right[i]);
-        borrow = bo;
-        if i == 3 {
-            borrow_at_4 = bo;
-        };
-        result[i] = o;
-    }
-
-    (unbits(result), borrow_at_4, borrow)
+    sbc_(left, right, false)
 }
 
 pub fn sub(flags: &mut Flags, left: u8, right: u8) -> u8 {
@@ -91,53 +37,48 @@ pub fn sub(flags: &mut Flags, left: u8, right: u8) -> u8 {
     r
 }
 
-/*
-    c i1 i2   o co
-    0 0  0    0 0
-    0 0  1    1 0
-    0 1  0    1 0
-    0 1  1    0 1
-    1 0  0    1 0
-    1 0  1    0 1
-    1 1  0    0 1
-    1 1  1    1 1
-*/
+pub fn sbc(flags: &mut Flags, left: u8, right: u8) -> u8 {
+    let (r, borrow_at_4, borrow_at_end) = sbc_(left, right, flags.c);
+    flags.z = r == 0;
+    flags.n = true;
+    flags.h = !borrow_at_4;
+    flags.c = !borrow_at_end;
+    r
+}
+
 // returns result, was there a carry at 3, and was there a carry at the end
+fn adc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
+    let left16 = u16::from(left);
+    let right16 = u16::from(right);
+
+    let old_carry_num = if old_carry { 1 } else { 0 };
+    let bottom_nibble = (left16 & 0x0f) + ((right16 + old_carry_num) & 0x0f);
+    let carry_at_3 = (bottom_nibble & 0x10) == 0x10;
+    let carry_at_end = (left16 + right16 + old_carry_num) & 0x100 == 0x100;
+    (left.wrapping_add(right), carry_at_3, carry_at_end)
+}
+
 fn add_(left: u8, right: u8) -> (u8, bool, bool) {
-    use self::bits::{bits, num, unbits};
+    adc_(left, right, false)
+}
 
-    fn lookup(c: bool, i1: bool, i2: bool) -> (bool, bool) {
-        let lut = [
-            (false, false),
-            (true, false),
-            (true, false),
-            (false, true),
-            (true, false),
-            (false, true),
-            (false, true),
-            (true, true),
-        ];
-        let idx = num(c) * 4 + num(i1) * 2 + num(i2);
-        lut[idx as usize]
-    }
+// returns result, carry_at_11, carry_at_end
+fn addhl_(left: u16, right: u16) -> (u16, bool, bool) {
+    let left32 = u32::from(left);
+    let right32 = u32::from(right);
 
-    let bits_left = bits(left);
-    let bits_right = bits(right);
-    let mut carry = false;
-    let mut carry_at_3 = false;
-    let mut result = [true, true, true, true, true, true, true, true];
+    let bottom_12 = (left32 & 0xfff) + (right32 & 0xfff);
+    let carry_at_11 = (bottom_12 & 0x1000) == 0x1000;
+    let carry_at_end = (left32 + right32) & 0x10_000 == 0x10_000;
+    (left.wrapping_add(right), carry_at_11, carry_at_end)
+}
 
-    for i in 0..8 {
-        let (o, co) = lookup(carry, bits_left[i], bits_right[i]);
-        println!("Out {}, co {} at {}", o, co, i);
-        carry = co;
-        if i == 3 {
-            carry_at_3 = co;
-        };
-        result[i] = o;
-    }
-
-    (unbits(result), carry_at_3, carry)
+pub fn addhl(flags: &mut Flags, left: u16, right: u16) -> u16 {
+    let (r, carry_at_11, carry_at_end) = addhl_(left, right);
+    flags.n = false;
+    flags.h = carry_at_11;
+    flags.c = carry_at_end;
+    r
 }
 
 pub fn add(flags: &mut Flags, left: u8, right: u8) -> u8 {
@@ -149,10 +90,34 @@ pub fn add(flags: &mut Flags, left: u8, right: u8) -> u8 {
     r
 }
 
+pub fn adc(flags: &mut Flags, left: u8, right: u8) -> u8 {
+    let (r, carry_at_3, carry_at_end) = adc_(left, right, flags.c);
+    flags.z = r == 0;
+    flags.n = false;
+    flags.h = carry_at_3;
+    flags.c = carry_at_end;
+    r
+}
+
 pub fn xor(flags: &mut Flags, left: u8, right: u8) -> u8 {
     let r = left ^ right;
     flags.reset();
     flags.z = r == 0;
+    r
+}
+
+pub fn or(flags: &mut Flags, left: u8, right: u8) -> u8 {
+    let r = left | right;
+    flags.reset();
+    flags.z = r == 0;
+    r
+}
+
+pub fn and(flags: &mut Flags, left: u8, right: u8) -> u8 {
+    let r = left & right;
+    flags.reset();
+    flags.z = r == 0;
+    flags.h = true;
     r
 }
 
@@ -226,11 +191,6 @@ mod tests {
     }
 
     proptest! {
-        #[test]
-        fn bits_unbits_selfinverse(x : u8) {
-            assert_eq!(alu::bits::unbits(alu::bits::bits(x)), x)
-        }
-
         #[test]
         fn subtraction_works(left : u8, right: u8) {
             let (r, _, _) = alu::sub_(left, right);

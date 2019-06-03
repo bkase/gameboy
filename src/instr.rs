@@ -142,39 +142,76 @@ impl HasDuration for Ld {
     }
 }
 
+// TODO: Hlist for the variants so we can reuse these better across all instrs
+#[derive(Debug, Clone)]
+pub enum RegsHlN {
+    HlInd,
+    N(u8),
+    Reg(RegisterKind8),
+}
+impl fmt::Display for RegsHlN {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RegsHlN::HlInd => write!(f, "[HL]"),
+            RegsHlN::N(n) => write!(f, "{:}", R8(*n)),
+            RegsHlN::Reg(rk) => write!(f, "{:}", rk),
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub enum RegsHl {
+    HlInd,
+    Reg(RegisterKind8),
+}
+impl fmt::Display for RegsHl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RegsHl::HlInd => write!(f, "[HL]"),
+            RegsHl::Reg(rk) => write!(f, "{:}", rk),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Arith {
-    Xor(RegisterKind8),
-    XorHlInd,
-    Sub(RegisterKind8),
-    SubHlInd,
-    AddHlInd,
-    AddN(u8),
-    Inc8(RegisterKind8),
+    Add(RegsHlN),
+    Adc(RegsHlN),
+    Sub(RegsHlN),
+    Sbc(RegsHl),
+    And(RegsHlN),
+    Or(RegsHlN),
+    Xor(RegsHlN),
+    Cp(RegsHlN),
+    Inc(RegsHl),
+    Dec(RegsHl),
+
+    AddHl(RegisterKind16),
+    AddSp(i8),
     Inc16(RegisterKind16),
-    IncHlInd,
-    Dec8(RegisterKind8),
     Dec16(RegisterKind16),
-    DecHlInd,
-    // Add / and / etc
 }
 use self::Arith::*;
 
 impl fmt::Display for Arith {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Xor(rk) => write!(f, "(XOR) A <- A ^ {:}", rk),
-            XorHlInd => write!(f, "(XOR) A <- A ^ [HL]"),
-            Sub(rk) => write!(f, "(SUB) A <- A - {:}", rk),
-            SubHlInd => write!(f, "(SUB) A <- A - [HL]"),
-            AddHlInd => write!(f, "(ADD) A <- A + [HL]"),
-            AddN(n) => write!(f, "(ADD) A <- A + {:}", R8(*n)),
-            Inc8(rk) => write!(f, "(INC) {:}++", rk),
+            // 8 bit
+            Add(x) => write!(f, "(ADD) A <- A + {:}", x),
+            Adc(x) => write!(f, "(ADC) A <- A + {:} + c", x),
+            Sub(x) => write!(f, "(SUB) A <- A - {:}", x),
+            Sbc(x) => write!(f, "(SBC) A <- A - {:} + c", x),
+            And(x) => write!(f, "(AND) A <- A & {:}", x),
+            Or(x) => write!(f, "(OR) A <- A | {:}", x),
+            Xor(x) => write!(f, "(OR) A <- A ^ {:}", x),
+            Cp(x) => write!(f, "(CP) A ==? {:}", x),
+            Inc(x) => write!(f, "(INC) {:}++", x),
+            Dec(x) => write!(f, "(DEC) {:}--", x),
+
+            // 16 bit
+            AddHl(rk) => write!(f, "(ADD) HL <- HL + {:}", rk),
+            AddSp(x) => write!(f, "(ADD) SP <- SP + {:}", x),
             Inc16(rk) => write!(f, "(INC) {:}++", rk),
-            IncHlInd => write!(f, "(INC) [HL]++"),
-            Dec8(rk) => write!(f, "(DEC) {:}--", rk),
             Dec16(rk) => write!(f, "(DEC) {:}--", rk),
-            DecHlInd => write!(f, "(DEC) [HL]--"),
         }
     }
 }
@@ -182,18 +219,20 @@ impl fmt::Display for Arith {
 impl HasDuration for Arith {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
-            Xor(_) => (1, None),
-            XorHlInd => (2, None),
-            Sub(_) => (1, None),
-            SubHlInd => (2, None),
-            AddHlInd => (2, None),
-            AddN(_) => (2, None),
-            Inc8(_) => (1, None),
-            Inc16(_) => (2, None),
-            IncHlInd => (3, None),
-            Dec8(_) => (1, None),
-            Dec16(_) => (2, None),
-            DecHlInd => (3, None),
+            Add(x) | Adc(x) | Sub(x) | And(x) | Or(x) | Xor(x) | Cp(x) => match x {
+                RegsHlN::HlInd => (2, None),
+                RegsHlN::N(_) => (2, None),
+                RegsHlN::Reg(_) => (1, None),
+            },
+            Sbc(RegsHl::HlInd) => (2, None),
+            Sbc(RegsHl::Reg(_)) => (1, None),
+            Inc(x) | Dec(x) => match x {
+                RegsHl::HlInd => (3, None),
+                RegsHl::Reg(_) => (1, None),
+            },
+            AddHl(_) => (2, None),
+            AddSp(_) => (4, None),
+            Inc16(_) | Dec16(_) => (2, None),
         }
     }
 }
@@ -266,7 +305,6 @@ pub enum Instr {
     Jump(Jump),
     Bit7h,
     CpHlInd,
-    Cp(u8),
     PopBc,
     PushBc,
     Ret,
@@ -283,7 +321,6 @@ impl fmt::Display for Instr {
             Jump(j) => write!(f, "{:}", j),
             Bit7h => write!(f, "BIT 7, H"),
             CpHlInd => write!(f, "(CP) A ==? [HL]"),
-            Cp(n) => write!(f, "(CP) A ==? {:}", R8(*n)),
             PopBc => write!(f, "POP BC"),
             PushBc => write!(f, "PUSH BC"),
             Ret => write!(f, "RET"),
@@ -301,7 +338,6 @@ impl HasDuration for Instr {
             Jump(jump) => jump.duration(),
             Bit7h => (2, None),
             CpHlInd => (2, None),
-            Cp(_) => (2, None),
             PopBc => (3, None),
             PushBc => (4, None),
             Ret => (4, None),
@@ -378,6 +414,8 @@ impl<'a> LiveInstrPointer<'a> {
     }
 }
 
+use register_kind::RegisterKind16::*;
+use register_kind::RegisterKind8::*;
 impl<'a> LiveInstrPointer<'a> {
     // returns instruction and bytes read by the PC
     fn read_(&mut self) -> (Instr, Vec<u8>) {
@@ -390,23 +428,23 @@ impl<'a> LiveInstrPointer<'a> {
             0x00 => (Nop, vec![pos0]),
             0x01 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x02 => (Ld(BcIndGetsA), vec![pos0]),
-            0x03 => (Arith(Inc16(RegisterKind16::Bc)), vec![pos0]),
-            0x04 => (Arith(Inc8(RegisterKind8::B)), vec![pos0]),
-            0x05 => (Arith(Dec8(RegisterKind8::B)), vec![pos0]),
+            0x03 => (Arith(Inc16(Bc)), vec![pos0]),
+            0x04 => (Arith(Inc(RegsHl::Reg(B))), vec![pos0]),
+            0x05 => (Arith(Dec(RegsHl::Reg(B))), vec![pos0]),
             0x06 => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(RegisterKind8::B, pos1)), vec![pos0, pos1])
+                (Ld(RGetsN(B, pos1)), vec![pos0, pos1])
             }
             0x07 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x08 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x09 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x09 => (Arith(AddHl(Bc)), vec![pos0]),
             0x0a => (Ld(AGetsBcInd), vec![pos0]),
-            0x0b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x0c => (Arith(Inc8(RegisterKind8::C)), vec![pos0]),
-            0x0d => (Arith(Dec8(RegisterKind8::C)), vec![pos0]),
+            0x0b => (Arith(Dec16(Bc)), vec![pos0]),
+            0x0c => (Arith(Inc(RegsHl::Reg(C))), vec![pos0]),
+            0x0d => (Arith(Dec(RegsHl::Reg(C))), vec![pos0]),
             0x0e => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(RegisterKind8::C, pos1)), vec![pos0, pos1])
+                (Ld(RGetsN(C, pos1)), vec![pos0, pos1])
             }
             0x0f => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x10 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -416,9 +454,9 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(DeGetsAddr(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0x12 => (Ld(DeIndGetsA), vec![pos0]),
-            0x13 => (Arith(Inc16(RegisterKind16::De)), vec![pos0]),
-            0x14 => (Arith(Inc8(RegisterKind8::D)), vec![pos0]),
-            0x15 => (Arith(Dec8(RegisterKind8::D)), vec![pos0]),
+            0x13 => (Arith(Inc16(De)), vec![pos0]),
+            0x14 => (Arith(Inc(RegsHl::Reg(D))), vec![pos0]),
+            0x15 => (Arith(Dec(RegsHl::Reg(D))), vec![pos0]),
             0x16 => {
                 let pos1 = self.read8();
                 (Ld(RGetsN(RegisterKind8::D, pos1)), vec![pos0, pos1])
@@ -428,14 +466,14 @@ impl<'a> LiveInstrPointer<'a> {
                 let pos1 = self.read8();
                 (Jump(Jr(pos1 as i8)), vec![pos0, pos1])
             }
-            0x19 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x19 => (Arith(AddHl(De)), vec![pos0]),
             0x1a => (Ld(AGetsDeInd), vec![pos0]),
-            0x1b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x1c => (Arith(Inc8(RegisterKind8::E)), vec![pos0]),
-            0x1d => (Arith(Dec8(RegisterKind8::E)), vec![pos0]),
+            0x1b => (Arith(Dec16(De)), vec![pos0]),
+            0x1c => (Arith(Inc(RegsHl::Reg(E))), vec![pos0]),
+            0x1d => (Arith(Dec(RegsHl::Reg(E))), vec![pos0]),
             0x1e => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(RegisterKind8::E, pos1)), vec![pos0, pos1])
+                (Ld(RGetsN(E, pos1)), vec![pos0, pos1])
             }
             0x1f => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x20 => {
@@ -448,26 +486,26 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(HlGetsAddr(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0x22 => (Ld(HlIndGetsAInc), vec![pos0]),
-            0x23 => (Arith(Inc16(RegisterKind16::Hl)), vec![pos0]),
-            0x24 => (Arith(Inc8(RegisterKind8::H)), vec![pos0]),
-            0x25 => (Arith(Dec8(RegisterKind8::H)), vec![pos0]),
+            0x23 => (Arith(Inc16(Hl)), vec![pos0]),
+            0x24 => (Arith(Inc(RegsHl::Reg(H))), vec![pos0]),
+            0x25 => (Arith(Dec(RegsHl::Reg(H))), vec![pos0]),
             0x26 => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(RegisterKind8::H, pos1)), vec![pos0, pos1])
+                (Ld(RGetsN(H, pos1)), vec![pos0, pos1])
             }
             0x27 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x28 => {
                 let pos1 = self.read8();
                 (Jump(JrZ(pos1 as i8)), vec![pos0, pos1])
             }
-            0x29 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x29 => (Arith(AddHl(Hl)), vec![pos0]),
             0x2a => (Ld(AGetsHlIndInc), vec![pos0]),
-            0x2b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x2c => (Arith(Inc8(RegisterKind8::L)), vec![pos0]),
-            0x2d => (Arith(Dec8(RegisterKind8::L)), vec![pos0]),
+            0x2b => (Arith(Dec16(Hl)), vec![pos0]),
+            0x2c => (Arith(Inc(RegsHl::Reg(L))), vec![pos0]),
+            0x2d => (Arith(Dec(RegsHl::Reg(L))), vec![pos0]),
             0x2e => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(RegisterKind8::L, pos1)), vec![pos0, pos1])
+                (Ld(RGetsN(L, pos1)), vec![pos0, pos1])
             }
             0x2f => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x30 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -477,153 +515,156 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(SpGetsAddr(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0x32 => (Ld(HlIndGetsADec), vec![pos0]),
-            0x33 => (Arith(Inc16(RegisterKind16::Sp)), vec![pos0]),
-            0x34 => (Arith(IncHlInd), vec![pos0]),
-            0x35 => (Arith(DecHlInd), vec![pos0]),
+            0x33 => (Arith(Inc16(Sp)), vec![pos0]),
+            0x34 => (Arith(Inc(RegsHl::HlInd)), vec![pos0]),
+            0x35 => (Arith(Dec(RegsHl::HlInd)), vec![pos0]),
             0x36 => {
                 let pos1 = self.read8();
                 (Ld(HlIndGetsN(pos1)), vec![pos0, pos1])
             }
             0x37 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x38 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x39 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x39 => (Arith(AddHl(Sp)), vec![pos0]),
             0x3a => (Ld(AGetsHlIndDec), vec![pos0]),
-            0x3b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x3c => (Arith(Inc8(RegisterKind8::A)), vec![pos0]),
-            0x3d => (Arith(Dec8(RegisterKind8::A)), vec![pos0]),
+            0x3b => (Arith(Dec16(Sp)), vec![pos0]),
+            0x3c => (Arith(Inc(RegsHl::Reg(A))), vec![pos0]),
+            0x3d => (Arith(Dec(RegsHl::Reg(A))), vec![pos0]),
             0x3e => {
                 let pos1 = self.read8();
                 (Ld(RGetsN(RegisterKind8::A, pos1)), vec![pos0, pos1])
             }
             0x3f => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x40 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::B)), vec![pos0]),
-            0x41 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::C)), vec![pos0]),
-            0x42 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::D)), vec![pos0]),
-            0x43 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::E)), vec![pos0]),
-            0x44 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::H)), vec![pos0]),
-            0x45 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::L)), vec![pos0]),
-            0x46 => (Ld(RGetsHlInd(RegisterKind8::B)), vec![pos0]),
-            0x47 => (Ld(RGetsR(RegisterKind8::B, RegisterKind8::A)), vec![pos0]),
-            0x48 => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::B)), vec![pos0]),
-            0x49 => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::C)), vec![pos0]),
-            0x4a => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::D)), vec![pos0]),
-            0x4b => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::E)), vec![pos0]),
-            0x4c => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::H)), vec![pos0]),
-            0x4d => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::L)), vec![pos0]),
-            0x4e => (Ld(RGetsHlInd(RegisterKind8::C)), vec![pos0]),
-            0x4f => (Ld(RGetsR(RegisterKind8::C, RegisterKind8::A)), vec![pos0]),
-            0x50 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::B)), vec![pos0]),
-            0x51 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::C)), vec![pos0]),
-            0x52 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::D)), vec![pos0]),
-            0x53 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::E)), vec![pos0]),
-            0x54 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::H)), vec![pos0]),
-            0x55 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::L)), vec![pos0]),
-            0x56 => (Ld(RGetsHlInd(RegisterKind8::D)), vec![pos0]),
-            0x57 => (Ld(RGetsR(RegisterKind8::D, RegisterKind8::A)), vec![pos0]),
-            0x58 => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::B)), vec![pos0]),
-            0x59 => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::C)), vec![pos0]),
-            0x5a => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::D)), vec![pos0]),
-            0x5b => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::E)), vec![pos0]),
-            0x5c => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::H)), vec![pos0]),
-            0x5d => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::L)), vec![pos0]),
-            0x5e => (Ld(RGetsHlInd(RegisterKind8::E)), vec![pos0]),
-            0x5f => (Ld(RGetsR(RegisterKind8::E, RegisterKind8::A)), vec![pos0]),
-            0x60 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::B)), vec![pos0]),
-            0x61 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::C)), vec![pos0]),
-            0x62 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::D)), vec![pos0]),
-            0x63 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::E)), vec![pos0]),
-            0x64 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::H)), vec![pos0]),
-            0x65 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::L)), vec![pos0]),
-            0x66 => (Ld(RGetsHlInd(RegisterKind8::H)), vec![pos0]),
-            0x67 => (Ld(RGetsR(RegisterKind8::H, RegisterKind8::A)), vec![pos0]),
-            0x68 => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::B)), vec![pos0]),
-            0x69 => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::C)), vec![pos0]),
-            0x6a => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::D)), vec![pos0]),
-            0x6b => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::E)), vec![pos0]),
-            0x6c => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::H)), vec![pos0]),
-            0x6d => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::L)), vec![pos0]),
-            0x6e => (Ld(RGetsHlInd(RegisterKind8::L)), vec![pos0]),
-            0x6f => (Ld(RGetsR(RegisterKind8::L, RegisterKind8::A)), vec![pos0]),
-            0x70 => (Ld(HlIndGetsR(RegisterKind8::B)), vec![pos0]),
-            0x71 => (Ld(HlIndGetsR(RegisterKind8::C)), vec![pos0]),
-            0x72 => (Ld(HlIndGetsR(RegisterKind8::D)), vec![pos0]),
-            0x73 => (Ld(HlIndGetsR(RegisterKind8::E)), vec![pos0]),
-            0x74 => (Ld(HlIndGetsR(RegisterKind8::H)), vec![pos0]),
-            0x75 => (Ld(HlIndGetsR(RegisterKind8::L)), vec![pos0]),
+            0x40 => (Ld(RGetsR(B, B)), vec![pos0]),
+            0x41 => (Ld(RGetsR(B, C)), vec![pos0]),
+            0x42 => (Ld(RGetsR(B, D)), vec![pos0]),
+            0x43 => (Ld(RGetsR(B, E)), vec![pos0]),
+            0x44 => (Ld(RGetsR(B, H)), vec![pos0]),
+            0x45 => (Ld(RGetsR(B, L)), vec![pos0]),
+            0x46 => (Ld(RGetsHlInd(B)), vec![pos0]),
+            0x47 => (Ld(RGetsR(B, A)), vec![pos0]),
+            0x48 => (Ld(RGetsR(C, B)), vec![pos0]),
+            0x49 => (Ld(RGetsR(C, C)), vec![pos0]),
+            0x4a => (Ld(RGetsR(C, D)), vec![pos0]),
+            0x4b => (Ld(RGetsR(C, E)), vec![pos0]),
+            0x4c => (Ld(RGetsR(C, H)), vec![pos0]),
+            0x4d => (Ld(RGetsR(C, L)), vec![pos0]),
+            0x4e => (Ld(RGetsHlInd(C)), vec![pos0]),
+            0x4f => (Ld(RGetsR(C, A)), vec![pos0]),
+            0x50 => (Ld(RGetsR(D, B)), vec![pos0]),
+            0x51 => (Ld(RGetsR(D, C)), vec![pos0]),
+            0x52 => (Ld(RGetsR(D, D)), vec![pos0]),
+            0x53 => (Ld(RGetsR(D, E)), vec![pos0]),
+            0x54 => (Ld(RGetsR(D, H)), vec![pos0]),
+            0x55 => (Ld(RGetsR(D, L)), vec![pos0]),
+            0x56 => (Ld(RGetsHlInd(D)), vec![pos0]),
+            0x57 => (Ld(RGetsR(D, A)), vec![pos0]),
+            0x58 => (Ld(RGetsR(E, B)), vec![pos0]),
+            0x59 => (Ld(RGetsR(E, C)), vec![pos0]),
+            0x5a => (Ld(RGetsR(E, D)), vec![pos0]),
+            0x5b => (Ld(RGetsR(E, E)), vec![pos0]),
+            0x5c => (Ld(RGetsR(E, H)), vec![pos0]),
+            0x5d => (Ld(RGetsR(E, L)), vec![pos0]),
+            0x5e => (Ld(RGetsHlInd(E)), vec![pos0]),
+            0x5f => (Ld(RGetsR(E, A)), vec![pos0]),
+            0x60 => (Ld(RGetsR(H, B)), vec![pos0]),
+            0x61 => (Ld(RGetsR(H, C)), vec![pos0]),
+            0x62 => (Ld(RGetsR(H, D)), vec![pos0]),
+            0x63 => (Ld(RGetsR(H, E)), vec![pos0]),
+            0x64 => (Ld(RGetsR(H, H)), vec![pos0]),
+            0x65 => (Ld(RGetsR(H, L)), vec![pos0]),
+            0x66 => (Ld(RGetsHlInd(H)), vec![pos0]),
+            0x67 => (Ld(RGetsR(H, A)), vec![pos0]),
+            0x68 => (Ld(RGetsR(L, B)), vec![pos0]),
+            0x69 => (Ld(RGetsR(L, C)), vec![pos0]),
+            0x6a => (Ld(RGetsR(L, D)), vec![pos0]),
+            0x6b => (Ld(RGetsR(L, E)), vec![pos0]),
+            0x6c => (Ld(RGetsR(L, H)), vec![pos0]),
+            0x6d => (Ld(RGetsR(L, L)), vec![pos0]),
+            0x6e => (Ld(RGetsHlInd(L)), vec![pos0]),
+            0x6f => (Ld(RGetsR(L, A)), vec![pos0]),
+            0x70 => (Ld(HlIndGetsR(B)), vec![pos0]),
+            0x71 => (Ld(HlIndGetsR(C)), vec![pos0]),
+            0x72 => (Ld(HlIndGetsR(D)), vec![pos0]),
+            0x73 => (Ld(HlIndGetsR(E)), vec![pos0]),
+            0x74 => (Ld(HlIndGetsR(H)), vec![pos0]),
+            0x75 => (Ld(HlIndGetsR(L)), vec![pos0]),
             0x76 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x77 => (Ld(HlIndGetsR(RegisterKind8::A)), vec![pos0]),
-            0x78 => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::B)), vec![pos0]),
-            0x79 => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::C)), vec![pos0]),
-            0x7a => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::D)), vec![pos0]),
-            0x7b => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::E)), vec![pos0]),
-            0x7c => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::H)), vec![pos0]),
-            0x7d => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::L)), vec![pos0]),
-            0x7e => (Ld(RGetsHlInd(RegisterKind8::A)), vec![pos0]),
-            0x7f => (Ld(RGetsR(RegisterKind8::A, RegisterKind8::A)), vec![pos0]),
-            0x80 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x81 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x82 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x83 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x84 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x85 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x86 => (Arith(AddHlInd), vec![pos0]),
-            0x87 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x88 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x89 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8a => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8c => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8d => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8e => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x8f => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x90 => (Arith(Sub(RegisterKind8::B)), vec![pos0]),
-            0x91 => (Arith(Sub(RegisterKind8::C)), vec![pos0]),
-            0x92 => (Arith(Sub(RegisterKind8::D)), vec![pos0]),
-            0x93 => (Arith(Sub(RegisterKind8::E)), vec![pos0]),
-            0x94 => (Arith(Sub(RegisterKind8::H)), vec![pos0]),
-            0x95 => (Arith(Sub(RegisterKind8::L)), vec![pos0]),
-            0x96 => (Arith(SubHlInd), vec![pos0]),
-            0x97 => (Arith(Sub(RegisterKind8::A)), vec![pos0]),
-            0x98 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x99 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9a => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9b => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9c => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9d => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9e => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x9f => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa1 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa7 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xa8 => (Arith(Xor(RegisterKind8::B)), vec![pos0]),
-            0xa9 => (Arith(Xor(RegisterKind8::C)), vec![pos0]),
-            0xaa => (Arith(Xor(RegisterKind8::D)), vec![pos0]),
-            0xab => (Arith(Xor(RegisterKind8::E)), vec![pos0]),
-            0xac => (Arith(Xor(RegisterKind8::H)), vec![pos0]),
-            0xad => (Arith(Xor(RegisterKind8::L)), vec![pos0]),
-            0xae => (Arith(XorHlInd), vec![pos0]),
-            0xaf => (Arith(Xor(RegisterKind8::A)), vec![pos0]),
-            0xb0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb1 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb7 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xb9 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xba => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xbb => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xbc => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xbd => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xbe => (Instr::CpHlInd, vec![pos0]),
-            0xbf => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x77 => (Ld(HlIndGetsR(A)), vec![pos0]),
+            0x78 => (Ld(RGetsR(A, B)), vec![pos0]),
+            0x79 => (Ld(RGetsR(A, C)), vec![pos0]),
+            0x7a => (Ld(RGetsR(A, D)), vec![pos0]),
+            0x7b => (Ld(RGetsR(A, E)), vec![pos0]),
+            0x7c => (Ld(RGetsR(A, H)), vec![pos0]),
+            0x7d => (Ld(RGetsR(A, L)), vec![pos0]),
+            0x7e => (Ld(RGetsHlInd(A)), vec![pos0]),
+            0x7f => (Ld(RGetsR(A, A)), vec![pos0]),
+            0x80 => (Arith(Add(RegsHlN::Reg(B))), vec![pos0]),
+            0x81 => (Arith(Add(RegsHlN::Reg(C))), vec![pos0]),
+            0x82 => (Arith(Add(RegsHlN::Reg(D))), vec![pos0]),
+            0x83 => (Arith(Add(RegsHlN::Reg(E))), vec![pos0]),
+            0x84 => (Arith(Add(RegsHlN::Reg(H))), vec![pos0]),
+            0x85 => (Arith(Add(RegsHlN::Reg(L))), vec![pos0]),
+            0x86 => (Arith(Add(RegsHlN::HlInd)), vec![pos0]),
+            0x87 => (Arith(Add(RegsHlN::Reg(A))), vec![pos0]),
+            0x88 => (Arith(Adc(RegsHlN::Reg(B))), vec![pos0]),
+            0x89 => (Arith(Adc(RegsHlN::Reg(C))), vec![pos0]),
+            0x8a => (Arith(Adc(RegsHlN::Reg(D))), vec![pos0]),
+            0x8b => (Arith(Adc(RegsHlN::Reg(E))), vec![pos0]),
+            0x8c => (Arith(Adc(RegsHlN::Reg(H))), vec![pos0]),
+            0x8d => (Arith(Adc(RegsHlN::Reg(L))), vec![pos0]),
+            0x8e => (Arith(Adc(RegsHlN::HlInd)), vec![pos0]),
+            0x8f => {
+                let pos1 = self.read8();
+                (Arith(Adc(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
+            0x90 => (Arith(Sub(RegsHlN::Reg(B))), vec![pos0]),
+            0x91 => (Arith(Sub(RegsHlN::Reg(C))), vec![pos0]),
+            0x92 => (Arith(Sub(RegsHlN::Reg(D))), vec![pos0]),
+            0x93 => (Arith(Sub(RegsHlN::Reg(E))), vec![pos0]),
+            0x94 => (Arith(Sub(RegsHlN::Reg(H))), vec![pos0]),
+            0x95 => (Arith(Sub(RegsHlN::Reg(L))), vec![pos0]),
+            0x96 => (Arith(Sub(RegsHlN::HlInd)), vec![pos0]),
+            0x97 => (Arith(Sub(RegsHlN::Reg(A))), vec![pos0]),
+            0x98 => (Arith(Sbc(RegsHl::Reg(B))), vec![pos0]),
+            0x99 => (Arith(Sbc(RegsHl::Reg(C))), vec![pos0]),
+            0x9a => (Arith(Sbc(RegsHl::Reg(D))), vec![pos0]),
+            0x9b => (Arith(Sbc(RegsHl::Reg(E))), vec![pos0]),
+            0x9c => (Arith(Sbc(RegsHl::Reg(H))), vec![pos0]),
+            0x9d => (Arith(Sbc(RegsHl::Reg(L))), vec![pos0]),
+            0x9e => (Arith(Sbc(RegsHl::HlInd)), vec![pos0]),
+            0x9f => (Arith(Sbc(RegsHl::Reg(A))), vec![pos0]),
+            0xa0 => (Arith(And(RegsHlN::Reg(B))), vec![pos0]),
+            0xa1 => (Arith(And(RegsHlN::Reg(C))), vec![pos0]),
+            0xa2 => (Arith(And(RegsHlN::Reg(D))), vec![pos0]),
+            0xa3 => (Arith(And(RegsHlN::Reg(E))), vec![pos0]),
+            0xa4 => (Arith(And(RegsHlN::Reg(H))), vec![pos0]),
+            0xa5 => (Arith(And(RegsHlN::Reg(L))), vec![pos0]),
+            0xa6 => (Arith(And(RegsHlN::HlInd)), vec![pos0]),
+            0xa7 => (Arith(And(RegsHlN::Reg(A))), vec![pos0]),
+            0xa8 => (Arith(Xor(RegsHlN::Reg(B))), vec![pos0]),
+            0xa9 => (Arith(Xor(RegsHlN::Reg(C))), vec![pos0]),
+            0xaa => (Arith(Xor(RegsHlN::Reg(D))), vec![pos0]),
+            0xab => (Arith(Xor(RegsHlN::Reg(E))), vec![pos0]),
+            0xac => (Arith(Xor(RegsHlN::Reg(H))), vec![pos0]),
+            0xad => (Arith(Xor(RegsHlN::Reg(L))), vec![pos0]),
+            0xae => (Arith(Xor(RegsHlN::HlInd)), vec![pos0]),
+            0xaf => (Arith(Xor(RegsHlN::Reg(A))), vec![pos0]),
+            0xb0 => (Arith(Or(RegsHlN::Reg(B))), vec![pos0]),
+            0xb1 => (Arith(Or(RegsHlN::Reg(C))), vec![pos0]),
+            0xb2 => (Arith(Or(RegsHlN::Reg(D))), vec![pos0]),
+            0xb3 => (Arith(Or(RegsHlN::Reg(E))), vec![pos0]),
+            0xb4 => (Arith(Or(RegsHlN::Reg(H))), vec![pos0]),
+            0xb5 => (Arith(Or(RegsHlN::Reg(L))), vec![pos0]),
+            0xb6 => (Arith(Or(RegsHlN::HlInd)), vec![pos0]),
+            0xb7 => (Arith(Or(RegsHlN::Reg(A))), vec![pos0]),
+            0xb8 => (Arith(Cp(RegsHlN::Reg(B))), vec![pos0]),
+            0xb9 => (Arith(Cp(RegsHlN::Reg(C))), vec![pos0]),
+            0xba => (Arith(Cp(RegsHlN::Reg(D))), vec![pos0]),
+            0xbb => (Arith(Cp(RegsHlN::Reg(E))), vec![pos0]),
+            0xbc => (Arith(Cp(RegsHlN::Reg(H))), vec![pos0]),
+            0xbd => (Arith(Cp(RegsHlN::Reg(L))), vec![pos0]),
+            0xbe => (Arith(Cp(RegsHlN::HlInd)), vec![pos0]),
+            0xbf => (Arith(Cp(RegsHlN::Reg(A))), vec![pos0]),
             0xc0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xc1 => (Instr::PopBc, vec![pos0]),
             0xc2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -655,7 +696,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xce => {
                 let pos1 = self.read8();
-                (Arith(AddN(pos1)), vec![pos0, pos1])
+                (Arith(Add(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xcf => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -664,7 +705,11 @@ impl<'a> LiveInstrPointer<'a> {
             0xd3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xd6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xd6 => {
+                let pos1 = self.read8();
+                (Arith(Sub(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
+
             0xd7 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd9 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -683,9 +728,15 @@ impl<'a> LiveInstrPointer<'a> {
             0xe3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xe4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xe5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xe6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xe6 => {
+                let pos1 = self.read8();
+                (Arith(And(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
             0xe7 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xe8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xe8 => {
+                let pos1 = self.read8();
+                (Arith(AddSp(pos1 as i8)), vec![pos0, pos1])
+            }
             0xe9 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xea => {
                 let addr = self.read16();
@@ -706,7 +757,10 @@ impl<'a> LiveInstrPointer<'a> {
             0xf3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xf6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xf6 => {
+                let pos1 = self.read8();
+                (Arith(Or(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
             0xf7 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf9 => panic!(format!("unimplemented instruction ${:x}", pos0)),
@@ -720,7 +774,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xfd => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xfe => {
                 let pos1 = self.read8();
-                (Instr::Cp(pos1), vec![pos0, pos1])
+                (Arith(Cp(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xff => panic!(format!("unimplemented instruction ${:x}", pos0)),
         }
