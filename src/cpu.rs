@@ -222,7 +222,11 @@ impl Cpu {
                 let result = alu::addhl(&mut self.registers.flags, old_hl, operand);
                 self.registers.write16n(RegisterKind16::Hl, result);
             }
-            AddSp(_rk) => panic!("TODO AddHl"),
+            AddSp(operand) => {
+                let old_sp = self.registers.sp.0;
+                let result = alu::addsp(&mut self.registers.flags, old_sp, operand);
+                self.registers.write16n(RegisterKind16::Sp, result);
+            }
             Inc16(r16) => {
                 let operand = self.registers.read16(r16);
                 let result = alu::inc16(&mut self.registers.flags, operand.0);
