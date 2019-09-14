@@ -2,7 +2,7 @@
 
 use alu;
 use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, RegsHl, RegsHlN, Rotate};
-use mem::{Addr, Direction, Memory};
+use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
 
@@ -18,10 +18,10 @@ enum BranchAction {
 }
 
 impl Cpu {
-    pub fn create() -> Cpu {
+    pub fn create(cartridge: Option<Cartridge>) -> Cpu {
         Cpu {
             registers: Registers::create(),
-            memory: Memory::create(),
+            memory: Memory::create(cartridge),
             ip: InstrPointer::create(),
         }
     }
@@ -313,6 +313,10 @@ impl Cpu {
         use self::Jump::*;
 
         match jump {
+            Jp(addr) => {
+                self.ip.jump(addr);
+                BranchAction::Take
+            }
             Jr(offset) => {
                 self.ip.offset_by(offset);
                 BranchAction::Take

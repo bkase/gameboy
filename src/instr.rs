@@ -264,6 +264,7 @@ impl HasDuration for Rotate {
 
 #[derive(Debug, Clone)]
 pub enum Jump {
+    Jp(Addr),
     Jr(i8),
     JrNz(i8),
     JrZ(i8),
@@ -275,6 +276,7 @@ use self::Jump::*;
 impl fmt::Display for Jump {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Jp(addr) => write!(f, "JP {:}", addr),
             Jr(n) => write!(f, "JR {:}", n),
             JrNz(n) => write!(f, "JRNZ {:} (if != 0)", n),
             JrZ(n) => write!(f, "JRZ {:} (if == 0)", n),
@@ -287,6 +289,7 @@ impl fmt::Display for Jump {
 impl HasDuration for Jump {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
+            Jp(_) => (16, None),
             Jr(_) => (3, None),
             JrNz(_) => (3, Some(2)),
             JrZ(_) => (3, Some(2)),
@@ -668,7 +671,11 @@ impl<'a> LiveInstrPointer<'a> {
             0xc0 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xc1 => (Instr::PopBc, vec![pos0]),
             0xc2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xc3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xc3 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (Jump(Jp(Addr::directly(addr))), vec![pos0, lo, hi])
+            }
             0xc4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xc5 => (Instr::PushBc, vec![pos0]),
             0xc6 => panic!(format!("unimplemented instruction ${:x}", pos0)),

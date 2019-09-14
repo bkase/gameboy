@@ -35,11 +35,17 @@ use std::fmt;
 
 pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
 
+// Cartridges
+pub type Cartridge = &'static [u8; 0x8000];
+
+pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
+
 pub struct Memory {
     zero: Vec<u8>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
+    rom1: Vec<u8>,
     pub ppu: PpuRegisters,
     pub sound: sound::Registers,
 }
@@ -86,12 +92,20 @@ impl Addr {
 }
 
 impl Memory {
-    pub fn create() -> Memory {
+    pub fn create(cartridge: Option<Cartridge>) -> Memory {
+        let (rom0, rom1) = match cartridge {
+            Some(c) => {
+                let (bank0, bank1) = c.split_at(0x4000);
+                (bank0.to_vec(), bank1.to_vec())
+            }
+            None => (vec![0; 0x4000], vec![0; 0x4000]),
+        };
         Memory {
             zero: vec![0; 0x7f],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
-            rom0: vec![0; 0x4000],
+            rom0,
+            rom1,
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
         }
