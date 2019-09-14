@@ -79,17 +79,17 @@ fn addsp_(left: u16, right: i8) -> (u16, bool, bool) {
     let (abs, is_sub) = if right > 0 {
         (right as u8, false)
     } else {
-        ((right * -1) as u8, true)
+        ((-right) as u8, true)
     };
 
     if is_sub {
         let (res8, borrow_at_4, borrow_at_end) = sub_((left & 0xff) as u8, abs);
         let result =
-            ((left & 0x00).wrapping_sub(if borrow_at_end { 1 } else { 0 })) | (u16::from(res8));
+            ((left & 0xff00).wrapping_sub(if borrow_at_end { 1 } else { 0 })) | (u16::from(res8));
         (result, borrow_at_4, borrow_at_end)
     } else {
         let (res8, carry_at_3, carry_at_end) = add_((left & 0xff) as u8, abs);
-        let result = ((left & 0x00) | (u16::from(res8))).wrapping_add(1);
+        let result = ((left & 0xff00) | (u16::from(res8))).wrapping_add(1);
         (result, carry_at_3, carry_at_end)
     }
 }

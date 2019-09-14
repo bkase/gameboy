@@ -41,7 +41,7 @@ impl Error for BadOpcode {
         "Bad opcode"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         // Generic error, underlying cause isn't tracked.
         None
     }

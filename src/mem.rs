@@ -122,8 +122,8 @@ impl Memory {
                 println!("ie register");
                 0
             }
-            0xff80...0xfffe => self.zero[(addr - 0xff80) as usize],
-            0xff4c...0xff7f => {
+            0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
+            0xff4c..=0xff7f => {
                 println!("unusable memory");
                 0
             }
@@ -137,18 +137,18 @@ impl Memory {
             0xff43 => self.ppu.scx.read(),
             0xff44 => self.ppu.ly.read(),
             0xff47 => self.ppu.bgp.read(),
-            0xff00...0xff4b => {
+            0xff00..=0xff4b => {
                 println!("Passthrough...");
                 0
             }
             // panic!("rest of I/O ports"),
-            0xfea0...0xfeff => panic!("unusable"),
-            0xfe00...0xfe9f => panic!("sprite oam"),
-            0xe000...0xfdff => panic!("echo ram"),
+            0xfea0..=0xfeff => panic!("unusable"),
+            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
-            0xc000...0xdfff => self.main[(addr - 0xc000) as usize],
-            0xa000...0xbfff => {
+            0xc000..=0xdfff => self.main[(addr - 0xc000) as usize],
+            0xa000..=0xbfff => {
                 // cartridge ram
                 // not sure what to do here...
                 println!("Passthrough...");
@@ -158,25 +158,25 @@ impl Memory {
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
             // 0x8000 ... 0x97ff => panic!("character ram"),
-            0x8000...0x9fff => self.video[(addr - 0x8000) as usize],
+            0x8000..=0x9fff => self.video[(addr - 0x8000) as usize],
             // begin video ram
-            0x4000...0x7fff => panic!("switchable rom banks xx"),
-            0x0150...0x3fff =>
+            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x0150..=0x3fff =>
             // rom bank 0
             {
                 self.rom0[addr as usize]
             }
             // HACK: cartridge header with Nintendo logo
-            0x0104...0x0134 => {
+            0x0104..=0x0134 => {
                 // redirect to nintendo logo inside bootrom
                 BOOTROM[(addr as usize) - 0x0104 + 0x00a8]
             }
-            0x0100...0x014f =>
+            0x0100..=0x014f =>
             // cartridge header
             {
                 self.rom0[addr as usize]
             }
-            0x0000...0x00ff =>
+            0x0000..=0x00ff =>
             // bootrom
             {
                 BOOTROM[addr as usize]
@@ -191,27 +191,27 @@ impl Memory {
 
         match addr {
             0xffff => panic!("interrupt enable register"),
-            0xff80...0xfffe => u16read(&self.zero, addr - 0xff80),
-            0xff4c...0xff7f => panic!("unusable"),
-            0xff00...0xff4b => panic!("I/O ports"),
-            0xfea0...0xfeff => panic!("unusable"),
-            0xfe00...0xfe9f => panic!("sprite oam"),
-            0xe000...0xfdff => panic!("echo ram"),
+            0xff80..=0xfffe => u16read(&self.zero, addr - 0xff80),
+            0xff4c..=0xff7f => panic!("unusable"),
+            0xff00..=0xff4b => panic!("I/O ports"),
+            0xfea0..=0xfeff => panic!("unusable"),
+            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
-            0xc000...0xdfff => u16read(&self.main, addr - 0xc000),
-            0xa000...0xbfff => panic!("cartridge ram"),
+            0xc000..=0xdfff => u16read(&self.main, addr - 0xc000),
+            0xa000..=0xbfff => panic!("cartridge ram"),
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
             // 0x8000 ... 0x97ff => panic!("character ram"),
-            0x8000...0x9fff => u16read(&self.video, addr - 0x8000),
+            0x8000..=0x9fff => u16read(&self.video, addr - 0x8000),
             // begin video ram
-            0x4000...0x7fff => panic!("switchable rom banks xx"),
-            0x0150...0x3fff => u16read(&self.rom0, addr),
+            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x0150..=0x3fff => u16read(&self.rom0, addr),
 
-            0x0100...0x014f => u16read(&self.rom0, addr),
-            0x0000...0x00ff =>
+            0x0100..=0x014f => u16read(&self.rom0, addr),
+            0x0000..=0x00ff =>
             // bootrom
             {
                 u16read(BOOTROM, addr)
@@ -223,9 +223,9 @@ impl Memory {
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
         match addr {
             0xffff => panic!("interrupt enable register"),
-            0xff80...0xfffe => self.zero[(addr - 0xff80) as usize] = n,
+            0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
-            0xff4c...0xff7f => panic!("unusable"),
+            0xff4c..=0xff7f => panic!("unusable"),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
             0xff12 => self.sound.pulse_a.volume.set(n),
@@ -236,29 +236,29 @@ impl Memory {
             0xff43 => self.ppu.scx.set(n),
             0xff44 => panic!("Cannot write to LY register"),
             0xff47 => self.ppu.bgp.set(n),
-            0xff00...0xff4b => println!("Passthrough"),
+            0xff00..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
-            0xfea0...0xfeff => panic!("unusable"),
-            0xfe00...0xfe9f => panic!("sprite oam"),
-            0xe000...0xfdff => panic!("echo ram"),
+            0xfea0..=0xfeff => panic!("unusable"),
+            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
-            0xc000...0xdfff => self.main[(addr - 0xc000) as usize] = n,
-            0xa000...0xbfff => panic!("cartridge ram"),
+            0xc000..=0xdfff => self.main[(addr - 0xc000) as usize] = n,
+            0xa000..=0xbfff => panic!("cartridge ram"),
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
             // 0x8000 ... 0x97ff => panic!("character ram"),
-            0x8000...0x9fff => self.video[(addr - 0x8000) as usize] = n,
+            0x8000..=0x9fff => self.video[(addr - 0x8000) as usize] = n,
             // begin video ram
-            0x4000...0x7fff => panic!("switchable rom banks xx"),
-            0x0150...0x3fff => panic!("Cannot write to ROM"),
-            0x0100...0x014f =>
+            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x0150..=0x3fff => panic!("Cannot write to ROM"),
+            0x0100..=0x014f =>
             // cartridge header
             {
                 panic!("Cannot write to ROM")
             }
-            0x0000...0x00ff => println!("Cannot write to bootrom"),
+            0x0000..=0x00ff => println!("Cannot write to bootrom"),
         }
     }
 }

@@ -1,13 +1,11 @@
 // hello world
 
 #![feature(proc_macro_hygiene)]
-#![feature(futures_api)]
 #![feature(exclusive_range_pattern)]
 
 extern crate console_error_panic_hook;
 extern crate css_rs_macro;
 extern crate futures;
-#[macro_use]
 extern crate futures_signals;
 extern crate futures_util;
 extern crate js_sys;
@@ -214,7 +212,7 @@ pub fn run() -> Result<(), JsValue> {
         // Schedule ourself for another requestAnimationFrame callback.
         request_animation_frame(f.borrow().as_ref().unwrap());
     };
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<FnMut()>));
+    *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<dyn FnMut()>));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
 
