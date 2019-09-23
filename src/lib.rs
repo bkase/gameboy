@@ -9,11 +9,15 @@ extern crate futures;
 extern crate futures_signals;
 extern crate futures_util;
 extern crate js_sys;
+// #[macro_use]
+// extern crate topo;
+// extern crate moxie;
+// #[macro_use]
+// extern crate moxie_dom;
+extern crate packed_struct;
 extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
 extern crate web_sys;
-
-extern crate packed_struct;
 #[macro_use]
 extern crate packed_struct_codegen;
 
@@ -109,6 +113,40 @@ pub fn run() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
         .unwrap();
+
+    /* TODO: Moxie
+    let moxie_cell = Rc::new(RefCell::new(None));
+    {
+        use moxie_dom::{prelude::*, *};
+        let moxie_root = document().get_element_by_id("moxie").unwrap();
+        moxie_dom::boot(moxie_root, move || {
+            let i = state!(|| 0);
+
+            let count = state!(|| 0);
+
+            text!(&format!("Hello world {:}", count));
+            text!(&format!("Raf {:}", i));
+
+            element!("button", |e| e
+                .attr("type", "button")
+                .on(|_: ClickEvent, count| Some(count + 1), count)
+                .inner(|| text!("increment")));
+
+            let closure: Closure<dyn FnMut()> = Closure::new(move || {
+                let _ = i.update(|i| Some(i + 1));
+            });
+            *moxie_cell.borrow_mut() = Some(closure);
+            window().set_timeout_with_callback_and_timeout_and_arguments_0(
+                moxie_cell
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unchecked_ref(),
+                0,
+            );
+        });
+    } */
 
     let width = canvas.width() as u32;
     let height = canvas.height() as u32;
