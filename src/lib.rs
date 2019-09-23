@@ -134,7 +134,7 @@ pub fn run() -> Result<(), JsValue> {
     primary.start().unwrap();
 
     let mut i = 0;
-    let mut last = performance_now();
+    let mut last = performance.now();
     let closure = move || {
         {
             // Change the state
@@ -152,7 +152,7 @@ pub fn run() -> Result<(), JsValue> {
         }
 
         // Measure time delta
-        let now = performance_now();
+        let now = performance.now();
         let diff = now - last;
         last = now;
 

@@ -8,8 +8,11 @@ extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     pub fn log(s: &str);
 
-    #[wasm_bindgen(js_namespace = performance, js_name = now)]
-    pub fn performance_now() -> f64;
+    pub type Performance;
+    pub static performance: Performance;
+
+    #[wasm_bindgen(method, js_name = now)]
+    pub fn now(this: &Performance) -> f64;
 }
 
 pub fn window() -> web_sys::Window {

@@ -1,5 +1,5 @@
 use cpu::Cpu;
-use mem::{Addr, TETRIS};
+use mem::Addr;
 use ppu::Ppu;
 use sound::Sound;
 use std::collections::HashSet;
@@ -21,7 +21,7 @@ impl Hardware {
         //_set.insert(Addr::directly(0x0080));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
+            cpu: Cpu::create(None),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
