@@ -5,11 +5,14 @@ use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, RegsHl, RegsHlN, 
 use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
+use web_utils::log;
 
 pub struct Cpu {
     pub registers: Registers,
     pub memory: Memory,
     pub ip: InstrPointer,
+    // a secret state bit that's controlled by interrupt-enabling/disabling instrs
+    pub interrupt_master_enable: bool,
 }
 
 enum BranchAction {
@@ -22,7 +25,12 @@ impl Cpu {
         Cpu {
             registers: Registers::create(),
             memory: Memory::create(cartridge),
-            ip: InstrPointer::create(),
+            // HACK: For now, just skip bootscreen if a cartridge is in
+            ip: match cartridge {
+                None => InstrPointer::create(),
+                Some(_) => InstrPointer(Addr::directly(0x100)),
+            },
+            interrupt_master_enable: true,
         }
     }
 
@@ -291,7 +299,7 @@ mod instr_tests {
     proptest! {
         #[test]
         fn push_pop_self_inverse(x : u16) {
-            let mut cpu = Cpu::create();
+            let mut cpu = Cpu::create(None);
             cpu.registers.sp = R16(0xff90);
 
             let r16 = R16(x);
@@ -352,6 +360,12 @@ impl Cpu {
         }
     }
 
+    fn do_ret(&mut self) -> BranchAction {
+        let reg = self.pop16();
+        self.ip.jump(Addr::directly(reg.0));
+        BranchAction::Take
+    }
+
     fn execute_instr(&mut self, instr: Instr) -> BranchAction {
         use self::Instr::*;
 
@@ -382,9 +396,17 @@ impl Cpu {
                 self.push16(bc);
                 BranchAction::Take
             }
-            Ret => {
-                let reg = self.pop16();
-                self.ip.jump(Addr::directly(reg.0));
+            Ret => self.do_ret(),
+            Reti => {
+                self.interrupt_master_enable = true;
+                self.do_ret()
+            }
+            Di => {
+                self.interrupt_master_enable = false;
+                BranchAction::Take
+            }
+            Ei => {
+                self.interrupt_master_enable = true;
                 BranchAction::Take
             }
         }

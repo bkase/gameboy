@@ -311,7 +311,10 @@ pub enum Instr {
     PopBc,
     PushBc,
     Ret,
+    Reti,
     Nop,
+    Di,
+    Ei,
 }
 use self::Instr::*;
 
@@ -327,7 +330,10 @@ impl fmt::Display for Instr {
             PopBc => write!(f, "POP BC"),
             PushBc => write!(f, "PUSH BC"),
             Ret => write!(f, "RET"),
+            Reti => write!(f, "RETI"),
             Nop => write!(f, "NOP"),
+            Ei => write!(f, "EI"),
+            Di => write!(f, "DI"),
         }
     }
 }
@@ -343,8 +349,9 @@ impl HasDuration for Instr {
             CpHlInd => (2, None),
             PopBc => (3, None),
             PushBc => (4, None),
-            Ret => (4, None),
+            Ret | Reti => (4, None),
             Nop => (1, None),
+            Di | Ei => (1, None),
         }
     }
 }
@@ -422,6 +429,7 @@ use register_kind::RegisterKind8::*;
 impl<'a> LiveInstrPointer<'a> {
     // returns instruction and bytes read by the PC
     fn read_(&mut self) -> (Instr, Vec<u8>) {
+        use web_utils;
         fn hi_lo_decompose(x: u16) -> (u8, u8) {
             (((x & 0xff00) >> 8) as u8, (x & 0xff) as u8)
         }
@@ -761,7 +769,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xf1 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf2 => (Ld(AGetsIOOffsetByC), vec![pos0]),
-            0xf3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xf3 => (Di, vec![pos0]),
             0xf4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf5 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xf6 => {
@@ -776,7 +784,7 @@ impl<'a> LiveInstrPointer<'a> {
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Ld(AGetsNnInd(Addr::directly(addr))), vec![pos0, lo, hi])
             }
-            0xfb => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xfb => (Ei, vec![pos0]),
             0xfc => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xfd => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xfe => {

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use packed_struct::prelude::*;
 use ppu::PpuRegisters;
 use read_view_u8::*;
 use register::R16;
@@ -40,12 +41,50 @@ pub type Cartridge = &'static [u8; 0x8000];
 
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 
+#[derive(PackedStruct)]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
+pub struct InterruptRegister {
+    #[packed_field(bits = "0")]
+    pub vblank: bool,
+    #[packed_field(bits = "1")]
+    pub lcd_stat: bool,
+    #[packed_field(bits = "2")]
+    pub timer: bool,
+    #[packed_field(bits = "3")]
+    pub serial: bool,
+    #[packed_field(bits = "4")]
+    pub joypad: bool,
+}
+impl InterruptRegister {
+    fn create() -> InterruptRegister {
+        InterruptRegister {
+            vblank: false,
+            lcd_stat: false,
+            timer: false,
+            serial: false,
+            joypad: false,
+        }
+    }
+}
+impl ReadViewU8 for InterruptRegister {
+    fn read(&self) -> u8 {
+        self.pack()[0]
+    }
+}
+impl ViewU8 for InterruptRegister {
+    fn set(&mut self, n: u8) {
+        *self = InterruptRegister::unpack(&[n]).expect("it's 8bits")
+    }
+}
+
 pub struct Memory {
     zero: Vec<u8>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
     rom1: Vec<u8>,
+    pub interrupt_enable: InterruptRegister,
+    pub interrupt_flag: InterruptRegister,
     pub ppu: PpuRegisters,
     pub sound: sound::Registers,
 }
@@ -106,6 +145,8 @@ impl Memory {
             video: vec![0; 0x2000],
             rom0,
             rom1,
+            interrupt_enable: InterruptRegister::create(),
+            interrupt_flag: InterruptRegister::create(),
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
         }
@@ -118,15 +159,13 @@ impl Memory {
     #[allow(clippy::match_overlapping_arm)]
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
-            0xffff => {
-                println!("ie register");
-                0
-            }
+            0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
             0xff4c..=0xff7f => {
                 println!("unusable memory");
                 0
             }
+            0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
             0xff12 => self.sound.pulse_a.volume.read(),
@@ -222,10 +261,11 @@ impl Memory {
     #[allow(clippy::match_overlapping_arm)]
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
         match addr {
-            0xffff => panic!("interrupt enable register"),
+            0xffff => self.interrupt_enable.set(n),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
             0xff4c..=0xff7f => panic!("unusable"),
+            0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
             0xff12 => self.sound.pulse_a.volume.set(n),

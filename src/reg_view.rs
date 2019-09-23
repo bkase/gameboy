@@ -3,6 +3,7 @@
 use futures_signals::map_ref;
 use futures_signals::signal::Signal;
 use hardware::Hardware;
+use mem::InterruptRegister;
 use mutable_effect::MutableEffect;
 use read_view_u8::*;
 use register::Flags;
@@ -25,6 +26,9 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
             let pulse_a = &sound_regs_hardware.borrow().cpu.memory.sound.pulse_a;
             let ppu_regs = &ppu_regs_hardware.borrow().cpu.memory.ppu;
             let registers = &hardware.borrow().cpu.registers;
+
+            let interrupt_enable = &hardware.borrow().cpu.memory.interrupt_enable;
+            let interrupt_flag = &hardware.borrow().cpu.memory.interrupt_flag;
 
             fn draw_r16(name: &'static str, value: R16) -> VirtualNode {
                 html! {
@@ -50,6 +54,14 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 </tr>
                 }
             }
+            fn draw_interrupt(name: &'static str, r: &InterruptRegister) -> VirtualNode {
+                html! {
+                <tr>
+                  <th> { name } </th>
+                  <td> { format!("vblank={:} lcd_stat={:} timer={:} serial={:} joypad={:}", r.vblank, r.lcd_stat, r.timer, r.serial, r.joypad) } </td>
+                </tr>
+                }
+            }
 
             Rc::new(
             html! {
@@ -67,6 +79,8 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     { draw_r16("sp", registers.sp) }
                     { draw_r8("a", registers.a) }
                     { draw_flags("flags", &registers.flags) }
+                    { draw_interrupt("ie", &interrupt_enable) }
+                    { draw_interrupt("id", &interrupt_flag) }
                     { draw_r8("pa:control", R8(pulse_a.control.read())) }
                     { draw_r8("pa:frequency", R8(pulse_a.frequency.read())) }
                     { draw_r8("pa:volume", R8(pulse_a.volume.read())) }
