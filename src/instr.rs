@@ -79,6 +79,7 @@ pub enum Ld {
     SpGetsAddr(Addr),
     HlGetsAddr(Addr),
     DeGetsAddr(Addr),
+    BcGetsAddr(Addr),
 }
 use self::Ld::*;
 
@@ -109,6 +110,7 @@ impl fmt::Display for Ld {
             SpGetsAddr(addr) => write!(f, "(LD) SP <- {:}", addr),
             HlGetsAddr(addr) => write!(f, "(LD) HL <- {:}", addr),
             DeGetsAddr(addr) => write!(f, "(LD) DE <- {:}", addr),
+            BcGetsAddr(addr) => write!(f, "(LD) BC <- {:}", addr),
         }
     }
 }
@@ -138,6 +140,7 @@ impl HasDuration for Ld {
             SpGetsAddr(_) => (3, None),
             HlGetsAddr(_) => (3, None),
             DeGetsAddr(_) => (3, None),
+            BcGetsAddr(_) => (3, None),
         }
     }
 }
@@ -434,9 +437,15 @@ impl<'a> LiveInstrPointer<'a> {
         }
 
         let pos0 = self.read8();
+        //use web_utils::log;
+        //log(&format!("Decode ${:x}", pos0));
         match pos0 {
             0x00 => (Nop, vec![pos0]),
-            0x01 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x01 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (Ld(BcGetsAddr(Addr::directly(addr))), vec![pos0, lo, hi])
+            }
             0x02 => (Ld(BcIndGetsA), vec![pos0]),
             0x03 => (Arith(Inc16(Bc)), vec![pos0]),
             0x04 => (Arith(Inc(RegsHl::Reg(B))), vec![pos0]),

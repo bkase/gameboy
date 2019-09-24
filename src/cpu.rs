@@ -137,6 +137,9 @@ impl Cpu {
             DeGetsAddr(addr) => {
                 self.registers.de = addr.into_register();
             }
+            BcGetsAddr(addr) => {
+                self.registers.bc = addr.into_register();
+            }
         };
         BranchAction::Take
     }
@@ -421,7 +424,9 @@ impl Cpu {
 
     /// Peek at the next instruction to see how long it will take
     pub fn peek_next(&mut self) -> u32 {
+        //use web_utils::log;
         let instr = self.ip.peek(&self.memory);
+        //log(&format!("{:}", instr));
         // Assumption: Take duration is longer than skip duration (this seems to be true for all
         // Gameboy instructions
         let (take_duration, _) = instr.duration();
@@ -449,6 +454,8 @@ impl Cpu {
             match kind {
                 InterruptKind::Vblank => {
                     if ie.vblank {
+                        use web_utils::log;
+                        log("Triggering vblank");
                         Some(Addr::directly(0x40))
                     } else {
                         None

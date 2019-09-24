@@ -199,7 +199,7 @@ impl Memory {
             // 0x8000 ... 0x97ff => panic!("character ram"),
             0x8000..=0x9fff => self.video[(addr - 0x8000) as usize],
             // begin video ram
-            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x4000..=0x7fff => self.rom1[(addr - 0x4000) as usize],
             0x0150..=0x3fff =>
             // rom bank 0
             {
@@ -246,7 +246,7 @@ impl Memory {
             // 0x8000 ... 0x97ff => panic!("character ram"),
             0x8000..=0x9fff => u16read(&self.video, addr - 0x8000),
             // begin video ram
-            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x4000..=0x7fff => u16read(&self.rom1, addr - 0x4000),
             0x0150..=0x3fff => u16read(&self.rom0, addr),
 
             0x0100..=0x014f => u16read(&self.rom0, addr),
@@ -264,7 +264,11 @@ impl Memory {
             0xffff => self.interrupt_enable.set(n),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
-            0xff4c..=0xff7f => panic!("unusable"),
+            0xff4c..=0xff7f => {
+                // TODO: Why does tetris write to "unusable" memory?
+                // panic!("unusable"),
+                ()
+            }
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
@@ -278,8 +282,14 @@ impl Memory {
             0xff47 => self.ppu.bgp.set(n),
             0xff00..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
-            0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xfea0..=0xfeff => {
+                // TODO: Why does tetris write to this "unusable" memory
+                ()
+            }
+            0xfe00..=0xfe9f => {
+                // TODO: Sprite OAM
+                ()
+            }
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
@@ -292,11 +302,13 @@ impl Memory {
             0x8000..=0x9fff => self.video[(addr - 0x8000) as usize] = n,
             // begin video ram
             0x4000..=0x7fff => panic!("switchable rom banks xx"),
-            0x0150..=0x3fff => panic!("Cannot write to ROM"),
+            0x0150..=0x3fff => {
+                println!("(header) ROM write; do we need to implement bank switching here?")
+            }
             0x0100..=0x014f =>
             // cartridge header
             {
-                panic!("Cannot write to ROM")
+                println!("(header) ROM write; do we need to implement bank switching here?")
             }
             0x0000..=0x00ff => println!("Cannot write to bootrom"),
         }
