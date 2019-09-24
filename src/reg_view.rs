@@ -29,6 +29,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
 
             let interrupt_enable = &hardware.borrow().cpu.memory.interrupt_enable;
             let interrupt_flag = &hardware.borrow().cpu.memory.interrupt_flag;
+            let interrupt_master_enable = &hardware.borrow().cpu.interrupt_master_enable;
 
             fn draw_r16(name: &'static str, value: R16) -> VirtualNode {
                 html! {
@@ -62,6 +63,14 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                 </tr>
                 }
             }
+            fn draw_bit(name: &'static str, bit: bool) -> VirtualNode {
+                html! {
+                <tr>
+                  <th> { name } </th>
+                  <td> { format!("{:}", bit) } </td>
+                </tr>
+                }
+            }
 
             Rc::new(
             html! {
@@ -81,6 +90,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                     { draw_flags("flags", &registers.flags) }
                     { draw_interrupt("ie", &interrupt_enable) }
                     { draw_interrupt("id", &interrupt_flag) }
+                    { draw_bit("ime", *interrupt_master_enable) }
                     { draw_r8("pa:control", R8(pulse_a.control.read())) }
                     { draw_r8("pa:frequency", R8(pulse_a.frequency.read())) }
                     { draw_r8("pa:volume", R8(pulse_a.volume.read())) }

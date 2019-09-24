@@ -198,6 +198,9 @@ const VBLANK_ROWS: u8 = 10;
 /// Invariant: .0 <= COLS * ROWS
 struct Moment(u16);
 
+#[derive(Copy, Clone, Debug)]
+pub struct TriggeredVblank(pub bool);
+
 impl Moment {
     /// Returns number between 0 and ROWS exclusive
     fn line(self) -> u8 {
@@ -220,10 +223,14 @@ impl Moment {
         }
     }
 
-    fn advance(&mut self, amount: u32) {
-        *self = Moment(
-            (u32::from(self.0).wrapping_add(amount) % (u32::from(COLS) * u32::from(ROWS))) as u16,
-        );
+    fn advance(&mut self, amount: u32) -> TriggeredVblank {
+        let pre_mod = u32::from(self.0).wrapping_add(amount);
+        *self = Moment((pre_mod % (u32::from(COLS) * u32::from(ROWS))) as u16);
+        if pre_mod >= u32::from(COLS) * u32::from(SCREEN_ROWS) {
+            TriggeredVblank(true)
+        } else {
+            TriggeredVblank(false)
+        }
     }
 }
 
@@ -238,7 +245,8 @@ mod moments_test {
         let mut moment = Moment(2 * u16::from(COLS) + 24);
         assert_eq!(moment.line(), 2);
         assert_eq!(moment.mode(), Mode::PixelTransfer);
-        moment.advance(BIG);
+        let TriggeredVblank(b) = moment.advance(BIG);
+        assert!(b);
         assert_eq!(moment.line(), 2);
         assert_eq!(moment.mode(), Mode::PixelTransfer);
     }
@@ -335,10 +343,11 @@ impl Ppu {
         })
     }
 
-    pub fn advance(&mut self, memory: &mut Memory, duration: u32) {
-        self.moment.advance(duration);
+    pub fn advance(&mut self, memory: &mut Memory, duration: u32) -> TriggeredVblank {
+        let triggered_vblank = self.moment.advance(duration);
         memory.ppu.ly = self.moment.line();
         self.dirty = true;
+        triggered_vblank
     }
 
     pub fn repaint(&mut self, memory: &Memory) {
@@ -368,7 +377,6 @@ mod tiles {
         println!("GOT {:?}", got);
         assert_eq!(got, vec![0, 2, 0, 3, 3, 1, 0, 2])
     }
-
 }
 
 /*
@@ -405,5 +413,4 @@ mod test {
         let x = bgp.pack()[0];
         assert_eq!(x, 0b1110_0100 as u8)
     }
-
 }

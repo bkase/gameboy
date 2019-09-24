@@ -429,7 +429,6 @@ use register_kind::RegisterKind8::*;
 impl<'a> LiveInstrPointer<'a> {
     // returns instruction and bytes read by the PC
     fn read_(&mut self) -> (Instr, Vec<u8>) {
-        use web_utils;
         fn hi_lo_decompose(x: u16) -> (u8, u8) {
             (((x & 0xff00) >> 8) as u8, (x & 0xff) as u8)
         }
@@ -829,7 +828,7 @@ mod tests {
 
     #[test]
     fn bootrom_roundtrip() {
-        let memory = Memory::create();
+        let memory = Memory::create(None);
         let mut ptr = InstrPointer::create();
 
         let mut acc = Vec::new();

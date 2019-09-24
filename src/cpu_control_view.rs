@@ -59,7 +59,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                                     let mode_borrow = mode_mutable.borrow_mut();
                                     let mut lock = mode_borrow.lock_mut();
                                     *lock = switch_to;
-                                    audio_ctx.resume();
+                                    let _ = audio_ctx.resume();
                                     hardware.borrow_mut().paused = match switch_to {
                                         Mode::Paused => true,
                                         Mode::Running => false,
@@ -75,7 +75,7 @@ pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
                                     let mode_borrow = mode_mutable.borrow_mut();
                                     let mut lock = mode_borrow.lock_mut();
                                     *lock = switch_to;
-                                    audio_ctx.resume();
+                                    let _ = audio_ctx.resume();
                                     hardware.borrow_mut().paused = match switch_to {
                                         Mode::Paused => true,
                                         Mode::Running => false,

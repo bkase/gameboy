@@ -5,7 +5,6 @@ use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, RegsHl, RegsHlN, 
 use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
-use web_utils::log;
 
 pub struct Cpu {
     pub registers: Registers,
@@ -310,6 +309,14 @@ mod instr_tests {
     }
 }
 
+pub enum InterruptKind {
+    Vblank,
+    LcdStat,
+    Timer,
+    Serial,
+    Joypad,
+}
+
 impl Cpu {
     fn do_call(&mut self, addr: Addr) {
         let r16 = self.ip.0.into_register();
@@ -430,6 +437,66 @@ impl Cpu {
         match action {
             BranchAction::Take => take_duration,
             BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
+        }
+    }
+
+    /// Attempt an interrupt of a certain kind
+    /// Returns None if the interrupt is not enabled
+    /// Returns Some(addr to call) otherwise
+    fn attempt_interrupt_(&self, kind: InterruptKind) -> Option<Addr> {
+        if self.interrupt_master_enable {
+            let ie = &self.memory.interrupt_enable;
+            match kind {
+                InterruptKind::Vblank => {
+                    if ie.vblank {
+                        Some(Addr::directly(0x40))
+                    } else {
+                        None
+                    }
+                }
+                InterruptKind::LcdStat => {
+                    if ie.lcd_stat {
+                        Some(Addr::directly(0x48))
+                    } else {
+                        None
+                    }
+                }
+                InterruptKind::Timer => {
+                    if ie.timer {
+                        Some(Addr::directly(0x50))
+                    } else {
+                        None
+                    }
+                }
+                InterruptKind::Serial => {
+                    if ie.serial {
+                        Some(Addr::directly(0x58))
+                    } else {
+                        None
+                    }
+                }
+                InterruptKind::Joypad => {
+                    if ie.joypad {
+                        Some(Addr::directly(0x58))
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to fire an interrupt; it can be ignored
+    /// If it fires, interrupts are disabled and we push ip + jump to the addr
+    pub fn attempt_interrupt(&mut self, kind: InterruptKind) {
+        match self.attempt_interrupt_(kind) {
+            None => (),
+            Some(addr) => {
+                self.interrupt_master_enable = false;
+                self.do_call(addr);
+            }
         }
     }
 }

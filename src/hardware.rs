@@ -1,6 +1,6 @@
-use cpu::Cpu;
+use cpu::{Cpu, InterruptKind};
 use mem::{Addr, TETRIS};
-use ppu::Ppu;
+use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
 use web_utils::log;
@@ -34,8 +34,14 @@ impl Hardware {
     // useful for step-debugging
     fn step_(&mut self) -> u32 {
         let elapsed_duration = self.cpu.execute();
-        self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
+        let TriggeredVblank(triggered_vblank) =
+            self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
+        // TODO: Is this okay that we ppu advance after the CPU tick? I.e. do we execute that
+        // instruction before the vblank interrupt triggers?
         self.sound.advance(&mut self.cpu.memory, elapsed_duration);
+        if triggered_vblank {
+            self.cpu.attempt_interrupt(InterruptKind::Vblank);
+        }
         elapsed_duration
     }
 
