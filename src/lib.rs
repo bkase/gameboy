@@ -9,11 +9,11 @@ extern crate futures;
 extern crate futures_signals;
 extern crate futures_util;
 extern crate js_sys;
-// #[macro_use]
-// extern crate topo;
-// extern crate moxie;
-// #[macro_use]
-// extern crate moxie_dom;
+#[macro_use]
+extern crate topo;
+extern crate moxie;
+#[macro_use]
+extern crate moxie_dom;
 extern crate packed_struct;
 extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
@@ -66,11 +66,6 @@ use web_utils::*;
 pub fn run() -> Result<(), JsValue> {
     utils::set_panic_hook();
 
-    // Rc is used to do a closure dance so we can stop the
-    // request_animation_frame loop
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
-
     // For now hardware has it's own memory
     let hardware = Rc::new(RefCell::new(Hardware::create()));
     // mem is for GUI
@@ -114,40 +109,6 @@ pub fn run() -> Result<(), JsValue> {
         .map_err(|_| ())
         .unwrap();
 
-    /* TODO: Moxie
-    let moxie_cell = Rc::new(RefCell::new(None));
-    {
-        use moxie_dom::{prelude::*, *};
-        let moxie_root = document().get_element_by_id("moxie").unwrap();
-        moxie_dom::boot(moxie_root, move || {
-            let i = state!(|| 0);
-
-            let count = state!(|| 0);
-
-            text!(&format!("Hello world {:}", count));
-            text!(&format!("Raf {:}", i));
-
-            element!("button", |e| e
-                .attr("type", "button")
-                .on(|_: ClickEvent, count| Some(count + 1), count)
-                .inner(|| text!("increment")));
-
-            let closure: Closure<dyn FnMut()> = Closure::new(move || {
-                let _ = i.update(|i| Some(i + 1));
-            });
-            *moxie_cell.borrow_mut() = Some(closure);
-            window().set_timeout_with_callback_and_timeout_and_arguments_0(
-                moxie_cell
-                    .borrow()
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .unchecked_ref(),
-                0,
-            );
-        });
-    } */
-
     let width = canvas.width() as u32;
     let height = canvas.height() as u32;
     // gameboy resolution
@@ -171,88 +132,83 @@ pub fn run() -> Result<(), JsValue> {
         .unwrap();
     primary.start().unwrap();
 
-    let mut i = 0;
-    let mut last = performance.now();
-    let closure = move || {
-        {
-            // Change the state
-            let mut lock = app_state.globals.frames.lock_mut();
-            *lock = i;
-        }
+    {
+        use moxie_dom::{prelude::*, *};
+        let moxie_root = document().get_element_by_id("moxie").unwrap();
+        let mut i = 0;
+        let mut last = performance.now();
+        moxie_dom::embed::WebRuntime::new(moxie_root, move || {
+            let count = state!(|| 0);
 
-        // Stop after 50,000 frames
-        if i > 50_000 {
-            // Drop our handle to this closure so that it will get cleaned
-            // up once we return.
-            let _ = f.borrow_mut().take();
-            audio_ctx.close().unwrap();
-            return;
-        }
+            text!(&format!("Hello world {:}", count));
+            text!(&format!("Raf {:}", i));
 
-        // Measure time delta
-        let now = performance.now();
-        let diff = now - last;
-        last = now;
+            element!("button", |e| e
+                .attr("type", "button")
+                .on(|_: ClickEvent, count| Some(count + 1), count)
+                .inner(|| text!("increment")));
 
-        // Execute our hardware!
-        {
-            hardware.borrow_mut().run(diff);
-        }
-        let dirty = { hardware.borrow().dirty };
-        {
-            hardware.borrow_mut().dirty = false;
-            if dirty {
-                // Trigger hardware changes
-                let mut lock = trigger.lock_mut();
-                *lock = ();
+            // Measure time delta
+            let now = performance.now();
+            let diff = now - last;
+            last = now;
+
+            // Execute our hardware!
+            {
+                hardware.borrow_mut().run(diff);
             }
-        }
-
-        // Blit bytes
-        let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
-            Clamped(&mut hardware.borrow_mut().ppu.screen.data),
-            width,
-            height,
-        )
-        .expect("u8 clamped array");
-        ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
-
-        // play sound
-        match hardware.borrow().sound.audio {
-            None => {
-                gain.gain().set_value(0.0);
+            let dirty = { hardware.borrow().dirty };
+            {
+                hardware.borrow_mut().dirty = false;
+                if dirty {
+                    // Trigger hardware changes
+                    let mut lock = trigger.lock_mut();
+                    *lock = ();
+                }
             }
-            Some(ref audio) => {
-                log(&format!(
-                    "Settings audio gain: {:?}, frequency: {:?}",
-                    audio.channel.gain, audio.channel.frequency
-                ));
-                gain.gain().set_value(audio.channel.gain);
-                primary.frequency().set_value(audio.channel.frequency);
+
+            // Blit bytes
+            let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+                Clamped(&mut hardware.borrow_mut().ppu.screen.data),
+                width,
+                height,
+            )
+            .expect("u8 clamped array");
+            ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
+
+            // play sound
+            match hardware.borrow().sound.audio {
+                None => {
+                    gain.gain().set_value(0.0);
+                }
+                Some(ref audio) => {
+                    log(&format!(
+                        "Settings audio gain: {:?}, frequency: {:?}",
+                        audio.channel.gain, audio.channel.frequency
+                    ));
+                    gain.gain().set_value(audio.channel.gain);
+                    primary.frequency().set_value(audio.channel.frequency);
+                }
             }
-        }
 
-        // Show fps
-        let fps = (1000.0 / diff).ceil();
-        ctx.set_font("bold 12px Monaco");
-        ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
-            .expect("fill_text");
+            // Show fps
+            let fps = (1000.0 / diff).ceil();
+            ctx.set_font("bold 12px Monaco");
+            ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
+                .expect("fill_text");
 
-        // Increment once per call
-        i += 1;
+            // Increment once per call
+            i += 1;
 
-        // Drive our GUI
-        match future_driver::tick(signal_future.clone()) {
-            Poll::Pending => (),
-            Poll::Ready(()) => panic!("The signal should never end!"),
-        };
-
-        // Schedule ourself for another requestAnimationFrame callback.
-        request_animation_frame(f.borrow().as_ref().unwrap());
-    };
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(closure) as Box<dyn FnMut()>));
-
-    request_animation_frame(g.borrow().as_ref().unwrap());
+            // Drive our GUI
+            match future_driver::tick(signal_future.clone()) {
+                Poll::Pending => (),
+                Poll::Ready(()) => panic!("The signal should never end!"),
+            };
+        })
+        .animation_frame_scheduler()
+        .run_on_every_frame();
+    }
 
     Ok(())
 }
