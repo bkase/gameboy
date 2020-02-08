@@ -1,3 +1,3 @@
-import('gameboy')
+import('../pkg/gameboy')
   .catch(console.error);
 

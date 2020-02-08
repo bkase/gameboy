@@ -138,15 +138,17 @@ pub fn run() -> Result<(), JsValue> {
         let mut i = 0;
         let mut last = performance.now();
         moxie_dom::embed::WebRuntime::new(moxie_root, move || {
-            let count = state!(|| 0);
+            let count = state(|| 0);
 
-            text!(&format!("Hello world {:}", count));
-            text!(&format!("Raf {:}", i));
+            text(&format!("Hello world {:}", count));
+            text(&format!("Raf {:}", i));
 
-            element!("button", |e| e
-                .attr("type", "button")
-                .on(|_: ClickEvent, count| Some(count + 1), count)
-                .inner(|| text!("increment")));
+            let count_ = count.clone();
+            element("button", |e| {
+                e.attr("type", "button")
+                    .on(move |_: event::Click| count_.update(|count| Some(count + 1)))
+                    .inner(|| text("increment"))
+            });
 
             // Measure time delta
             let now = performance.now();
