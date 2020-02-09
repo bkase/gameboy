@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Screen {
     pub data: Vec<u8>,
     width: u32,

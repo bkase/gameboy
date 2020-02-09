@@ -41,7 +41,7 @@ pub type Cartridge = &'static [u8; 0x8000];
 
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 
-#[derive(PackedStruct)]
+#[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct InterruptRegister {
     #[packed_field(bits = "0")]
@@ -77,6 +77,7 @@ impl ViewU8 for InterruptRegister {
     }
 }
 
+#[derive(Debug)]
 pub struct Memory {
     zero: Vec<u8>,
     main: Vec<u8>,

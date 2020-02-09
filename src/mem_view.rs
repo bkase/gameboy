@@ -1,227 +1,176 @@
-#![allow(dead_code)]
-
-use futures_signals::map_ref;
-use futures_signals::signal::{Mutable, Signal};
 use hardware::Hardware;
 use mem::{Addr, Direction};
-use mutable_effect::MutableEffect;
+use moxie_dom::{
+    elements::{button, div, span, table, tbody, td, th, thead, tr},
+    prelude::*,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
-#[allow(unused_imports)]
-use web_sys::MouseEvent;
 use web_utils::log;
-
-use virtual_dom_rs::prelude::*;
 
 const ROWS: u16 = 16;
 const COLS: u16 = 16;
 
-// supports only 16 cols for now
-#[derive(Debug, Clone)]
-struct ViewModel {
-    data: Vec<u8>, // assumption: aligned to +0 of the first row
-    local_mutable: LocalState<Rc<RefCell<Mutable<u16>>>>,
-    local: LocalState<u16>,
-    local_cell: Rc<RefCell<LocalState<u16>>>,
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct Cursor(pub u16);
+#[derive(Debug, PartialEq)]
+pub struct Focus(pub u16);
+
+fn cursor_of_coord(focus: &Focus, row: usize, col: usize) -> Cursor {
+    Cursor(focus.0 - ((ROWS / 2) * COLS) + ((row as u16) * COLS) + (col as u16))
 }
 
-fn mem_table_view(model: ViewModel) -> Rc<VirtualNode> {
-    fn cursor_of_coord(focus: u16, row: usize, col: usize) -> u16 {
-        focus - ((ROWS / 2) * COLS) + ((row as u16) * COLS) + (col as u16)
+fn color(cursor: &Cursor, focus: &Focus, row: usize, col: usize) -> &'static str {
+    if *cursor == cursor_of_coord(focus, row, col) {
+        "rgba(0,170,170,.2)"
+    } else {
+        "rgba(0,0,0,0)"
     }
+}
 
-    fn color(local: &LocalState<u16>, row: usize, col: usize) -> &'static str {
-        if local.cursor == cursor_of_coord(local.focus, row, col) {
-            "rgba(0,170,170,.2)"
+#[topo::nested]
+fn top_labels() {
+    (0..16).for_each(|i| {
+        mox! {
+            <th> {text(format!("{:02x}", i))} </th>
+        }
+    })
+}
+
+#[topo::nested]
+#[illicit::from_env(cursor: &Key<Cursor>, focus: &Key<Focus>)]
+fn cols(i: usize, row: &[u8]) {
+    row.iter().enumerate().for_each(|(j, byte)| {
+        let bg_color = color(cursor, focus, i, j);
+        mox! {
+            <td style={format!("background-color: {};", bg_color)}
+                on={{
+                    let focus = focus.clone();
+                    let cursor = cursor.clone();
+
+                    move |_: event::Click| {
+                    log(&format!("Cursor moved to ({},{})", i, j));
+                    let new_cursor = cursor_of_coord(&focus, i, j);
+                    cursor.set(new_cursor);
+                }}}>
+                {text(format!("{:02x}", byte))}
+            </td>
+        }
+    });
+}
+
+#[topo::nested]
+#[illicit::from_env(cursor: &Key<Cursor>, focus: &Key<Focus>)]
+fn ascii(i: usize, row: &[u8]) {
+    row.iter().enumerate().for_each(|(j, byte)| {
+        let bg_color = color(cursor, focus, i, j);
+
+        let content = if *byte >= 32 && *byte < 128 {
+            (*byte as char).to_string()
         } else {
-            "rgba(0,0,0,0)"
-        }
-    }
+            '.'.to_string()
+        };
 
-    let top_labels: Vec<VirtualNode> = (0..16)
-        .map(|i| html! { <th> { format!("{:02x}", i) } </th> })
-        .collect();
+        mox! {
+            <span style={format!("background-color: {}", bg_color)}>{content}</span>
+        };
+    })
+}
 
-    // data for the first closure
-    let local = model.local.clone();
-    let local_mutable = model.local_mutable.clone();
-
-    let draw_row = move |(i, row): (usize, &[u8])| {
-        let cols: Vec<VirtualNode> = row
-            .iter()
-            .enumerate()
-            .map({
-                // data for the next closure
-                let local = local.clone();
-                let local_mutable = local_mutable.clone();
-
-                move |(j, byte)| {
-                    let bg_color = color(&local, i, j);
-
-                    // RLS and clippy aren't smart enough to understand html!
-                    // data for the next closure
-                    #[allow(unused_variables)]
-                    let local = local.clone();
-                    #[allow(unused_variables)]
-                    let local_mutable = local_mutable.clone();
-
-                    html! {
-                         <td style={format!("background-color: {};", bg_color)}
-                             onclick=move |_event: MouseEvent| {
-                        web_sys::console::log_1(&format!("Cursor moved to ({},{})", i, j).into());
-                        let cursor = local_mutable.cursor.clone();
-                        {
-                            let cursor_borrow = cursor.borrow_mut();
-                            let mut lock = cursor_borrow.lock_mut();
-                            *lock = cursor_of_coord(local.focus, i, j);
-                        }
-                    }> { format!("{:02x}", byte) } </td>
-                    }
-                }
-            })
-            .collect();
-
-        let ascii: Vec<VirtualNode> = row
-            .iter()
-            .enumerate()
-            .map(|(j, byte)| {
-                let bg_color = color(&local, i, j);
-
-                let content = if *byte >= 32 && *byte < 128 {
-                    (*byte as char).to_string()
-                } else {
-                    '.'.to_string()
-                };
-
-                html! {
-                    <span style={format!("background-color: {}", bg_color)}>{content}</span>
-                }
-            })
-            .collect();
-
-        html! {
+#[topo::nested]
+#[illicit::from_env(focus: &Key<Focus>)]
+fn row((i, row): (usize, &[u8])) {
+    mox! {
         <tr>
-            <th> { format!("${:04x}", local.focus + ((i as u16) * COLS) - ((ROWS/2)*COLS)) } </th>
-            { cols }
-            <td> { ascii } </td>
+            <th> {text(format!("${:04x}", focus.0 + ((i as u16) * COLS) - ((ROWS/2)*COLS))) } </th>
+            <cols _=(i, row) />
+
+            <td>
+                <ascii _=(i, row) />
+            </td>
         </tr>
-        }
-    };
+    }
+}
 
-    let data_per_row = model.data.chunks(COLS as usize);
-    let all_data: Vec<VirtualNode> = data_per_row.enumerate().map(draw_row).collect();
-
-    fn arrow_button(
-        local: Rc<RefCell<LocalState<u16>>>,
-        local_mutable: LocalState<Rc<RefCell<Mutable<u16>>>>,
-        direction: Direction,
-    ) {
-        let cursor = local_mutable.cursor.clone();
-        let focus = local_mutable.cursor.clone();
-        let new_focus = (i32::from(local.borrow().focus)
+#[topo::nested]
+#[illicit::from_env(cursor: &Key<Cursor>, focus: &Key<Focus>)]
+fn arrow_press(direction: Direction) {
+    let new_focus = Focus(
+        (i32::from(focus.0)
             + (0x40
                 * match direction {
                     Direction::Pos => 1,
                     Direction::Neg => -1,
-                })) as u16;
-        {
-            let focus_borrow = focus.borrow_mut();
-            let mut lock = focus_borrow.lock_mut();
-            log(&format!(
-                "Writing new focus {:?} (old focus) {:?}",
-                new_focus,
-                local.borrow().focus
-            ));
-            *lock = new_focus;
-        }
+                })) as u16,
+    );
 
-        let new_cursor = if local.borrow().cursor < cursor_of_coord(new_focus, 0, 0) {
-            cursor_of_coord(new_focus, 0, 0)
-        } else if local.borrow().cursor
-            > cursor_of_coord(new_focus, (ROWS - 1) as usize, (COLS - 1) as usize)
-        {
-            cursor_of_coord(new_focus, (ROWS - 1) as usize, (COLS - 1) as usize)
-        } else {
-            local.borrow().cursor
-        };
+    let new_cursor = if cursor.0 < cursor_of_coord(&new_focus, 0, 0).0 {
+        cursor_of_coord(&new_focus, 0, 0)
+    } else if cursor.0 > cursor_of_coord(&new_focus, (ROWS - 1) as usize, (COLS - 1) as usize).0 {
+        cursor_of_coord(&new_focus, (ROWS - 1) as usize, (COLS - 1) as usize)
+    } else {
+        Cursor(cursor.0)
+    };
 
-        {
-            let cursor_borrow = cursor.borrow_mut();
-            let mut lock = cursor_borrow.lock_mut();
-            log(&format!("Writing new cursor {:?}", new_cursor));
-            *lock = new_cursor;
-        }
-    }
+    log(&format!(
+        "Writing new focus {:?} (old focus) {:?}",
+        new_focus, focus
+    ));
+    focus.set(new_focus);
 
-    #[allow(unused_variables)]
-    let local_mutable_up = model.local_mutable.clone();
-    #[allow(unused_variables)]
-    let local_mutable_down = model.local_mutable.clone();
-    #[allow(unused_variables)]
-    let local_up = model.local_cell.clone();
-    #[allow(unused_variables)]
-    let local_down = model.local_cell.clone();
+    log(&format!("Writing new cursor {:?}", new_cursor));
+    cursor.set(new_cursor);
+}
 
-    Rc::new(html! {
+#[topo::nested]
+fn mem_table(data: Vec<u8>) {
+    let data_per_row = data.chunks(COLS as usize);
+
+    mox! {
         <div style="font-family: PragmataPro, monospace;">
-            <button onclick=move |_: MouseEvent| {
-        arrow_button(local_up.clone(), local_mutable_up.clone(), Direction::Pos)
-            }>
-        { "↑" }
+            <button on={move |_: event::Click| {
+                arrow_press(Direction::Pos)
+            }}>
+        { text("↑") }
             </button>
 
-            <button onclick=move |_: MouseEvent| {
-               arrow_button(local_down.clone(), local_mutable_down.clone(), Direction::Neg)
-            }>
-            { "↓" }
+            <button on={move |_: event::Click| {
+               arrow_press(Direction::Neg)
+            }}>
+            { text("↓") }
             </button>
 
             <table>
                 <thead>
                     <tr>
-                        <th> </th>
-                        { top_labels }
+                        <th></th>
+                        <top_labels />
                     </tr>
                 </thead>
                 <tbody>
-                    { all_data }
+                { data_per_row.enumerate().for_each(row) }
                 </tbody>
             </table>
         </div>
-    })
-}
-
-#[derive(Debug, Clone)]
-pub struct LocalState<T> {
-    pub focus: T,  // the row which is centered, invariant 0xXXX0 and >= 0x40
-    pub cursor: T, // invariant in the vec
-}
-
-pub struct State {
-    pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
-    pub local: LocalState<Rc<RefCell<Mutable<u16>>>>,
-}
-
-pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
-    let hardware = state.hardware.clone_data();
-    let local = state.local.clone();
-
-    let local_cell = Rc::new(RefCell::new(LocalState {
-        cursor: 0,
-        focus: 0,
-    }));
-
-    map_ref! {
-        let focus = state.local.focus.borrow().signal(),
-        let cursor = state.local.cursor.borrow().signal(),
-        let _ = state.hardware.trigger.signal() => move {
-            let start_addr = Addr::directly(focus - ((ROWS / 2) * COLS));
-            let data = hardware.borrow().cpu.memory.ld_lots(start_addr, ROWS * COLS);
-
-            let new_local = LocalState { cursor: *cursor, focus: *focus };
-            *local_cell.borrow_mut() = new_local.clone();
-
-            mem_table_view(ViewModel { data, local_mutable: local.clone(), local: new_local, local_cell: local_cell.clone() } )
-        }
     }
+}
+
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
+pub fn mem_view(start_focus: u16, start_cursor: u16) {
+    let start_addr = Addr::directly(start_focus - ((ROWS / 2) * COLS));
+    let data = hardware
+        .borrow()
+        .cpu
+        .memory
+        .ld_lots(start_addr, ROWS * COLS);
+
+    let cursor = state(|| Cursor(start_cursor));
+    let focus = state(|| Focus(start_focus));
+
+    illicit::child_env![
+      Key<Cursor> => cursor,
+      Key<Focus> => focus
+    ]
+    .enter(|| topo::call(|| mem_table(data)));
 }

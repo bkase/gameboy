@@ -1,16 +1,12 @@
-#![allow(dead_code)]
-
-use futures_signals::map_ref;
-use futures_signals::signal::{Mutable, Signal};
 use hardware::Hardware;
 use instr::InstrPointer;
-use mutable_effect::MutableEffect;
+use moxie_dom::{
+    elements::{button, div, li, ol},
+    prelude::*,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
-use virtual_dom_rs::prelude::*;
-#[allow(unused_imports)]
-use web_sys::{AudioContext, MouseEvent};
-#[allow(unused_imports)]
+use web_sys::AudioContext;
 use web_utils::log;
 
 #[derive(Debug, Copy, Clone)]
@@ -18,137 +14,121 @@ pub enum Mode {
     Paused,
     Running,
 }
-impl Mode {
-    fn toggle(self) -> Mode {
-        match self {
-            Mode::Paused => Mode::Running,
-            Mode::Running => Mode::Paused,
+
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>, mode: &Key<Rc<RefCell<Mode>>>, audio_ctx: &Key<Rc<AudioContext>>)]
+fn run_button(copy: &str, switch_to: Mode, disabled: bool) {
+    let hardware = hardware.clone();
+    let mode = mode.clone();
+    let audio_ctx = audio_ctx.clone();
+
+    let click_handler = move |_: event::Click| {
+        {
+            *mode.borrow_mut() = switch_to;
+            let _ = audio_ctx.resume();
+            hardware.borrow_mut().paused = match switch_to {
+                Mode::Paused => true,
+                Mode::Running => false,
+            };
+        }
+        log("Hit the toggle on it");
+    };
+    if disabled {
+        mox! {
+          <button disabled="" on={click_handler}>{text(copy)}</button>
+        }
+    } else {
+        mox! {
+          <button on={click_handler}>{text(copy)}</button>
         }
     }
 }
 
-pub struct State {
-    pub hardware: Rc<MutableEffect<Rc<RefCell<Hardware>>>>,
-    pub mode: Rc<RefCell<Mutable<Mode>>>,
-    pub audio_ctx: Rc<AudioContext>,
-}
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
+fn step_button(copy: &str, disabled: bool) {
+    let hardware = hardware.clone();
+    let click_handler = move |_: event::Click| {
+        hardware.borrow_mut().step();
+        log("Stepping once");
+    };
 
-pub fn component(state: State) -> impl Signal<Item = Rc<VirtualNode>> {
-    let hardware = state.hardware.clone_data();
-    let mode_mutable = state.mode.clone();
-    let audio_ctx = state.audio_ctx.clone();
-
-    map_ref! {
-        let mode = state.mode.borrow().signal(),
-        let _ = state.hardware.trigger.signal() => move {
-            let disabled1 = match mode {
-                Mode::Paused => false,
-                Mode::Running => true,
-            };
-            let disabled2 = !disabled1;
-
-            // Note: Due to a bug in percy, we have to manually write out the onclick twice
-            // (onclicks don't get updated by the vdom)
-            #[allow(unused_variables)]
-            fn run_button(audio_ctx: Rc<AudioContext>, hardware: Rc<RefCell<Hardware>>, children: VirtualNode, switch_to: Mode, disabled: bool, mode_mutable: Rc<RefCell<Mutable<Mode>>>) -> VirtualNode {
-                if disabled {
-                        html! { <button disabled="" onclick=
-                            move |_e: MouseEvent| {
-                                let mode_mutable = mode_mutable.clone();
-                                {
-                                    let mode_borrow = mode_mutable.borrow_mut();
-                                    let mut lock = mode_borrow.lock_mut();
-                                    *lock = switch_to;
-                                    let _ = audio_ctx.resume();
-                                    hardware.borrow_mut().paused = match switch_to {
-                                        Mode::Paused => true,
-                                        Mode::Running => false,
-                                    };
-                                }
-                                log("Hit the toggle on it");
-                            }> { children } </button> }
-                } else {
-                        html! {
-                            <button onclick=move |_e: MouseEvent| {
-                                let mode_mutable = mode_mutable.clone();
-                                {
-                                    let mode_borrow = mode_mutable.borrow_mut();
-                                    let mut lock = mode_borrow.lock_mut();
-                                    *lock = switch_to;
-                                    let _ = audio_ctx.resume();
-                                    hardware.borrow_mut().paused = match switch_to {
-                                        Mode::Paused => true,
-                                        Mode::Running => false,
-                                    };
-                                }
-                                log("Hit the toggle on it");
-                            }>
-                            { children }
-                                </button>
-                        }
-                }
-            }
-
-            #[allow(unused_variables)]
-            fn step_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode, disabled: bool) -> VirtualNode {
-                if disabled {
-                    html! {
-                        <button disabled="" onclick=move |_: MouseEvent| {
-                            hardware.borrow_mut().step();
-                            log("Stepping once");
-                        }>{children}</button>
-                    }
-                } else {
-                    html! {
-                        <button onclick=move |_: MouseEvent| {
-                            hardware.borrow_mut().step();
-                            log("Stepping once");
-                        }>{children}</button>
-                    }
-                }
-            }
-
-            #[allow(unused_variables)]
-            fn repaint_button(hardware: Rc<RefCell<Hardware>>, children: VirtualNode) -> VirtualNode {
-                html! {
-                <button onclick=move |_: MouseEvent| {
-                    hardware.borrow_mut().force_repaint();
-                    log("Force repainting");
-                }>
-                {children}
-                </button>
-                }
-            }
-
-            let instrs: Vec<VirtualNode> = {
-                let ip_addr = hardware.borrow().cpu.ip.0;
-                let mut new_ip = InstrPointer(ip_addr);
-
-                vec![
-                    new_ip.read(&hardware.borrow().cpu.memory),
-                    new_ip.read(&hardware.borrow().cpu.memory),
-                    new_ip.read(&hardware.borrow().cpu.memory),
-                    new_ip.read(&hardware.borrow().cpu.memory),
-                    new_ip.read(&hardware.borrow().cpu.memory),
-                ].into_iter().map(|i| {
-                    html!{ <li> { format!("{:}", i) } </li> }
-                }).collect()
-            };
-
-            Rc::new(
-            html! {
-                <div>
-                { run_button(audio_ctx.clone(), hardware.clone(), html! { Run }, Mode::Running, disabled1, mode_mutable.clone()) }
-                { run_button(audio_ctx.clone(), hardware.clone(), html! { Pause }, Mode::Paused, disabled2, mode_mutable.clone()) }
-                { step_button(hardware.clone(), html! { Step }, disabled1) }
-                { repaint_button(hardware.clone(), html! { Repaint }) }
-                <ol style="font-family: PragmataPro, monospace;">
-                //{ if disabled1 { vec![VirtualNode::text("")] } else { instrs } }
-                { instrs }
-                </ol>
-
-                </div>
-            })
+    if disabled {
+        mox! {
+          <button disabled="" on={click_handler}>{text(copy)}</button>
+        }
+    } else {
+        mox! {
+          <button on={click_handler}>{text(copy)}</button>
         }
     }
+}
+
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
+fn repaint_button(copy: &str) {
+    let hardware = hardware.clone();
+    let click_handler = move |_: event::Click| {
+        hardware.borrow_mut().force_repaint();
+        log("Force repainting");
+    };
+    mox! {
+        <button on={click_handler}> {text(copy)} </button>
+    }
+}
+
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
+fn instr(new_ip: &mut InstrPointer) {
+    let instr = new_ip.read(&hardware.borrow().cpu.memory);
+    mox! { <li> { text(format!("{:}", instr)) } </li> }
+}
+
+#[topo::nested]
+#[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
+fn instrs() {
+    let ip_addr = hardware.borrow().cpu.ip.0;
+    let mut new_ip = InstrPointer(ip_addr);
+
+    mox! {
+        <ol style="font-family: PragmataPro, monospace;">
+            <instr _=(&mut new_ip) />
+            <instr _=(&mut new_ip) />
+            <instr _=(&mut new_ip) />
+            <instr _=(&mut new_ip) />
+            <instr _=(&mut new_ip) />
+        </ol>
+    }
+}
+
+#[topo::nested]
+#[illicit::from_env(mode: &Key<Rc<RefCell<Mode>>>)]
+fn view() {
+    let disabled1 = match *(mode.borrow()) {
+        Mode::Paused => false,
+        Mode::Running => true,
+    };
+    let disabled2 = !disabled1;
+
+    mox! {
+     <div>
+       <run_button _=("Run", Mode::Running, disabled1) />
+       <run_button _=("Pause", Mode::Paused, disabled2) />
+       <step_button _=("Step", disabled1) />
+       <repaint_button _=("Repaint") />
+       <instrs />
+     </div>
+    }
+}
+
+#[topo::nested]
+pub fn cpu_control_view(audio_ctx: Rc<AudioContext>, mode: Rc<RefCell<Mode>>) {
+    let audio_ctx = state(|| audio_ctx);
+    let mode = state(|| mode);
+
+    illicit::child_env![
+      Key<Rc<AudioContext>> => audio_ctx,
+      Key<Rc<RefCell<Mode>>> => mode
+    ]
+    .enter(|| topo::call(|| view()));
 }

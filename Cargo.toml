@@ -15,13 +15,9 @@ wasm-bindgen = "0.2.50"
 packed_struct = "0.3"
 packed_struct_codegen = "0.3"
 js-sys = "0.3.27"
-virtual-dom-rs = "0.6.7"
-css-rs-macro = "0.1"
-futures-preview = "0.3.0-alpha.18"
-futures-util-preview = "0.3.0-alpha.18"
-futures-signals = "0.3.8"
 moxie = { git = "https://github.com/anp/moxie" }
 moxie-dom = { git = "https://github.com/anp/moxie" }
+illicit = { git = "https://github.com/anp/moxie" }
 topo = { git = "https://github.com/anp/moxie" }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

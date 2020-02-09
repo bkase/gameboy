@@ -85,6 +85,7 @@ mod r_tests {
 // 7 6 5 4 3 2 1 0
 // Z N H C 0 0 0 0
 //==================
+#[derive(Debug)]
 pub struct Flags {
     pub z: bool,
     pub n: bool,
@@ -100,6 +101,7 @@ impl Flags {
     }
 }
 
+#[derive(Debug)]
 pub struct Registers {
     pub bc: R16,
     pub de: R16,

@@ -1,10 +1,11 @@
 use cpu::{Cpu, InterruptKind};
-use mem::{Addr, TETRIS};
+use mem::Addr;
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
 use web_utils::log;
 
+#[derive(Debug)]
 pub struct Hardware {
     pub cpu: Cpu,
     pub ppu: Ppu,
@@ -21,7 +22,7 @@ impl Hardware {
         //_set.insert(Addr::directly(0x020c));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
+            cpu: Cpu::create(None),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,

@@ -1,13 +1,9 @@
-// hello world
-
 #![feature(proc_macro_hygiene)]
+#![feature(track_caller)]
 #![feature(exclusive_range_pattern)]
+#![recursion_limit = "512"]
 
 extern crate console_error_panic_hook;
-extern crate css_rs_macro;
-extern crate futures;
-extern crate futures_signals;
-extern crate futures_util;
 extern crate js_sys;
 #[macro_use]
 extern crate topo;
@@ -15,7 +11,6 @@ extern crate moxie;
 #[macro_use]
 extern crate moxie_dom;
 extern crate packed_struct;
-extern crate virtual_dom_rs;
 extern crate wasm_bindgen;
 extern crate web_sys;
 #[macro_use]
@@ -27,19 +22,13 @@ pub mod test {
 }
 
 mod alu;
-mod app;
 mod cpu;
 mod cpu_control_view;
-mod debug_gui;
-mod future_driver;
-mod game;
-mod hack_vdom;
 mod hardware;
 mod instr;
 mod mem;
 mod mem_view;
 mod monoid;
-mod mutable_effect;
 mod ppu;
 mod read_view_u8;
 mod reg_view;
@@ -51,58 +40,22 @@ mod tile_debug;
 mod utils;
 mod web_utils;
 
-use futures::task::Poll;
-use futures_signals::signal::Mutable;
 use hardware::Hardware;
-use mutable_effect::MutableEffect;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
 use web_utils::*;
 
-// This function is automatically invoked after the wasm module is instantiated.
-#[wasm_bindgen(start)]
-pub fn run() -> Result<(), JsValue> {
-    utils::set_panic_hook();
+#[derive(Debug, Clone)]
+struct CanvasInfo {
+    width: u32,
+    height: u32,
+    ctx: web_sys::CanvasRenderingContext2d,
+}
 
-    // For now hardware has it's own memory
-    let hardware = Rc::new(RefCell::new(Hardware::create()));
-    // mem is for GUI
-    let trigger = Mutable::new(());
-    let hardware_effect = MutableEffect {
-        state: hardware.clone(),
-        trigger: trigger.read_only(),
-    };
-
-    // Note: Safari refuses to play any audio unless it's resumed from a
-    //       callstack originating at a button press, so we also hook it into
-    //       the "run" button press in our GUI.
-    let audio_ctx = Rc::new(web_sys::AudioContext::new().unwrap());
-
-    let app_state: app::AppState = app::AppState {
-        globals: app::Globals {
-            unit: Mutable::new(()),
-            frames: Mutable::new(0),
-        },
-        hardware: Rc::new(hardware_effect),
-        mem_view_state: vec![
-            mem_view::LocalState {
-                focus: Rc::new(RefCell::new(Mutable::new(0x9910))),
-                cursor: Rc::new(RefCell::new(Mutable::new(0x9910))),
-            },
-            mem_view::LocalState {
-                focus: Rc::new(RefCell::new(Mutable::new(0x8080))),
-                cursor: Rc::new(RefCell::new(Mutable::new(0x8080))),
-            },
-        ],
-        cpu_control_view_state: Rc::new(RefCell::new(Mutable::new(cpu_control_view::Mode::Paused))),
-        cpu_control_view_audio_ctx: audio_ctx.clone(),
-    };
-    let signal_future = Rc::new(RefCell::new(app::run(&app_state)));
-    // trigger the initial render
-    let _ = future_driver::tick(signal_future.clone());
-
+fn init_graphics() -> CanvasInfo {
+    log("Init graphics");
     let canvas = document().get_element_by_id("canvas").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
@@ -122,6 +75,22 @@ pub fn run() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
+    CanvasInfo { width, height, ctx }
+}
+
+// This function is automatically invoked after the wasm module is instantiated.
+#[wasm_bindgen(start)]
+pub fn run() -> Result<(), JsValue> {
+    utils::set_panic_hook();
+
+    // For now hardware has it's own memory
+    let hardware = Rc::new(RefCell::new(Hardware::create()));
+
+    // Note: Safari refuses to play any audio unless it's resumed from a
+    //       callstack originating at a button press, so we also hook it into
+    //       the "run" button press in our GUI.
+    let audio_ctx = Rc::new(web_sys::AudioContext::new().unwrap());
+
     let primary = audio_ctx.create_oscillator().unwrap();
     let gain = audio_ctx.create_gain().unwrap();
     primary.set_type(web_sys::OscillatorType::Square);
@@ -133,80 +102,101 @@ pub fn run() -> Result<(), JsValue> {
     primary.start().unwrap();
 
     {
-        use moxie_dom::{prelude::*, *};
+        use cpu_control_view::cpu_control_view;
+        use mem_view::mem_view;
+        use moxie_dom::{
+            elements::{canvas, div},
+            prelude::*,
+        };
+        use reg_view::reg_view;
         let moxie_root = document().get_element_by_id("moxie").unwrap();
         let mut i = 0;
         let mut last = performance.now();
         moxie_dom::embed::WebRuntime::new(moxie_root, move || {
-            let count = state(|| 0);
+            let hardware_ = state(|| hardware.clone());
 
-            text(&format!("Hello world {:}", count));
-            text(&format!("Raf {:}", i));
+            let mode_ = Rc::new(RefCell::new(cpu_control_view::Mode::Paused));
 
-            let count_ = count.clone();
-            element("button", |e| {
-                e.attr("type", "button")
-                    .on(move |_: event::Click| count_.update(|count| Some(count + 1)))
-                    .inner(|| text("increment"))
-            });
+            let audio_ctx_ = audio_ctx.clone();
 
-            // Measure time delta
-            let now = performance.now();
-            let diff = now - last;
-            last = now;
+            illicit::child_env![
+                Key<Rc<RefCell<Hardware>>> => hardware_
+            ].enter(|| {
+                topo::call(|| {
 
-            // Execute our hardware!
-            {
-                hardware.borrow_mut().run(diff);
-            }
-            let dirty = { hardware.borrow().dirty };
-            {
-                hardware.borrow_mut().dirty = false;
-                if dirty {
-                    // Trigger hardware changes
-                    let mut lock = trigger.lock_mut();
-                    *lock = ();
-                }
-            }
+                    mox! {
+                        <div class="mw8 ph4 mt2">
+                            <div class="flex">
+                                <div class="mw6 w-100">
+                                    <canvas width="160" height="144" id="canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+                                </div>
+                                <div class="mw4">
+                                    <cpu_control_view _=(audio_ctx_, mode_) />
+                                </div>
+                            </div>
+                            <div class="mw5 mt2">
+                                <reg_view />
+                            </div>
+                            <div class="mw7 mt2">
+                                <mem_view _=(0x9910, 0x9910) />
+                            </div>
+                            <div class="mw7 mt2">
+                                <mem_view _=(0x8080, 0x8080) />
+                            </div>
+                        </div>
+                    };
 
-            // Blit bytes
-            let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
-                Clamped(&mut hardware.borrow_mut().ppu.screen.data),
-                width,
-                height,
-            )
-            .expect("u8 clamped array");
-            ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
+                    let info = once(|| init_graphics());
+                    let ctx = info.ctx;
+                    let width = info.width;
+                    let height = info.height;
 
-            // play sound
-            match hardware.borrow().sound.audio {
-                None => {
-                    gain.gain().set_value(0.0);
-                }
-                Some(ref audio) => {
-                    log(&format!(
-                        "Settings audio gain: {:?}, frequency: {:?}",
-                        audio.channel.gain, audio.channel.frequency
-                    ));
-                    gain.gain().set_value(audio.channel.gain);
-                    primary.frequency().set_value(audio.channel.frequency);
-                }
-            }
+                    // Measure time delta
+                    let now = performance.now();
+                    let diff = now - last;
+                    last = now;
 
-            // Show fps
-            let fps = (1000.0 / diff).ceil();
-            ctx.set_font("bold 12px Monaco");
-            ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
-                .expect("fill_text");
+                    // Execute our hardware!
+                    {
+                        hardware.borrow_mut().run(diff);
+                    }
+                    {
+                        hardware.borrow_mut().dirty = false;
+                    }
 
-            // Increment once per call
-            i += 1;
+                    // Blit bytes
+                    let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+                        Clamped(&mut hardware.borrow_mut().ppu.screen.data),
+                        width,
+                        height,
+                    )
+                    .expect("u8 clamped array");
+                    ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
 
-            // Drive our GUI
-            match future_driver::tick(signal_future.clone()) {
-                Poll::Pending => (),
-                Poll::Ready(()) => panic!("The signal should never end!"),
-            };
+                    // play sound
+                    match hardware.borrow().sound.audio {
+                        None => {
+                            gain.gain().set_value(0.0);
+                        }
+                        Some(ref audio) => {
+                            log(&format!(
+                                "Settings audio gain: {:?}, frequency: {:?}",
+                                audio.channel.gain, audio.channel.frequency
+                            ));
+                            gain.gain().set_value(audio.channel.gain);
+                            primary.frequency().set_value(audio.channel.frequency);
+                        }
+                    }
+
+                    // Show fps
+                    let fps = (1000.0 / diff).ceil();
+                    ctx.set_font("bold 12px Monaco");
+                    ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
+                        .expect("fill_text");
+
+                    // Increment once per call
+                    i += 1;
+            })});
         })
         .animation_frame_scheduler()
         .run_on_every_frame();

@@ -6,7 +6,7 @@ use packed_struct::prelude::*;
 use read_view_u8::*;
 use screen::{Coordinate, Rgb, Screen};
 
-#[derive(PackedStruct)]
+#[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Palette {
     #[packed_field(bits = "0:1")]
@@ -73,7 +73,7 @@ impl BgWindowTileData {
     }
 }
 
-#[derive(PackedStruct)]
+#[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Lcdc {
     #[packed_field(bits = "0")]
@@ -113,6 +113,7 @@ impl ViewU8 for Lcdc {
     }
 }
 
+#[derive(Debug)]
 pub struct PpuRegisters {
     pub lcdc: Lcdc,
     pub scy: u8,
@@ -252,6 +253,7 @@ mod moments_test {
     }
 }
 
+#[derive(Debug)]
 pub struct Ppu {
     pub screen: Screen,
     moment: Moment,

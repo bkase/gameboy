@@ -6,6 +6,7 @@ use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
 
+#[derive(Debug)]
 pub struct Cpu {
     pub registers: Registers,
     pub memory: Memory,
