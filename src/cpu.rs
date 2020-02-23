@@ -575,8 +575,8 @@ impl Cpu {
             match kind {
                 InterruptKind::Vblank => {
                     if ie.vblank {
-                        use web_utils::log;
-                        log("Triggering vblank");
+                        // use web_utils::log;
+                        // log("Triggering vblank");
                         Some(Addr::directly(0x40))
                     } else {
                         None

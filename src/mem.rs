@@ -275,6 +275,22 @@ impl Memory {
         }
     }
 
+    fn start_dma(&mut self, n: u8) {
+        use web_utils::*;
+        log(&format!("Initiating DMA from {:}", n));
+        let base_addr = Addr::directly(u16::from(n) * 0x100);
+        // TODO: Don't instantly DMA transfer, actually take the 160us
+        // Right now this code instantly does the full transfer
+        let bytes = self.ld_lots(base_addr, 160);
+        self.st_lots(Addr::directly(0xfe00), bytes);
+    }
+
+    fn st_lots(&mut self, addr: Addr, bytes: Vec<u8>) {
+        bytes.iter().enumerate().for_each(|(i, byte)| {
+            self.st8(addr.offset(i as u16, Direction::Pos), *byte);
+        });
+    }
+
     #[allow(clippy::match_overlapping_arm)]
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
         match addr {
@@ -296,6 +312,7 @@ impl Memory {
             0xff42 => self.ppu.scy.set(n),
             0xff43 => self.ppu.scx.set(n),
             0xff44 => panic!("Cannot write to LY register"),
+            0xff46 => self.start_dma(n),
             0xff47 => self.ppu.bgp.set(n),
             0xff00..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
