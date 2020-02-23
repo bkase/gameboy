@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
 use alu;
-use instr::{Arith, HasDuration, Instr, InstrPointer, Jump, Ld, RegsHl, RegsHlN, Rotate};
+use instr::{
+    Arith, Bits, HasDuration, Instr, InstrPointer, Jump, Ld, RegsHl, RegsHlN, RetCondition, Rotate,
+};
 use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
@@ -25,11 +27,7 @@ impl Cpu {
         Cpu {
             registers: Registers::create(),
             memory: Memory::create(cartridge),
-            // HACK: For now, just skip bootscreen if a cartridge is in
-            ip: match cartridge {
-                None => InstrPointer::create(),
-                Some(_) => InstrPointer(Addr::directly(0x100)),
-            },
+            ip: InstrPointer::create(),
             interrupt_master_enable: true,
         }
     }
@@ -248,6 +246,20 @@ impl Cpu {
                 let result = alu::dec16(&mut self.registers.flags, operand.0);
                 self.registers.write16n(r16, result);
             }
+            Cpl => {
+                let result = alu::complement(&mut self.registers.flags, self.registers.a.0);
+                self.registers.write8n(RegisterKind8::A, result);
+            }
+            Swap(RegsHl::Reg(r)) => {
+                let operand = self.registers.read8(r).0;
+                let result = alu::swap_nibbles(&mut self.registers.flags, operand);
+                self.registers.write8n(r, result);
+            }
+            Swap(RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::swap_nibbles(&mut self.registers.flags, operand.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
         };
         BranchAction::Take
     }
@@ -336,6 +348,11 @@ impl Cpu {
                 self.ip.jump(addr);
                 BranchAction::Take
             }
+            JpHlInd => {
+                let operand = self.registers.read16(RegisterKind16::Hl);
+                self.ip.jump(Addr::indirectly(operand));
+                BranchAction::Take
+            }
             Jr(offset) => {
                 self.ip.offset_by(offset);
                 BranchAction::Take
@@ -368,6 +385,47 @@ impl Cpu {
                     BranchAction::Skip
                 }
             }
+            Rst(n) => {
+                self.do_call(Addr::directly(u16::from(n)));
+                BranchAction::Take
+            }
+        }
+    }
+
+    fn execute_bits(&mut self, bits: Bits) -> BranchAction {
+        use self::Bits::*;
+
+        match bits {
+            Bit(b, RegsHl::Reg(reg)) => {
+                let operand = self.registers.read8(reg);
+                alu::bit(&mut self.registers.flags, operand.0, b);
+                BranchAction::Take
+            }
+            Bit(b, RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                alu::bit(&mut self.registers.flags, operand.0, b);
+                BranchAction::Take
+            }
+            Res(b, RegsHl::Reg(reg)) => {
+                let operand = self.registers.read8(reg);
+                alu::reset_bit(operand.0, b);
+                BranchAction::Take
+            }
+            Res(b, RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                alu::reset_bit(operand.0, b);
+                BranchAction::Take
+            }
+            Set(b, RegsHl::Reg(reg)) => {
+                let operand = self.registers.read8(reg);
+                alu::set_bit(operand.0, b);
+                BranchAction::Take
+            }
+            Set(b, RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                alu::set_bit(operand.0, b);
+                BranchAction::Take
+            }
         }
     }
 
@@ -386,25 +444,47 @@ impl Cpu {
             Arith(arith) => self.execute_arith(arith),
             Rotate(rotate) => self.execute_rotate(rotate),
             Jump(jump) => self.execute_jump(jump),
-            Bit7h => {
-                let x = self.registers.read8(RegisterKind8::H);
-                alu::bit(&mut self.registers.flags, x.0, 7);
-                BranchAction::Take
-            }
+            Bits(bits) => self.execute_bits(bits),
             CpHlInd => {
                 let x = self.registers.read8(RegisterKind8::A);
                 let (operand, _) = self.indirect_ld(RegisterKind16::Hl);
                 let _ = alu::sub(&mut self.registers.flags, x.0, operand);
                 BranchAction::Take
             }
-            PopBc => {
-                // TODO: Are we pushing and popping the stack in the right order
-                self.registers.bc = self.pop16();
+            Pop(reg) => {
+                let new16 = self.pop16();
+                self.registers.write16r(reg, new16);
                 BranchAction::Take
             }
-            PushBc => {
-                let bc = self.registers.bc;
-                self.push16(bc);
+            PopAf => {
+                let new16 = self.pop16();
+                self.registers.a = new16.hi();
+                let low = new16.lo().0;
+                self.registers.flags.z = (low & 0b10000000) > 0;
+                self.registers.flags.n = (low & 0b01000000) > 0;
+                self.registers.flags.h = (low & 0b00100000) > 0;
+                self.registers.flags.c = (low & 0b00010000) > 0;
+                BranchAction::Take
+            }
+            Push(reg) => {
+                let operand = self.registers.read16(reg);
+                self.push16(operand);
+                BranchAction::Take
+            }
+            PushAf => {
+                let a = self.registers.a;
+
+                let btoi = |b| if b { 1 } else { 0 };
+
+                let f = R8((btoi(self.registers.flags.z) << 7)
+                    | (btoi(self.registers.flags.n) << 6)
+                    | (btoi(self.registers.flags.h) << 5)
+                    | (btoi(self.registers.flags.c) << 4));
+
+                let mut r16 = R16(0);
+                r16.set_hi(a);
+                r16.set_lo(f);
+                self.push16(r16);
                 BranchAction::Take
             }
             Ret => self.do_ret(),
@@ -412,12 +492,52 @@ impl Cpu {
                 self.interrupt_master_enable = true;
                 self.do_ret()
             }
+            RetCc(cond) => match cond {
+                RetCondition::Nz => {
+                    if !self.registers.flags.z {
+                        self.do_ret();
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::Z => {
+                    if self.registers.flags.z {
+                        self.do_ret();
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::Nc => {
+                    if !self.registers.flags.c {
+                        self.do_ret();
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::C => {
+                    if self.registers.flags.c {
+                        self.do_ret();
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+            },
             Di => {
                 self.interrupt_master_enable = false;
                 BranchAction::Take
             }
             Ei => {
                 self.interrupt_master_enable = true;
+                BranchAction::Take
+            }
+            Scf => {
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
+                self.registers.flags.c = true;
                 BranchAction::Take
             }
         }

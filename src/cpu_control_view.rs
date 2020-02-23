@@ -1,7 +1,7 @@
 use hardware::Hardware;
 use instr::InstrPointer;
 use moxie_dom::{
-    elements::{button, div, li, ol},
+    elements::{button, div, li, ol, p},
     prelude::*,
 };
 use std::cell::RefCell;
@@ -91,13 +91,18 @@ fn instrs() {
     let mut new_ip = InstrPointer(ip_addr);
 
     mox! {
-        <ol style="font-family: PragmataPro, monospace;">
-            <instr _=(&mut new_ip) />
-            <instr _=(&mut new_ip) />
-            <instr _=(&mut new_ip) />
-            <instr _=(&mut new_ip) />
-            <instr _=(&mut new_ip) />
-        </ol>
+        <div>
+            <p style="font-family: PragmataPro, monospace;">
+                { text(format!("ip: {:}", ip_addr)) }
+            </p>
+            <ol style="font-family: PragmataPro, monospace;">
+                <instr _=(&mut new_ip) />
+                <instr _=(&mut new_ip) />
+                <instr _=(&mut new_ip) />
+                <instr _=(&mut new_ip) />
+                <instr _=(&mut new_ip) />
+            </ol>
+        </div>
     }
 }
 

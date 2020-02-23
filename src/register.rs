@@ -55,12 +55,12 @@ impl fmt::Display for R8 {
 }
 
 impl R16 {
-    fn set_hi(&mut self, n: R8) {
+    pub fn set_hi(&mut self, n: R8) {
         let lo = self.lo();
         *self = n.concat(lo);
     }
 
-    fn set_lo(&mut self, n: R8) {
+    pub fn set_lo(&mut self, n: R8) {
         let hi = self.hi();
         *self = hi.concat(n);
     }
@@ -93,6 +93,15 @@ pub struct Flags {
     pub c: bool,
 }
 impl Flags {
+    pub fn create() -> Flags {
+        Flags {
+            z: true,
+            n: true,
+            h: true,
+            c: true,
+        }
+    }
+
     pub fn reset(&mut self) {
         self.z = false;
         self.n = false;

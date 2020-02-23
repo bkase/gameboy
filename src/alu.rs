@@ -191,10 +191,70 @@ pub fn bit(flags: &mut Flags, x: u8, b: u8) {
     // c not affected
 }
 
+pub fn reset_bit(x: u8, b: u8) -> u8 {
+    assert!(b < 8);
+    x & !(1 << b)
+}
+
+pub fn set_bit(x: u8, b: u8) -> u8 {
+    assert!(b < 8);
+    x | (1 << b)
+}
+
+pub fn complement(flags: &mut Flags, x: u8) -> u8 {
+    flags.n = true;
+    flags.h = true;
+    !x
+}
+
+fn swap_nibbles_(x: u8) -> u8 {
+    let high_nibble = (x & 0xf0) >> 4;
+    let low_nibble = x & 0x0f;
+
+    (low_nibble << 4) | high_nibble
+}
+
+pub fn swap_nibbles(flags: &mut Flags, x: u8) -> u8 {
+    let r = swap_nibbles_(x);
+
+    flags.reset();
+    flags.z = r == 0;
+    r
+}
+
 #[cfg(test)]
 mod tests {
     use alu;
+    use register::Flags;
     use test::proptest::prelude::*;
+
+    #[test]
+    fn set_bit() {
+        let r1 = alu::set_bit(0b11001111, 4);
+        assert_eq!(r1, 0b11011111);
+    }
+
+    #[test]
+    fn reset_bit() {
+        let r1 = alu::reset_bit(0b11011111, 4);
+        assert_eq!(r1, 0b11001111);
+    }
+
+    #[test]
+    fn swap_nibbles() {
+        let r1 = alu::swap_nibbles_(0b10110000);
+        let r2 = alu::swap_nibbles_(0b00001101);
+        assert_eq!(r1, 0b00001011);
+        assert_eq!(r2, 0b11010000);
+    }
+
+    #[test]
+    fn complement() {
+        let mut flags = Flags::create();
+        let x = 0b00110011;
+        let x_ = alu::complement(&mut flags, x);
+        assert_eq!(x_, 0b11001100);
+    }
 
     #[test]
     fn borrow_at_4() {

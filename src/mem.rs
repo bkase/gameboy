@@ -34,7 +34,8 @@ use std::fmt;
  --------------------------- 0000 --
 */
 
-pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
+// TODO: Switch to unpatched ROM and figure out why lockup happens
+pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM_PATCHED.bin");
 
 // Cartridges
 pub type Cartridge = &'static [u8; 0x8000];
@@ -79,6 +80,7 @@ impl ViewU8 for InterruptRegister {
 
 #[derive(Debug)]
 pub struct Memory {
+    booting: bool,
     zero: Vec<u8>,
     main: Vec<u8>,
     video: Vec<u8>,
@@ -90,7 +92,7 @@ pub struct Memory {
     pub sound: sound::Registers,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd)]
 pub struct Addr(u16);
 impl fmt::Display for Addr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -141,6 +143,7 @@ impl Memory {
             None => (vec![0; 0x4000], vec![0; 0x4000]),
         };
         Memory {
+            booting: true,
             zero: vec![0; 0x7f],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
@@ -151,6 +154,11 @@ impl Memory {
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
         }
+    }
+
+    #[inline]
+    pub fn done_booting(&mut self) {
+        self.booting = false;
     }
 
     pub fn ld_lots(&self, Addr(addr): Addr, length: u16) -> Vec<u8> {
@@ -219,7 +227,11 @@ impl Memory {
             0x0000..=0x00ff =>
             // bootrom
             {
-                BOOTROM[addr as usize]
+                if self.booting {
+                    BOOTROM[addr as usize]
+                } else {
+                    self.rom0[addr as usize]
+                }
             }
         }
     }
@@ -254,7 +266,11 @@ impl Memory {
             0x0000..=0x00ff =>
             // bootrom
             {
-                u16read(BOOTROM, addr)
+                if self.booting {
+                    u16read(BOOTROM, addr)
+                } else {
+                    u16read(&self.rom0, addr)
+                }
             }
         }
     }

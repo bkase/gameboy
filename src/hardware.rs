@@ -1,5 +1,5 @@
 use cpu::{Cpu, InterruptKind};
-use mem::Addr;
+use mem::{Addr, TETRIS};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
@@ -19,10 +19,10 @@ pub struct Hardware {
 impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
-        //_set.insert(Addr::directly(0x020c));
+        _set.insert(Addr::directly(0x021b));
         //set.insert(Addr::directly(0x00fe));
         Hardware {
-            cpu: Cpu::create(None),
+            cpu: Cpu::create(Some(TETRIS)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
@@ -39,7 +39,7 @@ impl Hardware {
             self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
         // TODO: Is this okay that we ppu advance after the CPU tick? I.e. do we execute that
         // instruction before the vblank interrupt triggers?
-        self.sound.advance(&mut self.cpu.memory, elapsed_duration);
+        // self.sound.advance(&mut self.cpu.memory, elapsed_duration);
         if triggered_vblank {
             self.cpu.attempt_interrupt(InterruptKind::Vblank);
         }
@@ -80,6 +80,10 @@ impl Hardware {
             clocks_to_tick -= elapsed_duration;
 
             duration = self.cpu.peek_next();
+            if self.cpu.ip.0 >= Addr::directly(0x0100) {
+                self.cpu.memory.done_booting()
+            }
+
             // hit a breakpoint?
             if self.breakpoints.contains(&self.cpu.ip.0) {
                 self.paused = true;
