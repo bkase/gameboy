@@ -93,8 +93,7 @@ fn row((i, row): (usize, &[u8])) {
 }
 
 #[topo::nested]
-#[illicit::from_env(cursor: &Key<Cursor>, focus: &Key<Focus>)]
-fn arrow_press(direction: Direction) {
+fn arrow_press(direction: Direction, cursor: &Key<Cursor>, focus: &Key<Focus>) {
     let new_focus = Focus(
         (i32::from(focus.0)
             + (0x40
@@ -123,20 +122,27 @@ fn arrow_press(direction: Direction) {
 }
 
 #[topo::nested]
+#[illicit::from_env(cursor: &Key<Cursor>, focus: &Key<Focus>)]
 fn mem_table(data: Vec<u8>) {
     let data_per_row = data.chunks(COLS as usize);
 
     mox! {
         <div style="font-family: PragmataPro, monospace;">
-            <button on={move |_: event::Click| {
-                arrow_press(Direction::Pos)
-            }}>
+            <button on={{
+                let cursor = cursor.clone();
+                let focus = focus.clone();
+                move |_: event::Click| {
+                    arrow_press(Direction::Pos, &cursor, &focus)
+                }}}>
         { text("↑") }
             </button>
 
-            <button on={move |_: event::Click| {
-               arrow_press(Direction::Neg)
-            }}>
+            <button on={{
+                let cursor = cursor.clone();
+                let focus = focus.clone();
+                move |_: event::Click| {
+                   arrow_press(Direction::Neg, &cursor, &focus)
+                }}}>
             { text("↓") }
             </button>
 
@@ -158,15 +164,15 @@ fn mem_table(data: Vec<u8>) {
 #[topo::nested]
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 pub fn mem_view(start_focus: u16, start_cursor: u16) {
-    let start_addr = Addr::directly(start_focus - ((ROWS / 2) * COLS));
+    let cursor = state(|| Cursor(start_cursor));
+    let focus = state(|| Focus(start_focus));
+
+    let start_addr = Addr::directly(focus.0 - ((ROWS / 2) * COLS));
     let data = hardware
         .borrow()
         .cpu
         .memory
         .ld_lots(start_addr, ROWS * COLS);
-
-    let cursor = state(|| Cursor(start_cursor));
-    let focus = state(|| Focus(start_focus));
 
     illicit::child_env![
       Key<Cursor> => cursor,
