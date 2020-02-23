@@ -54,9 +54,14 @@ struct CanvasInfo {
     ctx: web_sys::CanvasRenderingContext2d,
 }
 
-fn init_graphics() -> CanvasInfo {
-    log("Init graphics");
-    let canvas = document().get_element_by_id("canvas").unwrap();
+#[derive(Debug, Clone)]
+struct Canvi {
+    real: CanvasInfo,
+    full_debug: CanvasInfo,
+}
+
+fn setup_canvas(id: &str, asserted_width: u32, asserted_height: u32) -> CanvasInfo {
+    let canvas = document().get_element_by_id(id).unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
@@ -65,8 +70,8 @@ fn init_graphics() -> CanvasInfo {
     let width = canvas.width() as u32;
     let height = canvas.height() as u32;
     // gameboy resolution
-    assert_eq!(width, 160);
-    assert_eq!(height, 144);
+    assert_eq!(width, asserted_width);
+    assert_eq!(height, asserted_height);
 
     let ctx = canvas
         .get_context("2d")
@@ -76,6 +81,35 @@ fn init_graphics() -> CanvasInfo {
         .unwrap();
 
     CanvasInfo { width, height, ctx }
+}
+
+fn init_graphics() -> Canvi {
+    log("Init graphics");
+    let full_debug = setup_canvas("debug-canvas", 256, 256);
+    let real = setup_canvas("canvas", 160, 144);
+
+    Canvi { real, full_debug }
+}
+
+fn blit_bytes(
+    hardware: &mut Hardware,
+    ctx: &mut web_sys::CanvasRenderingContext2d,
+    screen_choice: ppu::ScreenChoice,
+) {
+    let data = match screen_choice {
+        ppu::ScreenChoice::Real => web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(&mut hardware.ppu.screen.data),
+            hardware.ppu.screen.width,
+            hardware.ppu.screen.height,
+        ),
+        ppu::ScreenChoice::FullDebug => web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(&mut hardware.ppu.debug_wide_screen.data),
+            hardware.ppu.debug_wide_screen.width,
+            hardware.ppu.debug_wide_screen.height,
+        ),
+    }
+    .expect("u8 clamped array");
+    ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
 }
 
 // This function is automatically invoked after the wasm module is instantiated.
@@ -134,6 +168,9 @@ pub fn run() -> Result<(), JsValue> {
                                     <cpu_control_view _=(audio_ctx_, mode_) />
                                 </div>
                             </div>
+                            <div class="mw6 w-100">
+                                <canvas width="256" height="256" id="debug-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+                            </div>
                             <div class="mw5 mt2">
                                 <reg_view />
                             </div>
@@ -146,10 +183,7 @@ pub fn run() -> Result<(), JsValue> {
                         </div>
                     };
 
-                    let info = once(|| init_graphics());
-                    let ctx = info.ctx;
-                    let width = info.width;
-                    let height = info.height;
+                    let mut canvi = once(|| init_graphics());
 
                     // Measure time delta
                     let now = performance.now();
@@ -165,13 +199,23 @@ pub fn run() -> Result<(), JsValue> {
                     }
 
                     // Blit bytes
-                    let data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
-                        Clamped(&mut hardware.borrow_mut().ppu.screen.data),
-                        width,
-                        height,
-                    )
-                    .expect("u8 clamped array");
-                    ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
+                    {
+                    blit_bytes(&mut hardware.borrow_mut(), &mut canvi.real.ctx, ppu::ScreenChoice::Real);
+                    }
+
+                    {
+                    blit_bytes(&mut hardware.borrow_mut(), &mut canvi.full_debug.ctx, ppu::ScreenChoice::FullDebug);
+                    }
+
+                    // Draw extra debug graphics
+                    canvi.full_debug.ctx.set_stroke_style(&JsValue::from_str("green"));
+                    canvi.full_debug.ctx.stroke_rect(
+                        hardware.borrow().cpu.memory.ppu.scx.into(),
+                        hardware.borrow().cpu.memory.ppu.scy.into(),
+                        canvi.real.width.into(),
+                        canvi.real.height.into(),
+                        );
+
 
                     // play sound
                     match hardware.borrow().sound.audio {
@@ -190,8 +234,8 @@ pub fn run() -> Result<(), JsValue> {
 
                     // Show fps
                     let fps = (1000.0 / diff).ceil();
-                    ctx.set_font("bold 12px Monaco");
-                    ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
+                    canvi.real.ctx.set_font("bold 12px Monaco");
+                    canvi.real.ctx.fill_text(&format!("FPS {}", fps), 10.0, 50.0)
                         .expect("fill_text");
 
                     // Increment once per call

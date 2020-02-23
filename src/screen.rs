@@ -1,8 +1,9 @@
 #[derive(Debug)]
 pub struct Screen {
     pub data: Vec<u8>,
-    width: u32,
-    height: u32,
+    // readonly
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
