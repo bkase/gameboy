@@ -195,6 +195,7 @@ const ROWS: u8 = 154;
 const SCREEN_ROWS: u8 = 144;
 const BG_ROWS_SUB_ONE: u8 = 255;
 const BG_COLS_SUB_ONE: u8 = 255;
+const TILE_DEBUG_ROWS: u8 = 192;
 const VBLANK_ROWS: u8 = 10;
 
 #[derive(Copy, Clone, Debug)]
@@ -259,16 +260,19 @@ mod moments_test {
 pub struct Ppu {
     pub screen: Screen,
     pub debug_wide_screen: Screen,
+    pub debug_tile_screen: Screen,
     moment: Moment,
     dirty: bool,
 }
 
 const TILES_PER_ROW: u8 = 32;
+const TILES_PER_ROW_TILE_VIEW: u8 = 16;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ScreenChoice {
     FullDebug,
     Real,
+    TileDebug,
 }
 
 impl Ppu {
@@ -276,6 +280,7 @@ impl Ppu {
         Ppu {
             screen: Screen::create(160, 144),
             debug_wide_screen: Screen::create(256, 256),
+            debug_tile_screen: Screen::create(16 * 8, 24 * 8),
             moment: Moment(0),
             dirty: false,
         }
@@ -309,28 +314,46 @@ impl Ppu {
         let scx = match screen_choice {
             ScreenChoice::Real => memory.ppu.scx,
             ScreenChoice::FullDebug => 0,
+            ScreenChoice::TileDebug => 0,
         };
         let scy = match screen_choice {
             ScreenChoice::Real => memory.ppu.scy,
             ScreenChoice::FullDebug => 0,
+            ScreenChoice::TileDebug => 0,
         };
         let pallette = &memory.ppu.bgp;
         let effective_row = row.wrapping_add(scy);
 
-        let tiles_base_addr = memory.ppu.lcdc.bg_window_tile_data.base_addr();
+        let tiles_base_addr = match screen_choice {
+            ScreenChoice::Real | ScreenChoice::FullDebug => {
+                memory.ppu.lcdc.bg_window_tile_data.base_addr()
+            }
+            ScreenChoice::TileDebug => {
+                Addr::directly(if row >= (16 * 8) { 0x9000 } else { 0x8000 })
+            }
+        };
+
         let map_base_addr = memory.ppu.lcdc.bg_tile_map_display.base_addr();
 
         let total_tiles = match screen_choice {
             ScreenChoice::Real => (self.screen.width / 8) as u8,
             ScreenChoice::FullDebug => (self.debug_wide_screen.width / 8) as u8,
+            ScreenChoice::TileDebug => (self.debug_tile_screen.width / 8) as u8,
         };
 
         // for each of the tiles on screen on the row
         ((scx / 8)..(total_tiles + (scx / 8))).for_each(|i| {
-            let tile_number = memory.ld8(map_base_addr.offset(
-                u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
-                Direction::Pos,
-            ));
+            let tile_number = match screen_choice {
+                ScreenChoice::Real | ScreenChoice::FullDebug => memory.ld8(map_base_addr.offset(
+                    u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
+                    Direction::Pos,
+                )),
+                ScreenChoice::TileDebug => {
+                    // when this overflows, it coincides with shifting to the
+                    // 0x9000 base addr
+                    (row / 8) * TILES_PER_ROW_TILE_VIEW + i
+                }
+            };
 
             let b0 = memory.ld8(tiles_base_addr.offset(
                 u16::from(tile_number) * 16 + 2 * (u16::from(effective_row % 8)),
@@ -365,6 +388,7 @@ impl Ppu {
                 match screen_choice {
                     ScreenChoice::Real => self.screen.bang(rgb, coord),
                     ScreenChoice::FullDebug => self.debug_wide_screen.bang(rgb, coord),
+                    ScreenChoice::TileDebug => self.debug_tile_screen.bang(rgb, coord),
                 };
             });
         })
@@ -383,6 +407,8 @@ impl Ppu {
             (0..=SCREEN_ROWS - 1).for_each(|row| self.paint_row(memory, row, ScreenChoice::Real));
             (0..=BG_ROWS_SUB_ONE)
                 .for_each(|row| self.paint_row(memory, row, ScreenChoice::FullDebug));
+            (0..=TILE_DEBUG_ROWS - 1)
+                .for_each(|row| self.paint_row(memory, row, ScreenChoice::TileDebug));
         }
     }
 

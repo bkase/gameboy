@@ -58,6 +58,7 @@ struct CanvasInfo {
 struct Canvi {
     real: CanvasInfo,
     full_debug: CanvasInfo,
+    tile_debug: CanvasInfo,
 }
 
 fn setup_canvas(id: &str, asserted_width: u32, asserted_height: u32) -> CanvasInfo {
@@ -87,8 +88,13 @@ fn init_graphics() -> Canvi {
     log("Init graphics");
     let full_debug = setup_canvas("debug-canvas", 256, 256);
     let real = setup_canvas("canvas", 160, 144);
+    let tile_debug = setup_canvas("tile-canvas", 16 * 8, 24 * 8);
 
-    Canvi { real, full_debug }
+    Canvi {
+        real,
+        full_debug,
+        tile_debug,
+    }
 }
 
 fn blit_bytes(
@@ -106,6 +112,11 @@ fn blit_bytes(
             Clamped(&mut hardware.ppu.debug_wide_screen.data),
             hardware.ppu.debug_wide_screen.width,
             hardware.ppu.debug_wide_screen.height,
+        ),
+        ppu::ScreenChoice::TileDebug => web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(&mut hardware.ppu.debug_tile_screen.data),
+            hardware.ppu.debug_tile_screen.width,
+            hardware.ppu.debug_tile_screen.height,
         ),
     }
     .expect("u8 clamped array");
@@ -164,8 +175,9 @@ pub fn run() -> Result<(), JsValue> {
                                 <div class="mw6 w-100">
                                     <canvas width="160" height="144" id="canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
                                 </div>
-                                <div class="mw4">
+                                <div class="mw5">
                                     <cpu_control_view _=(audio_ctx_, mode_) />
+                                    <canvas width="128" height="192" id="tile-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
                                 </div>
                             </div>
                             <div class="mw6 w-100">
@@ -205,6 +217,10 @@ pub fn run() -> Result<(), JsValue> {
 
                     {
                     blit_bytes(&mut hardware.borrow_mut(), &mut canvi.full_debug.ctx, ppu::ScreenChoice::FullDebug);
+                    }
+
+                    {
+                    blit_bytes(&mut hardware.borrow_mut(), &mut canvi.tile_debug.ctx, ppu::ScreenChoice::TileDebug);
                     }
 
                     // Draw extra debug graphics
