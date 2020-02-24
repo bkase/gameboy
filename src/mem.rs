@@ -6,6 +6,7 @@ use read_view_u8::*;
 use register::R16;
 use sound;
 use std::fmt;
+use std::io::Write;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -82,6 +83,7 @@ impl ViewU8 for InterruptRegister {
 pub struct Memory {
     booting: bool,
     zero: Vec<u8>,
+    sprite_oam: Vec<u8>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
@@ -145,6 +147,7 @@ impl Memory {
         Memory {
             booting: true,
             zero: vec![0; 0x7f],
+            sprite_oam: vec![0; 0xa0],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
             rom0,
@@ -191,7 +194,7 @@ impl Memory {
             }
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xfe00..=0xfe9f => self.sprite_oam[(addr - 0xfe00) as usize],
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
@@ -247,7 +250,7 @@ impl Memory {
             0xff4c..=0xff7f => panic!("unusable"),
             0xff00..=0xff4b => panic!("I/O ports"),
             0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => panic!("sprite oam"),
+            0xfe00..=0xfe9f => u16read(&self.sprite_oam, addr - 0xfe00),
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
@@ -281,8 +284,8 @@ impl Memory {
         let base_addr = Addr::directly(u16::from(n) * 0x100);
         // TODO: Don't instantly DMA transfer, actually take the 160us
         // Right now this code instantly does the full transfer
-        let bytes = self.ld_lots(base_addr, 160);
-        self.st_lots(Addr::directly(0xfe00), bytes);
+        let bytes = self.ld_lots(base_addr, 0xa0);
+        self.sprite_oam.write(&bytes).unwrap();
     }
 
     fn st_lots(&mut self, addr: Addr, bytes: Vec<u8>) {
@@ -322,7 +325,7 @@ impl Memory {
             }
             0xfe00..=0xfe9f => {
                 // TODO: Sprite OAM
-                ()
+                self.sprite_oam[(addr - 0xfe00) as usize] = n
             }
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
