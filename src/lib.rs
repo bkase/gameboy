@@ -190,7 +190,10 @@ pub fn run() -> Result<(), JsValue> {
                                 <mem_view _=(0x9910, 0x9910) />
                             </div>
                             <div class="mw7 mt2">
-                                <mem_view _=(0x8080, 0x8080) />
+                                <mem_view _=(0xc000, 0xc000) />
+                            </div>
+                            <div class="mw7 mt2">
+                                <mem_view _=(0xfe80, 0xfe80) />
                             </div>
                         </div>
                     };

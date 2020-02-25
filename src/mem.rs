@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
 use packed_struct::prelude::*;
-use ppu::PpuRegisters;
+use ppu::{OamEntry, PpuRegisters};
 use read_view_u8::*;
 use register::R16;
 use sound;
+use std::convert::TryInto;
 use std::fmt;
-use std::io::Write;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -83,7 +83,7 @@ impl ViewU8 for InterruptRegister {
 pub struct Memory {
     booting: bool,
     zero: Vec<u8>,
-    sprite_oam: Vec<u8>,
+    sprite_oam: Vec<OamEntry>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
@@ -147,7 +147,7 @@ impl Memory {
         Memory {
             booting: true,
             zero: vec![0; 0x7f],
-            sprite_oam: vec![0; 0xa0],
+            sprite_oam: vec![OamEntry::create(); 40],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
             rom0,
@@ -193,8 +193,11 @@ impl Memory {
                 0
             }
             // panic!("rest of I/O ports"),
-            0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => self.sprite_oam[(addr - 0xfe00) as usize],
+            0xfea0..=0xfeff => 0, // unusable memory
+            0xfe00..=0xfe9f => {
+                let addr_ = addr - 0xfe00;
+                self.sprite_oam[(addr_ / 4) as usize].pack()[(addr_ % 4) as usize]
+            }
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
@@ -250,7 +253,9 @@ impl Memory {
             0xff4c..=0xff7f => panic!("unusable"),
             0xff00..=0xff4b => panic!("I/O ports"),
             0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => u16read(&self.sprite_oam, addr - 0xfe00),
+            0xfe00..=0xfe9f => {
+                u16::from(self.ld8(Addr(addr + 1))) << 8 | u16::from(self.ld8(Addr(addr)))
+            }
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
@@ -280,12 +285,15 @@ impl Memory {
 
     fn start_dma(&mut self, n: u8) {
         use web_utils::*;
-        log(&format!("Initiating DMA from {:}", n));
+        log(&format!("Initiating DMA from {:x}", u16::from(n) * 0x100));
         let base_addr = Addr::directly(u16::from(n) * 0x100);
         // TODO: Don't instantly DMA transfer, actually take the 160us
         // Right now this code instantly does the full transfer
         let bytes = self.ld_lots(base_addr, 0xa0);
-        self.sprite_oam.write(&bytes).unwrap();
+        for (i, chunk) in bytes.chunks(4).enumerate() {
+            self.sprite_oam[i] = OamEntry::unpack(chunk.try_into().expect("chunks are 4"))
+                .expect("oam entry expected");
+        }
     }
 
     fn st_lots(&mut self, addr: Addr, bytes: Vec<u8>) {
@@ -324,8 +332,8 @@ impl Memory {
                 ()
             }
             0xfe00..=0xfe9f => {
-                // TODO: Sprite OAM
-                self.sprite_oam[(addr - 0xfe00) as usize] = n
+                let addr_ = addr - 0xfe00;
+                self.sprite_oam[(addr_ / 4) as usize].pack()[(addr_ % 4) as usize] = n;
             }
             0xe000..=0xfdff => panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),

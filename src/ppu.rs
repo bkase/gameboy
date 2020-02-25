@@ -268,6 +268,42 @@ pub struct Ppu {
 const TILES_PER_ROW: u8 = 32;
 const TILES_PER_ROW_TILE_VIEW: u8 = 16;
 
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+pub enum OamEntryPriority {
+    AboveEverything = 0,
+    BelowMost = 1, // still above 00 on bg tiles
+}
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+pub enum OamEntryPalette {
+    ObjectPalette0 = 0,
+    ObjectPalette1 = 1,
+}
+
+#[derive(PackedStruct, Debug, Clone, Copy)]
+#[packed_struct(size_bytes = "4", bit_numbering = "lsb0")]
+pub struct OamEntry {
+    #[packed_field(bytes = "0")]
+    pos_y: u8,
+    #[packed_field(bytes = "1")]
+    pos_x: u8,
+    #[packed_field(bytes = "2")]
+    tile_number: u8,
+    #[packed_field(bits = "24", ty = "enum")]
+    priority: OamEntryPriority,
+    #[packed_field(bits = "25")]
+    flip_x: bool,
+    #[packed_field(bits = "26")]
+    flip_y: bool,
+    #[packed_field(bits = "27", ty = "enum")]
+    palette: OamEntryPalette,
+}
+impl OamEntry {
+    pub fn create() -> OamEntry {
+        OamEntry::unpack(&[0x00, 0x00, 0x00, 0x00]).expect("Fits within a u8;4")
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum ScreenChoice {
     FullDebug,
