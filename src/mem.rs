@@ -36,7 +36,7 @@ use std::fmt;
 */
 
 // TODO: Switch to unpatched ROM and figure out why lockup happens
-pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM_PATCHED.bin");
+pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
 
 // Cartridges
 pub type Cartridge = &'static [u8; 0x8000];
@@ -219,11 +219,6 @@ impl Memory {
             // rom bank 0
             {
                 self.rom0[addr as usize]
-            }
-            // HACK: cartridge header with Nintendo logo
-            0x0104..=0x0134 => {
-                // redirect to nintendo logo inside bootrom
-                BOOTROM[(addr as usize) - 0x0104 + 0x00a8]
             }
             0x0100..=0x014f =>
             // cartridge header

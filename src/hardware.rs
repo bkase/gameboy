@@ -19,8 +19,8 @@ pub struct Hardware {
 impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
-        _set.insert(Addr::directly(0x021b));
-        //set.insert(Addr::directly(0x00fe));
+        // _set.insert(Addr::directly(0x021b));
+        _set.insert(Addr::directly(0x00e0));
         Hardware {
             cpu: Cpu::create(Some(TETRIS)),
             ppu: Ppu::create(),

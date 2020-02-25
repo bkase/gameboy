@@ -32,8 +32,8 @@ pub fn sub(flags: &mut Flags, left: u8, right: u8) -> u8 {
     let (r, borrow_at_4, borrow_at_end) = sub_(left, right);
     flags.z = r == 0;
     flags.n = true;
-    flags.h = !borrow_at_4;
-    flags.c = !borrow_at_end;
+    flags.h = borrow_at_4;
+    flags.c = borrow_at_end;
     r
 }
 
@@ -41,8 +41,8 @@ pub fn sbc(flags: &mut Flags, left: u8, right: u8) -> u8 {
     let (r, borrow_at_4, borrow_at_end) = sbc_(left, right, flags.c);
     flags.z = r == 0;
     flags.n = true;
-    flags.h = !borrow_at_4;
-    flags.c = !borrow_at_end;
+    flags.h = borrow_at_4;
+    flags.c = borrow_at_end;
     r
 }
 
@@ -278,6 +278,18 @@ mod tests {
     fn carry_at_end() {
         let (_, _, c) = alu::add_(0xff, 0xff);
         assert!(c);
+    }
+
+    #[test]
+    fn sub_with_flags() {
+        let mut flags = Flags::create();
+        let x = 0xce;
+        let x_ = alu::sub(&mut flags, x, x);
+        assert_eq!(x_, 0);
+        assert!(flags.z);
+        assert!(flags.n);
+        assert!(!flags.h);
+        assert!(!flags.c);
     }
 
     proptest! {
