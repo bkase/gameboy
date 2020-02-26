@@ -173,10 +173,7 @@ impl Memory {
         match addr {
             0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
-            0xff4c..=0xff7f => {
-                println!("unusable memory");
-                0
-            }
+            0xff4c..=0xff7f => panic!("unusable memory"),
             0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
@@ -189,7 +186,7 @@ impl Memory {
             0xff44 => self.ppu.ly.read(),
             0xff47 => self.ppu.bgp.read(),
             0xff00..=0xff4b => {
-                println!("Passthrough...");
+                println!("Passthrough other interrupts...");
                 0
             }
             // panic!("rest of I/O ports"),
@@ -305,8 +302,11 @@ impl Memory {
 
             0xff4c..=0xff7f => {
                 // TODO: Why does tetris write to "unusable" memory?
-                // panic!("unusable"),
-                ()
+                use web_utils::log;
+                log(&format!(
+                    "unusable addr ${:x} attempting to write ${:x}",
+                    addr, n
+                ))
             }
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
@@ -324,7 +324,7 @@ impl Memory {
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
                 // TODO: Why does tetris write to this "unusable" memory
-                ()
+                panic!("unusable 0xfea0")
             }
             0xfe00..=0xfe9f => {
                 let addr_ = addr - 0xfe00;

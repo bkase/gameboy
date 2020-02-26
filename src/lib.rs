@@ -22,6 +22,7 @@ pub mod test {
 }
 
 mod alu;
+mod breakpoints_view;
 mod cpu;
 mod cpu_control_view;
 mod hardware;
@@ -147,6 +148,7 @@ pub fn run() -> Result<(), JsValue> {
     primary.start().unwrap();
 
     {
+        use breakpoints_view::breakpoints_view;
         use cpu_control_view::cpu_control_view;
         use mem_view::mem_view;
         use moxie_dom::{
@@ -177,6 +179,7 @@ pub fn run() -> Result<(), JsValue> {
                                 </div>
                                 <div class="mw5">
                                     <cpu_control_view _=(audio_ctx_, mode_) />
+                                    <breakpoints_view />
                                     <canvas width="128" height="192" id="tile-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
                                 </div>
                             </div>
