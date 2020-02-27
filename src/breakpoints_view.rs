@@ -58,7 +58,7 @@ fn decode_hex(s: &str) -> u16 {
         .collect();
 
     let bytes = bytes.expect("hex is saved");
-    u16::from(bytes[1]) << 8 | u16::from(bytes[0])
+    u16::from(bytes[0]) << 8 | u16::from(bytes[1])
 }
 
 fn sync_local_storage(bps: &Vec<String>) {
