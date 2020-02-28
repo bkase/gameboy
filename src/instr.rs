@@ -188,6 +188,7 @@ pub enum Arith {
     Inc(RegsHl),
     Dec(RegsHl),
     Swap(RegsHl),
+    Sla(RegsHl),
     Cpl,
 
     AddHl(RegisterKind16),
@@ -211,7 +212,8 @@ impl fmt::Display for Arith {
             Cp(x) => write!(f, "(CP) A ==? {:}", x),
             Inc(x) => write!(f, "(INC) {:}++", x),
             Dec(x) => write!(f, "(DEC) {:}--", x),
-            Swap(reg) => write!(f, "(SWAP) nibs {:}", reg),
+            Swap(x) => write!(f, "(SWAP) nibs {:}", x),
+            Sla(x) => write!(f, "(SLA) carry << {:}", x),
             Cpl => write!(f, "(CPL) ~A"),
 
             // 16 bit
@@ -242,6 +244,10 @@ impl HasDuration for Arith {
             Inc16(_) | Dec16(_) => (2, None),
             Cpl => (1, None),
             Swap(x) => match x {
+                RegsHl::Reg(_) => (2, None),
+                RegsHl::HlInd => (4, None),
+            },
+            Sla(x) => match x {
                 RegsHl::Reg(_) => (2, None),
                 RegsHl::HlInd => (4, None),
             },
@@ -697,10 +703,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x8c => (Arith(Adc(RegsHlN::Reg(H))), vec![pos0]),
             0x8d => (Arith(Adc(RegsHlN::Reg(L))), vec![pos0]),
             0x8e => (Arith(Adc(RegsHlN::HlInd)), vec![pos0]),
-            0x8f => {
-                let pos1 = self.read8();
-                (Arith(Adc(RegsHlN::N(pos1))), vec![pos0, pos1])
-            }
+            0x8f => (Arith(Adc(RegsHlN::Reg(A))), vec![pos0]),
             0x90 => (Arith(Sub(RegsHlN::Reg(B))), vec![pos0]),
             0x91 => (Arith(Sub(RegsHlN::Reg(C))), vec![pos0]),
             0x92 => (Arith(Sub(RegsHlN::Reg(D))), vec![pos0]),
@@ -766,7 +769,10 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xc4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xc5 => (Push(RegisterKind16::Bc), vec![pos0]),
-            0xc6 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xc6 => {
+                let pos1 = self.read8();
+                (Arith(Add(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
             0xc7 => (Jump(Rst(0x00)), vec![pos0]),
             0xc8 => (RetCc(RetCondition::Z), vec![pos0]),
             0xc9 => (Instr::Ret, vec![pos0]),
@@ -782,6 +788,20 @@ impl<'a> LiveInstrPointer<'a> {
                 let pos1 = self.read8();
                 match pos1 {
                     0x11 => (Rotate(Rl(RegisterKind8::C)), vec![pos0, pos1]),
+                    0x20..=0x27 => {
+                        let r = match pos1 - 0x20 {
+                            0x0 => RegsHl::Reg(B),
+                            0x1 => RegsHl::Reg(C),
+                            0x2 => RegsHl::Reg(D),
+                            0x3 => RegsHl::Reg(E),
+                            0x4 => RegsHl::Reg(H),
+                            0x5 => RegsHl::Reg(L),
+                            0x6 => RegsHl::HlInd,
+                            0x7 => RegsHl::Reg(A),
+                            x => panic!("Unexpected match value {:}", x),
+                        };
+                        (Arith(Sla(r)), vec![pos0, pos1])
+                    }
                     0x30 => (Arith(Swap(RegsHl::Reg(B))), vec![pos0, pos1]),
                     0x31 => (Arith(Swap(RegsHl::Reg(C))), vec![pos0, pos1]),
                     0x32 => (Arith(Swap(RegsHl::Reg(D))), vec![pos0, pos1]),
@@ -791,7 +811,7 @@ impl<'a> LiveInstrPointer<'a> {
                     0x36 => (Arith(Swap(RegsHl::HlInd)), vec![pos0, pos1]),
                     0x37 => (Arith(Swap(RegsHl::Reg(A))), vec![pos0, pos1]),
                     // bits, res, set
-                    0x40..0xff => {
+                    0x40..=0xff => {
                         let num = ((pos1 - 0x40) % 0x40) / 8;
                         assert!(num < 8);
                         let reg = match pos1 % 0x8 {
@@ -832,7 +852,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xce => {
                 let pos1 = self.read8();
-                (Arith(Add(RegsHlN::N(pos1))), vec![pos0, pos1])
+                (Arith(Adc(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xcf => (Jump(Rst(0x08)), vec![pos0]),
             0xd0 => (RetCc(RetCondition::Nc), vec![pos0]),

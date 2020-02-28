@@ -13,6 +13,16 @@ pub struct Rgb {
     pub b: u8,
 }
 
+impl Rgb {
+    pub fn white() -> Rgb {
+        Rgb {
+            r: 255,
+            g: 255,
+            b: 255,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Coordinate {
     pub x: u8,

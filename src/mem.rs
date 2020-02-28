@@ -174,6 +174,7 @@ impl Memory {
             0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
             0xff4c..=0xff7f => panic!("unusable memory"),
+            0xff00 => 0xff, // assume all butons are never pressed
             0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
@@ -181,9 +182,10 @@ impl Memory {
             0xff13 => self.sound.pulse_a.frequency.read(),
             0xff14 => self.sound.pulse_a.control.read(),
             0xff40 => self.ppu.lcdc.read(),
+            0xff41 => self.ppu.lcdc_stat_controller_mode(),
             0xff42 => self.ppu.scy.read(),
             0xff43 => self.ppu.scx.read(),
-            0xff44 => self.ppu.ly.read(),
+            0xff44 => self.ppu.ly(),
             0xff47 => self.ppu.bgp.read(),
             0xff00..=0xff4b => {
                 println!("Passthrough other interrupts...");
@@ -315,6 +317,11 @@ impl Memory {
             0xff13 => self.sound.pulse_a.frequency.set(n),
             0xff14 => self.sound.pulse_a.control.set(n),
             0xff40 => self.ppu.lcdc.set(n),
+            0xff41 => {
+                if n != 0 {
+                    panic!("Assuming that 0xff41 is always set to 0")
+                }
+            }
             0xff42 => self.ppu.scy.set(n),
             0xff43 => self.ppu.scx.set(n),
             0xff44 => panic!("Cannot write to LY register"),

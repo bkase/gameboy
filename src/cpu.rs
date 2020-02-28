@@ -260,6 +260,16 @@ impl Cpu {
                 let result = alu::swap_nibbles(&mut self.registers.flags, operand.0);
                 self.indirect_st(RegisterKind16::Hl, result);
             }
+            Sla(RegsHl::Reg(r)) => {
+                let operand = self.registers.read8(r).0;
+                let result = alu::shift_left_carry(&mut self.registers.flags, operand);
+                self.registers.write8n(r, result);
+            }
+            Sla(RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::shift_left_carry(&mut self.registers.flags, operand.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
         };
         BranchAction::Take
     }

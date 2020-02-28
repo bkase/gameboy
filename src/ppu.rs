@@ -118,8 +118,8 @@ pub struct PpuRegisters {
     pub lcdc: Lcdc,
     pub scy: u8,
     pub scx: u8,
-    pub ly: u8, // read/only
     pub bgp: Palette,
+    moment: Moment,
 }
 
 impl PpuRegisters {
@@ -128,9 +128,28 @@ impl PpuRegisters {
             lcdc: Lcdc::create(),
             scy: 0,
             scx: 0,
-            ly: 0,
             bgp: Palette::create(),
+            moment: Moment(0),
         }
+    }
+
+    // TODO: Flesh this out so writes work and more data is sent
+    pub fn lcdc_stat_controller_mode(&self) -> u8 {
+        let result = match self.moment.mode() {
+            Mode::Hblank => 0,
+            Mode::Vblank => 1,
+            Mode::OamSearch => 2,
+            Mode::PixelTransfer => 3,
+        };
+
+        assert!(result <= 3);
+
+        result
+    }
+
+    #[inline]
+    pub fn ly(&self) -> u8 {
+        self.moment.line()
     }
 }
 
@@ -261,7 +280,6 @@ pub struct Ppu {
     pub screen: Screen,
     pub debug_wide_screen: Screen,
     pub debug_tile_screen: Screen,
-    moment: Moment,
     dirty: bool,
 }
 
@@ -317,7 +335,6 @@ impl Ppu {
             screen: Screen::create(160, 144),
             debug_wide_screen: Screen::create(256, 256),
             debug_tile_screen: Screen::create(16 * 8, 24 * 8),
-            moment: Moment(0),
             dirty: false,
         }
     }
@@ -422,8 +439,22 @@ impl Ppu {
                 };
 
                 match screen_choice {
-                    ScreenChoice::Real => self.screen.bang(rgb, coord),
-                    ScreenChoice::FullDebug => self.debug_wide_screen.bang(rgb, coord),
+                    ScreenChoice::Real => {
+                        // TODO: Still draw sprites whenever we implement that
+                        if memory.ppu.lcdc.lcd_control_operation {
+                            self.screen.bang(rgb, coord)
+                        } else {
+                            self.screen.bang(Rgb::white(), coord)
+                        }
+                    }
+                    ScreenChoice::FullDebug => {
+                        // TODO: Still draw sprites whenever we implement that
+                        if memory.ppu.lcdc.lcd_control_operation {
+                            self.debug_wide_screen.bang(rgb, coord)
+                        } else {
+                            self.debug_wide_screen.bang(Rgb::white(), coord)
+                        }
+                    }
                     ScreenChoice::TileDebug => self.debug_tile_screen.bang(rgb, coord),
                 };
             });
@@ -431,8 +462,7 @@ impl Ppu {
     }
 
     pub fn advance(&mut self, memory: &mut Memory, duration: u32) -> TriggeredVblank {
-        let triggered_vblank = self.moment.advance(duration);
-        memory.ppu.ly = self.moment.line();
+        let triggered_vblank = memory.ppu.moment.advance(duration);
         self.dirty = true;
         triggered_vblank
     }

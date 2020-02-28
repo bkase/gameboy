@@ -95,7 +95,7 @@ pub fn reg_view() {
                     <draw_r8 _=("pa:sweep", R8(pulse_a.sweep.read())) />
                     <draw_r8 _=("scx", R8(ppu_regs.scx)) />
                     <draw_r8 _=("scy", R8(ppu_regs.scy)) />
-                    <draw_r8 _=("ly", R8(ppu_regs.ly)) />
+                    <draw_r8 _=("ly", R8(ppu_regs.ly())) />
                     <draw_r8 _=("lcdc", R8(ppu_regs.lcdc.read())) />
                 </tbody>
             </table>
