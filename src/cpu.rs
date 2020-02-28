@@ -348,6 +348,40 @@ impl Cpu {
                 self.ip.jump(addr);
                 BranchAction::Take
             }
+            JpCc(cond, addr) => match cond {
+                RetCondition::Nz => {
+                    if !self.registers.flags.z {
+                        self.ip.jump(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::Z => {
+                    if self.registers.flags.z {
+                        self.ip.jump(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::Nc => {
+                    if !self.registers.flags.c {
+                        self.ip.jump(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::C => {
+                    if self.registers.flags.c {
+                        self.ip.jump(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+            },
             JpHlInd => {
                 let operand = self.registers.read16(RegisterKind16::Hl);
                 self.ip.jump(Addr::indirectly(operand));
@@ -408,22 +442,26 @@ impl Cpu {
             }
             Res(b, RegsHl::Reg(reg)) => {
                 let operand = self.registers.read8(reg);
-                alu::reset_bit(operand.0, b);
+                let result = alu::reset_bit(operand.0, b);
+                self.registers.write8n(reg, result);
                 BranchAction::Take
             }
             Res(b, RegsHl::HlInd) => {
                 let operand = self.indirect_ld(RegisterKind16::Hl);
-                alu::reset_bit(operand.0, b);
+                let result = alu::reset_bit(operand.0, b);
+                self.indirect_st(RegisterKind16::Hl, result);
                 BranchAction::Take
             }
             Set(b, RegsHl::Reg(reg)) => {
                 let operand = self.registers.read8(reg);
-                alu::set_bit(operand.0, b);
+                let result = alu::set_bit(operand.0, b);
+                self.registers.write8n(reg, result);
                 BranchAction::Take
             }
             Set(b, RegsHl::HlInd) => {
                 let operand = self.indirect_ld(RegisterKind16::Hl);
-                alu::set_bit(operand.0, b);
+                let result = alu::set_bit(operand.0, b);
+                self.indirect_st(RegisterKind16::Hl, result);
                 BranchAction::Take
             }
         }

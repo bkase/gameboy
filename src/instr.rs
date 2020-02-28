@@ -277,6 +277,7 @@ impl HasDuration for Rotate {
 #[derive(Debug, Clone)]
 pub enum Jump {
     Jp(Addr),
+    JpCc(RetCondition, Addr),
     JpHlInd,
     Jr(i8),
     JrNz(i8),
@@ -291,6 +292,7 @@ impl fmt::Display for Jump {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Jp(addr) => write!(f, "JP {:}", addr),
+            JpCc(c, addr) => write!(f, "JP {:?} {:}", c, addr),
             JpHlInd => write!(f, "JP (HL)"),
             Jr(n) => write!(f, "JR {:}", n),
             JrNz(n) => write!(f, "JRNZ {:} (if != 0)", n),
@@ -306,6 +308,7 @@ impl HasDuration for Jump {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
             Jp(_) => (4, None),
+            JpCc(_, _) => (4, Some(3)),
             JpHlInd => (1, None),
             Jr(_) => (3, None),
             JrNz(_) => (3, Some(2)),
@@ -748,7 +751,14 @@ impl<'a> LiveInstrPointer<'a> {
             0xbf => (Arith(Cp(RegsHlN::Reg(A))), vec![pos0]),
             0xc0 => (RetCc(RetCondition::Nz), vec![pos0]),
             0xc1 => (Pop(RegisterKind16::Bc), vec![pos0]),
-            0xc2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xc2 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(JpCc(RetCondition::Nz, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xc3 => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
@@ -760,7 +770,14 @@ impl<'a> LiveInstrPointer<'a> {
             0xc7 => (Jump(Rst(0x00)), vec![pos0]),
             0xc8 => (RetCc(RetCondition::Z), vec![pos0]),
             0xc9 => (Instr::Ret, vec![pos0]),
-            0xca => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xca => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(JpCc(RetCondition::Z, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xcb => {
                 let pos1 = self.read8();
                 match pos1 {
@@ -820,7 +837,14 @@ impl<'a> LiveInstrPointer<'a> {
             0xcf => (Jump(Rst(0x08)), vec![pos0]),
             0xd0 => (RetCc(RetCondition::Nc), vec![pos0]),
             0xd1 => (Pop(RegisterKind16::De), vec![pos0]),
-            0xd2 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xd2 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(JpCc(RetCondition::Nc, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xd3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xd5 => (Push(RegisterKind16::De), vec![pos0]),
@@ -832,7 +856,14 @@ impl<'a> LiveInstrPointer<'a> {
             0xd7 => (Jump(Rst(0x10)), vec![pos0]),
             0xd8 => (RetCc(RetCondition::C), vec![pos0]),
             0xd9 => (Reti, vec![pos0]),
-            0xda => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xda => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(JpCc(RetCondition::C, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xdb => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xdc => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xdd => panic!(format!("unimplemented instruction ${:x}", pos0)),

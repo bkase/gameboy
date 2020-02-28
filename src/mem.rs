@@ -296,13 +296,13 @@ impl Memory {
 
     #[allow(clippy::match_overlapping_arm)]
     pub fn st8(&mut self, Addr(addr): Addr, n: u8) {
+        use web_utils::log;
         match addr {
             0xffff => self.interrupt_enable.set(n),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
             0xff4c..=0xff7f => {
                 // TODO: Why does tetris write to "unusable" memory?
-                use web_utils::log;
                 log(&format!(
                     "unusable addr ${:x} attempting to write ${:x}",
                     addr, n
@@ -324,7 +324,10 @@ impl Memory {
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
                 // TODO: Why does tetris write to this "unusable" memory
-                panic!("unusable 0xfea0")
+                log(&format!(
+                    "unusable ${:x} attempting to write ${:x}",
+                    addr, n
+                ))
             }
             0xfe00..=0xfe9f => {
                 let addr_ = addr - 0xfe00;

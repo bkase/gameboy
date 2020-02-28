@@ -238,6 +238,10 @@ mod tests {
     fn reset_bit() {
         let r1 = alu::reset_bit(0b11011111, 4);
         assert_eq!(r1, 0b11001111);
+
+        // 9 -> 8
+        let r2 = alu::reset_bit(9, 0);
+        assert_eq!(r2, 8);
     }
 
     #[test]
