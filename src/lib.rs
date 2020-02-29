@@ -25,6 +25,7 @@ mod alu;
 mod breakpoints_view;
 mod cpu;
 mod cpu_control_view;
+mod gameboy_view;
 mod hardware;
 mod instr;
 mod mem;
@@ -150,6 +151,7 @@ pub fn run() -> Result<(), JsValue> {
     {
         use breakpoints_view::breakpoints_view;
         use cpu_control_view::cpu_control_view;
+        use gameboy_view::gameboy_view;
         use mem_view::mem_view;
         use moxie_dom::{
             elements::{canvas, div},
@@ -175,7 +177,7 @@ pub fn run() -> Result<(), JsValue> {
                         <div class="mw8 ph4 mt2">
                             <div class="flex">
                                 <div class="mw6 w-100">
-                                    <canvas width="160" height="144" id="canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+                                    <gameboy_view />
                                 </div>
                                 <div class="mw5">
                                     <cpu_control_view _=(audio_ctx_, mode_) />

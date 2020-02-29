@@ -1,5 +1,6 @@
 use hardware::Hardware;
 use instr::InstrPointer;
+use mem::Addr;
 use moxie_dom::{
     elements::{button, div, li, ol, p},
     prelude::*,
@@ -88,12 +89,13 @@ fn instr(new_ip: &mut InstrPointer) {
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 fn instrs() {
     let ip_addr = hardware.borrow().cpu.ip.0;
+    let joy = hardware.borrow().cpu.memory.ld8(Addr::directly(0xff00));
     let mut new_ip = InstrPointer(ip_addr);
 
     mox! {
         <div>
             <p style="font-family: PragmataPro, monospace;">
-                { text(format!("ip: {:}", ip_addr)) }
+                { text(format!("ip: ${:} joy: ${:}", ip_addr, joy)) }
             </p>
             <ol style="font-family: PragmataPro, monospace;">
                 <instr _=(&mut new_ip) />

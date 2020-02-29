@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use alu;
 use packed_struct::prelude::*;
 use ppu::{OamEntry, PpuRegisters};
 use read_view_u8::*;
@@ -79,6 +80,121 @@ impl ViewU8 for InterruptRegister {
     }
 }
 
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+pub enum JoypadSelect {
+    Selected = 0,
+    Unselected = 1,
+}
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+pub enum JoypadButton {
+    A = 0,
+    B = 1,
+    Start = 2,
+    Select = 3,
+}
+
+#[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
+pub enum JoypadDpad {
+    Right = 0,
+    Left = 1,
+    Up = 2,
+    Down = 3,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum JoypadKey {
+    Dpad(JoypadDpad),
+    Button(JoypadButton),
+}
+
+#[derive(PackedStruct, Debug)]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
+pub struct JoypadRegister {
+    #[packed_field(bits = "0", ty = "enum")]
+    input_right_or_a: JoypadSelect,
+    #[packed_field(bits = "1", ty = "enum")]
+    input_left_or_b: JoypadSelect,
+    #[packed_field(bits = "2", ty = "enum")]
+    input_up_or_select: JoypadSelect,
+    #[packed_field(bits = "3", ty = "enum")]
+    input_down_or_start: JoypadSelect,
+    #[packed_field(bits = "4", ty = "enum")]
+    select_direction_keys: JoypadSelect,
+    #[packed_field(bits = "5", ty = "enum")]
+    select_button_keys: JoypadSelect,
+}
+
+impl JoypadRegister {
+    fn create() -> JoypadRegister {
+        JoypadRegister::unpack(&[0xFF]).expect("Fits within a u8")
+    }
+
+    fn set_all(&mut self, n: u8) {
+        *self = JoypadRegister::unpack(&[n]).expect("it's 8bits")
+    }
+
+    fn handle_key(&mut self, key: JoypadKey, is_down: bool) {
+        let select_button_keys = self.select_button_keys;
+        let select_direction_keys = self.select_direction_keys;
+        use web_utils::*;
+        log(&format!(
+            "Try handling {:?}, is_down: {:}, select_direction_keys {:?}, select_button_keys {:?}",
+            key, is_down, select_direction_keys, select_button_keys
+        ));
+
+        let mut perform_set = |key_bit: u8| {
+            let f = if is_down {
+                alu::reset_bit
+            } else {
+                alu::set_bit
+            };
+            let curr = self.read();
+            let new_val = f(curr, key_bit);
+            log(&format!("Settig to new val {:}", new_val));
+            self.set_all(new_val);
+        };
+
+        match key {
+            JoypadKey::Dpad(dpad) => {
+                if select_direction_keys == JoypadSelect::Selected {
+                    perform_set(dpad.to_primitive())
+                }
+            }
+            JoypadKey::Button(button) => {
+                if select_button_keys == JoypadSelect::Selected {
+                    perform_set(button.to_primitive())
+                }
+            }
+        }
+    }
+
+    pub fn handle_key_down(&mut self, key: JoypadKey) {
+        self.handle_key(key, true);
+    }
+
+    pub fn handle_key_up(&mut self, key: JoypadKey) {
+        self.handle_key(key, false);
+    }
+}
+
+impl ReadViewU8 for JoypadRegister {
+    fn read(&self) -> u8 {
+        self.pack()[0]
+    }
+}
+
+impl ViewU8 for JoypadRegister {
+    // only sets the "Writable" bits of this register (which keys to care about)
+    fn set(&mut self, n: u8) {
+        let curr = self.read();
+        let mask = 0b00110000;
+        let masked = n & mask;
+        // first clear those bits, then set them as required
+        *self = JoypadRegister::unpack(&[(curr & !mask) | masked]).expect("it's 8bits")
+    }
+}
+
 #[derive(Debug)]
 pub struct Memory {
     booting: bool,
@@ -92,6 +208,7 @@ pub struct Memory {
     pub interrupt_flag: InterruptRegister,
     pub ppu: PpuRegisters,
     pub sound: sound::Registers,
+    pub joypad: JoypadRegister,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd)]
@@ -156,6 +273,7 @@ impl Memory {
             interrupt_flag: InterruptRegister::create(),
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
+            joypad: JoypadRegister::create(),
         }
     }
 
@@ -174,7 +292,7 @@ impl Memory {
             0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
             0xff4c..=0xff7f => panic!("unusable memory"),
-            0xff00 => 0xff, // assume all butons are never pressed
+            0xff00 => self.joypad.read(),
             0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
@@ -316,6 +434,7 @@ impl Memory {
                     addr, n
                 ))
             }
+            0xff00 => self.joypad.set(n),
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
