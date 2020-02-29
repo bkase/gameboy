@@ -83,7 +83,7 @@ impl ViewU8 for InterruptRegister {
 pub struct Memory {
     booting: bool,
     zero: Vec<u8>,
-    sprite_oam: Vec<OamEntry>,
+    pub sprite_oam: Vec<OamEntry>,
     main: Vec<u8>,
     video: Vec<u8>,
     rom0: Vec<u8>,
@@ -187,6 +187,8 @@ impl Memory {
             0xff43 => self.ppu.scx.read(),
             0xff44 => self.ppu.ly(),
             0xff47 => self.ppu.bgp.read(),
+            0xff48 => self.ppu.obp0.read(),
+            0xff49 => self.ppu.obp1.read(),
             0xff00..=0xff4b => {
                 println!("Passthrough other interrupts...");
                 0
@@ -284,6 +286,10 @@ impl Memory {
         // TODO: Don't instantly DMA transfer, actually take the 160us
         // Right now this code instantly does the full transfer
         let bytes = self.ld_lots(base_addr, 0xa0);
+        log(&format!(
+            "DMA first few bytes {:x},{:x},{:x},{:x}",
+            bytes[0], bytes[1], bytes[2], bytes[3]
+        ));
         for (i, chunk) in bytes.chunks(4).enumerate() {
             self.sprite_oam[i] = OamEntry::unpack(chunk.try_into().expect("chunks are 4"))
                 .expect("oam entry expected");
@@ -327,6 +333,8 @@ impl Memory {
             0xff44 => panic!("Cannot write to LY register"),
             0xff46 => self.start_dma(n),
             0xff47 => self.ppu.bgp.set(n),
+            0xff48 => self.ppu.obp0.set(n),
+            0xff49 => self.ppu.obp1.set(n),
             0xff00..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {

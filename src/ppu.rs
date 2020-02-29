@@ -6,7 +6,7 @@ use packed_struct::prelude::*;
 use read_view_u8::*;
 use screen::{Coordinate, Rgb, Screen};
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, Clone, Copy)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Palette {
     #[packed_field(bits = "0:1")]
@@ -119,6 +119,8 @@ pub struct PpuRegisters {
     pub scy: u8,
     pub scx: u8,
     pub bgp: Palette,
+    pub obp0: Palette,
+    pub obp1: Palette,
     moment: Moment,
 }
 
@@ -129,6 +131,8 @@ impl PpuRegisters {
             scy: 0,
             scx: 0,
             bgp: Palette::create(),
+            obp0: Palette::create(),
+            obp1: Palette::create(),
             moment: Moment(0),
         }
     }
@@ -156,7 +160,7 @@ impl PpuRegisters {
 #[derive(Copy, Clone, Debug)]
 pub enum PixelSource {
     Bg,
-    Sprite(u8),
+    Sprite(usize),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -281,6 +285,7 @@ pub struct Ppu {
     pub debug_wide_screen: Screen,
     pub debug_tile_screen: Screen,
     dirty: bool,
+    visible_sprites_mask: [Option<usize>; 10],
 }
 
 const TILES_PER_ROW: u8 = 32;
@@ -299,7 +304,7 @@ pub enum OamEntryPalette {
 }
 
 #[derive(PackedStruct, Debug, Clone, Copy)]
-#[packed_struct(size_bytes = "4", bit_numbering = "lsb0")]
+#[packed_struct(size_bytes = "4", bit_numbering = "msb0")]
 pub struct OamEntry {
     #[packed_field(bytes = "0")]
     pos_y: u8,
@@ -320,6 +325,13 @@ impl OamEntry {
     pub fn create() -> OamEntry {
         OamEntry::unpack(&[0x00, 0x00, 0x00, 0x00]).expect("Fits within a u8;4")
     }
+
+    fn get_palette(&self, memory: &Memory) -> Palette {
+        match self.palette {
+            OamEntryPalette::ObjectPalette0 => memory.ppu.obp0,
+            OamEntryPalette::ObjectPalette1 => memory.ppu.obp1,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -336,6 +348,7 @@ impl Ppu {
             debug_wide_screen: Screen::create(256, 256),
             debug_tile_screen: Screen::create(16 * 8, 24 * 8),
             dirty: false,
+            visible_sprites_mask: [None; 10],
         }
     }
 
@@ -354,16 +367,77 @@ impl Ppu {
 
     // TODO: There's probably some bit hacks I can do to make this faster
     //       if necessary
-    fn tile_row(&self, b0: u8, b1: u8) -> Vec<Pixel> {
+    fn tile_row(&self, b0: u8, b1: u8, sprite_index_option: Option<usize>) -> Vec<Pixel> {
         Self::compute_tile_row(b0, b1)
             .map(|num| Pixel {
                 value: num.into(),
-                source: PixelSource::Bg, // TODO: determine if sprite or not
+                source: match sprite_index_option {
+                    None => PixelSource::Bg,
+                    Some(i) => PixelSource::Sprite(i),
+                },
             })
             .collect()
     }
 
+    fn sprite_mux(&self, memory: &Memory, row: u8, pixels: &mut Vec<Pixel>, tile_col: u8) {
+        self.visible_sprites_mask.iter().for_each(|i| match i {
+            None => (),
+            Some(i) => {
+                let entry = memory.sprite_oam[*i];
+                // we already know the sprite is visible on the row due to the oam search
+                // but we still need to make sure it's visible on in the col
+                if entry.pos_x - 8 < tile_col * 8 || entry.pos_x - 8 >= (tile_col + 1) * 8 {
+                    return;
+                }
+
+                // TODO: Implement flip_x and flip_y
+                let pixels_ = self.pixels_for_tile_number(
+                    memory,
+                    entry.tile_number,
+                    Addr::directly(0x8000),
+                    row,
+                    Some(*i),
+                );
+
+                let offset = usize::from((tile_col * 8) - (entry.pos_x - 8));
+                assert!(offset < 8);
+
+                (offset..8).for_each(|j| {
+                    // we only overwrite when the priority is above everything
+                    // or the existing value is transparent (0x00)
+                    if entry.priority == OamEntryPriority::AboveEverything
+                        || pixels[j].value == 0.into()
+                    {
+                        pixels[j] = pixels_[j - offset];
+                    }
+                })
+            }
+        });
+    }
+
+    fn pixels_for_tile_number(
+        &self,
+        memory: &Memory,
+        tile_number: u8,
+        tiles_base_addr: Addr,
+        row: u8,
+        sprite_index_option: Option<usize>,
+    ) -> Vec<Pixel> {
+        let b0 = memory.ld8(tiles_base_addr.offset(
+            u16::from(tile_number) * 16 + 2 * (u16::from(row % 8)),
+            Direction::Pos,
+        ));
+        let b1 = memory.ld8(tiles_base_addr.offset(
+            u16::from(tile_number) * 16 + 2 * (u16::from(row % 8)) + 1,
+            Direction::Pos,
+        ));
+
+        self.tile_row(b0, b1, sprite_index_option)
+    }
+
     fn paint_row(&mut self, memory: &Memory, row: u8, screen_choice: ScreenChoice) {
+        self.oam_search(memory, row);
+
         let scx = match screen_choice {
             ScreenChoice::Real => memory.ppu.scx,
             ScreenChoice::FullDebug => 0,
@@ -374,7 +448,6 @@ impl Ppu {
             ScreenChoice::FullDebug => 0,
             ScreenChoice::TileDebug => 0,
         };
-        let pallette = &memory.ppu.bgp;
         let effective_row = row.wrapping_add(scy);
 
         let tiles_base_addr = match screen_choice {
@@ -408,20 +481,28 @@ impl Ppu {
                 }
             };
 
-            let b0 = memory.ld8(tiles_base_addr.offset(
-                u16::from(tile_number) * 16 + 2 * (u16::from(effective_row % 8)),
-                Direction::Pos,
-            ));
-            let b1 = memory.ld8(tiles_base_addr.offset(
-                u16::from(tile_number) * 16 + 2 * (u16::from(effective_row % 8)) + 1,
-                Direction::Pos,
-            ));
-
-            let pixels = self.tile_row(b0, b1);
+            let mut pixels = self.pixels_for_tile_number(
+                memory,
+                tile_number,
+                tiles_base_addr,
+                effective_row,
+                None,
+            );
+            // mux in the sprites
+            match screen_choice {
+                ScreenChoice::Real | ScreenChoice::FullDebug => {
+                    self.sprite_mux(memory, effective_row, &mut pixels, i)
+                }
+                ScreenChoice::TileDebug => (),
+            };
             let pixel_lut: [(u8, u8, u8); 4] =
                 [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
 
             pixels.into_iter().enumerate().for_each(|(j, pixel)| {
+                let pallette = match pixel.source {
+                    PixelSource::Bg => memory.ppu.bgp,
+                    PixelSource::Sprite(i) => memory.sprite_oam[i].get_palette(memory),
+                };
                 let idx: u8 = match pixel.value.into() {
                     0b00 => pallette.dot00,
                     0b01 => pallette.dot01,
@@ -467,9 +548,39 @@ impl Ppu {
         triggered_vblank
     }
 
+    // Fills the visible_sprites_mask
+    pub fn oam_search(&mut self, memory: &Memory, row: u8) {
+        let h = match memory.ppu.lcdc.obj_size {
+            _8x8 => 8,
+            _8x16 => 16,
+        };
+        // TODO: Should we pre-allocate this extra buffer
+        let mut entries: Vec<(usize, &OamEntry)> = memory
+            .sprite_oam
+            .iter()
+            .enumerate()
+            // keep those that are visible on this row
+            .filter(|(_, e)| e.pos_x != 0 && row + 16 >= e.pos_y && row + 16 < e.pos_y + h)
+            .collect();
+        // lower x earlier, for ties delegate to the earlier entry
+        entries.sort_by(|(ai, a), (bi, b)| a.pos_x.cmp(&b.pos_x).then(ai.cmp(bi)));
+
+        // start fresh so we don't have to worry about straggling visible_sprites
+        (0..self.visible_sprites_mask.len()).for_each(|i| self.visible_sprites_mask[i] = None);
+
+        // reversing so we can put the ones that are drawn earlier first
+        // in the visible mask
+        entries
+            .iter()
+            .rev()
+            .enumerate()
+            .for_each(|(i, (ei, _))| self.visible_sprites_mask[i] = Some(*ei));
+    }
+
     pub fn repaint(&mut self, memory: &Memory) {
         if self.dirty {
             self.dirty = false;
+
             (0..=SCREEN_ROWS - 1).for_each(|row| self.paint_row(memory, row, ScreenChoice::Real));
             (0..=BG_ROWS_SUB_ONE)
                 .for_each(|row| self.paint_row(memory, row, ScreenChoice::FullDebug));
@@ -497,6 +608,16 @@ mod tiles {
         let got: Vec<u8> = Ppu::compute_tile_row(0b0001_1100, 0b0101_1001).collect();
         println!("GOT {:?}", got);
         assert_eq!(got, vec![0, 2, 0, 3, 3, 1, 0, 2])
+    }
+
+    #[test]
+    fn oam_entry_pack_unpack() {
+        let bytes: &[u8; 4] = &[0x80, 0x10, 0x58, 0];
+        let entry = OamEntry::unpack(bytes).expect("four bytes");
+        println!("entry {:?}", entry);
+        assert!(entry.pos_y == 0x80);
+        assert!(entry.pos_x == 0x10);
+        assert!(entry.tile_number == 0x58);
     }
 }
 
