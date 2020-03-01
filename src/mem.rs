@@ -80,10 +80,57 @@ impl ViewU8 for InterruptRegister {
     }
 }
 
+// emulate the physical hardware, ie. hook this up to the actual events
+// reading from the IO register will poll the hardware
+#[derive(PackedStruct, Debug)]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
+pub struct JoypadHardware {
+    #[packed_field(bits = "0", ty = "enum")]
+    a: JoypadSelect,
+    #[packed_field(bits = "1", ty = "enum")]
+    b: JoypadSelect,
+    #[packed_field(bits = "2", ty = "enum")]
+    start: JoypadSelect,
+    #[packed_field(bits = "3", ty = "enum")]
+    select: JoypadSelect,
+    #[packed_field(bits = "4", ty = "enum")]
+    right: JoypadSelect,
+    #[packed_field(bits = "5", ty = "enum")]
+    left: JoypadSelect,
+    #[packed_field(bits = "6", ty = "enum")]
+    up: JoypadSelect,
+    #[packed_field(bits = "7", ty = "enum")]
+    down: JoypadSelect,
+}
+impl JoypadHardware {
+    fn create() -> JoypadHardware {
+        JoypadHardware {
+            a: JoypadSelect::Unselected,
+            b: JoypadSelect::Unselected,
+            start: JoypadSelect::Unselected,
+            select: JoypadSelect::Unselected,
+            right: JoypadSelect::Unselected,
+            left: JoypadSelect::Unselected,
+            up: JoypadSelect::Unselected,
+            down: JoypadSelect::Unselected,
+        }
+    }
+}
+
 #[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
 pub enum JoypadSelect {
     Selected = 0,
     Unselected = 1,
+}
+
+impl JoypadSelect {
+    fn or(&self, other: JoypadSelect) -> JoypadSelect {
+        match (self, other) {
+            (JoypadSelect::Selected, _) => JoypadSelect::Selected,
+            (_, JoypadSelect::Selected) => JoypadSelect::Selected,
+            _ => JoypadSelect::Unselected,
+        }
+    }
 }
 
 #[derive(PrimitiveEnum_u8, Clone, Copy, Debug, PartialEq)]
@@ -108,7 +155,7 @@ pub enum JoypadKey {
     Button(JoypadButton),
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, Clone, Copy)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct JoypadRegister {
     #[packed_field(bits = "0", ty = "enum")]
@@ -130,13 +177,31 @@ impl JoypadRegister {
         JoypadRegister::unpack(&[0xFF]).expect("Fits within a u8")
     }
 
-    fn set_all(&mut self, n: u8) {
-        *self = JoypadRegister::unpack(&[n]).expect("it's 8bits")
+    fn unselect_all(&mut self) {
+        self.input_down_or_start = JoypadSelect::Unselected;
+        self.input_up_or_select = JoypadSelect::Unselected;
+        self.input_left_or_b = JoypadSelect::Unselected;
+        self.input_right_or_a = JoypadSelect::Unselected;
+    }
+}
+
+#[derive(Debug)]
+pub struct Joypad {
+    pub register: JoypadRegister,
+    hardware: JoypadHardware,
+}
+
+impl Joypad {
+    fn create() -> Joypad {
+        Joypad {
+            register: JoypadRegister::create(),
+            hardware: JoypadHardware::create(),
+        }
     }
 
     fn handle_key(&mut self, key: JoypadKey, is_down: bool) {
-        let select_button_keys = self.select_button_keys;
-        let select_direction_keys = self.select_direction_keys;
+        let select_button_keys = self.register.select_button_keys;
+        let select_direction_keys = self.register.select_direction_keys;
         use web_utils::*;
         log(&format!(
             "Try handling {:?}, is_down: {:}, select_direction_keys {:?}, select_button_keys {:?}",
@@ -144,24 +209,37 @@ impl JoypadRegister {
         ));
 
         let mut perform_set = |key_bit: u8| {
-            let f = if is_down {
-                alu::reset_bit
-            } else {
-                alu::set_bit
-            };
-            let curr = self.read();
-            let new_val = f(curr, key_bit);
-            log(&format!("Settig to new val {:}", new_val));
-            self.set_all(new_val);
+            // TODO: Perform interrupt here
+            ()
+        };
+
+        let select_state = if is_down {
+            JoypadSelect::Selected
+        } else {
+            JoypadSelect::Unselected
         };
 
         match key {
             JoypadKey::Dpad(dpad) => {
+                match dpad {
+                    JoypadDpad::Right => self.hardware.right = select_state,
+                    JoypadDpad::Left => self.hardware.left = select_state,
+                    JoypadDpad::Up => self.hardware.up = select_state,
+                    JoypadDpad::Down => self.hardware.down = select_state,
+                };
+
                 if select_direction_keys == JoypadSelect::Selected {
                     perform_set(dpad.to_primitive())
                 }
             }
             JoypadKey::Button(button) => {
+                match button {
+                    JoypadButton::A => self.hardware.a = select_state,
+                    JoypadButton::B => self.hardware.b = select_state,
+                    JoypadButton::Start => self.hardware.start = select_state,
+                    JoypadButton::Select => self.hardware.select = select_state,
+                };
+
                 if select_button_keys == JoypadSelect::Selected {
                     perform_set(button.to_primitive())
                 }
@@ -176,22 +254,39 @@ impl JoypadRegister {
     pub fn handle_key_up(&mut self, key: JoypadKey) {
         self.handle_key(key, false);
     }
-}
 
-impl ReadViewU8 for JoypadRegister {
-    fn read(&self) -> u8 {
-        self.pack()[0]
+    pub fn poll_and_read(&self) -> u8 {
+        // TODO: Should we change this to not need to allocate?
+        // it will require making ld8 on mem &mut self I think
+        // but since register is a PrimitiveEnum_u8, it may be free to Copy
+        let mut reg = self.register;
+
+        let dpad_on = reg.select_direction_keys;
+        let button_on = reg.select_button_keys;
+
+        let mux = |dpad, button| match (dpad_on, button_on) {
+            (JoypadSelect::Unselected, JoypadSelect::Unselected) => JoypadSelect::Unselected,
+            (JoypadSelect::Unselected, JoypadSelect::Selected) => button,
+            (JoypadSelect::Selected, JoypadSelect::Unselected) => dpad,
+            (JoypadSelect::Selected, JoypadSelect::Selected) => dpad.or(button),
+        };
+
+        reg.input_down_or_start = mux(self.hardware.down, self.hardware.start);
+        reg.input_up_or_select = mux(self.hardware.up, self.hardware.select);
+        reg.input_right_or_a = mux(self.hardware.right, self.hardware.a);
+        reg.input_left_or_b = mux(self.hardware.left, self.hardware.b);
+
+        reg.pack()[0]
     }
-}
 
-impl ViewU8 for JoypadRegister {
     // only sets the "Writable" bits of this register (which keys to care about)
-    fn set(&mut self, n: u8) {
-        let curr = self.read();
+    pub fn partial_set(&mut self, n: u8) {
+        let curr = self.poll_and_read();
         let mask = 0b00110000;
         let masked = n & mask;
         // first clear those bits, then set them as required
-        *self = JoypadRegister::unpack(&[(curr & !mask) | masked]).expect("it's 8bits")
+        let new_reg = JoypadRegister::unpack(&[(curr & !mask) | masked]).expect("it's 8bits");
+        self.register = new_reg;
     }
 }
 
@@ -208,7 +303,7 @@ pub struct Memory {
     pub interrupt_flag: InterruptRegister,
     pub ppu: PpuRegisters,
     pub sound: sound::Registers,
-    pub joypad: JoypadRegister,
+    pub joypad: Joypad,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd)]
@@ -273,7 +368,7 @@ impl Memory {
             interrupt_flag: InterruptRegister::create(),
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
-            joypad: JoypadRegister::create(),
+            joypad: Joypad::create(),
         }
     }
 
@@ -292,7 +387,7 @@ impl Memory {
             0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
             0xff4c..=0xff7f => panic!("unusable memory"),
-            0xff00 => self.joypad.read(),
+            0xff00 => self.joypad.poll_and_read(),
             0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
@@ -434,7 +529,7 @@ impl Memory {
                     addr, n
                 ))
             }
-            0xff00 => self.joypad.set(n),
+            0xff00 => self.joypad.partial_set(n),
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
