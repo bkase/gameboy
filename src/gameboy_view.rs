@@ -1,9 +1,6 @@
 use hardware::Hardware;
-use mem::{JoypadButton, JoypadDpad, JoypadKey};
-use moxie_dom::{
-    elements::{canvas, form},
-    prelude::*,
-};
+use mem::{JoypadButton, JoypadKey};
+use moxie_dom::{elements::canvas, prelude::*};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::string::String;

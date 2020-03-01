@@ -63,7 +63,7 @@ fn decode_hex(s: &str) -> u16 {
 
 fn sync_local_storage(bps: &Vec<String>) {
     let window = web_sys::window().expect("window to exist");
-    let mut local_storage: web_sys::Storage = window
+    let local_storage: web_sys::Storage = window
         .local_storage()
         .expect("local_storage")
         .expect("Some local_storage");
@@ -84,7 +84,7 @@ fn sync_local_storage(bps: &Vec<String>) {
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 pub fn breakpoints_view() {
     let window = web_sys::window().expect("window to exist");
-    let mut local_storage: web_sys::Storage = window
+    let local_storage: web_sys::Storage = window
         .local_storage()
         .expect("local_storage")
         .expect("Some local_storage");

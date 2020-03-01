@@ -556,8 +556,8 @@ impl Ppu {
     // Fills the visible_sprites_mask
     pub fn oam_search(&mut self, memory: &Memory, row: u8) {
         let h = match memory.ppu.lcdc.obj_size {
-            _8x8 => 8,
-            _8x16 => 16,
+            ObjSize::_8x8 => 8,
+            ObjSize::_8x16 => 16,
         };
         // TODO: Should we pre-allocate this extra buffer
         let mut entries: Vec<(usize, &OamEntry)> = memory

@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use alu;
 use packed_struct::prelude::*;
 use ppu::{OamEntry, PpuRegisters};
 use read_view_u8::*;
@@ -208,7 +207,7 @@ impl Joypad {
             key, is_down, select_direction_keys, select_button_keys
         ));
 
-        let mut perform_set = |key_bit: u8| {
+        let perform_set = |_key_bit: u8| {
             // TODO: Perform interrupt here
             ()
         };
@@ -382,6 +381,7 @@ impl Memory {
     }
 
     #[allow(clippy::match_overlapping_arm)]
+    #[allow(overlapping_patterns)]
     pub fn ld8(&self, Addr(addr): Addr) -> u8 {
         match addr {
             0xffff => self.interrupt_enable.read(),
@@ -493,7 +493,6 @@ impl Memory {
     }
 
     fn start_dma(&mut self, n: u8) {
-        use web_utils::*;
         let base_addr = Addr::directly(u16::from(n) * 0x100);
         // TODO: Don't instantly DMA transfer, actually take the 160us
         // Right now this code instantly does the full transfer
@@ -544,7 +543,7 @@ impl Memory {
             0xff47 => self.ppu.bgp.set(n),
             0xff48 => self.ppu.obp0.set(n),
             0xff49 => self.ppu.obp1.set(n),
-            0xff00..=0xff4b => println!("Passthrough"),
+            0xff01..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
                 // TODO: Why does tetris write to this "unusable" memory
