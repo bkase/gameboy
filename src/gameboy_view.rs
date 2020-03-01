@@ -1,5 +1,5 @@
 use hardware::Hardware;
-use mem::{JoypadButton, JoypadKey};
+use mem::{JoypadButton, JoypadDpad, JoypadKey};
 use moxie_dom::{elements::canvas, prelude::*};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -13,6 +13,14 @@ fn button_of_key(key: &String) -> Option<JoypadKey> {
         Some(JoypadKey::Button(JoypadButton::Start))
     } else if key == "a" {
         Some(JoypadKey::Button(JoypadButton::A))
+    } else if key == "ArrowLeft" {
+        Some(JoypadKey::Dpad(JoypadDpad::Left))
+    } else if key == "ArrowRight" {
+        Some(JoypadKey::Dpad(JoypadDpad::Right))
+    } else if key == "ArrowUp" {
+        Some(JoypadKey::Dpad(JoypadDpad::Up))
+    } else if key == "ArrowDown" {
+        Some(JoypadKey::Dpad(JoypadDpad::Down))
     } else {
         None
     }

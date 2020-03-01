@@ -409,13 +409,15 @@ impl Ppu {
                     );
                 }
 
-                (offset..8).for_each(|j| {
+                // TODO: figure out how to use offset
+                // (offset..8+offset).for_each(|j| {
+                (0..8).for_each(|j| {
                     // we only overwrite when the priority is above everything
                     // or the existing value is transparent (0x00)
                     if entry.priority == OamEntryPriority::AboveEverything
                         || pixels[j].value == 0.into()
                     {
-                        pixels[j] = pixels_[j - offset];
+                        pixels[j] = pixels_[j];
                     }
                 })
             }
@@ -526,7 +528,6 @@ impl Ppu {
 
                 match screen_choice {
                     ScreenChoice::Real => {
-                        // TODO: Still draw sprites whenever we implement that
                         if memory.ppu.lcdc.lcd_control_operation {
                             self.screen.bang(rgb, coord)
                         } else {
@@ -534,7 +535,6 @@ impl Ppu {
                         }
                     }
                     ScreenChoice::FullDebug => {
-                        // TODO: Still draw sprites whenever we implement that
                         if memory.ppu.lcdc.lcd_control_operation {
                             self.debug_wide_screen.bang(rgb, coord)
                         } else {
