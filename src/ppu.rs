@@ -399,8 +399,13 @@ impl Ppu {
                     Some(*i),
                 );
 
-                let offset = usize::from((tile_col * 8) - (entry.pos_x - 8));
-                assert!(offset < 8);
+                let offset = usize::from((entry.pos_x - 8) - (tile_col * 8));
+                if !(offset < 8) {
+                    panic!(
+                        "Why offset is less than 8, {:}, tile_col {:}, pos_x {:}",
+                        offset, tile_col, entry.pos_x
+                    );
+                }
 
                 (offset..8).for_each(|j| {
                     // we only overwrite when the priority is above everything

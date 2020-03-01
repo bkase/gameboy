@@ -412,22 +412,40 @@ impl Cpu {
                 self.ip.offset_by(offset);
                 BranchAction::Take
             }
-            JrNz(offset) => {
-                if !self.registers.flags.z {
-                    self.ip.offset_by(offset);
-                    BranchAction::Take
-                } else {
-                    BranchAction::Skip
+            JrCc(cond, offset) => match cond {
+                RetCondition::Nz => {
+                    if !self.registers.flags.z {
+                        self.ip.offset_by(offset);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
                 }
-            }
-            JrZ(offset) => {
-                if self.registers.flags.z {
-                    self.ip.offset_by(offset);
-                    BranchAction::Take
-                } else {
-                    BranchAction::Skip
+                RetCondition::Z => {
+                    if self.registers.flags.z {
+                        self.ip.offset_by(offset);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
                 }
-            }
+                RetCondition::Nc => {
+                    if !self.registers.flags.c {
+                        self.ip.offset_by(offset);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::C => {
+                    if self.registers.flags.c {
+                        self.ip.offset_by(offset);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+            },
             Call(addr) => {
                 self.do_call(addr);
                 BranchAction::Take

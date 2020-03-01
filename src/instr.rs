@@ -295,8 +295,7 @@ pub enum Jump {
     JpCc(RetCondition, Addr),
     JpHlInd,
     Jr(i8),
-    JrNz(i8),
-    JrZ(i8),
+    JrCc(RetCondition, i8),
     Call(Addr),
     CallZ(Addr),
     Rst(u8),
@@ -310,8 +309,7 @@ impl fmt::Display for Jump {
             JpCc(c, addr) => write!(f, "JP {:?} {:}", c, addr),
             JpHlInd => write!(f, "JP (HL)"),
             Jr(n) => write!(f, "JR {:}", n),
-            JrNz(n) => write!(f, "JRNZ {:} (if != 0)", n),
-            JrZ(n) => write!(f, "JRZ {:} (if == 0)", n),
+            JrCc(c, i) => write!(f, "JR {:?} {:}", c, i),
             Call(addr) => write!(f, "CALL {:}", addr),
             CallZ(addr) => write!(f, "CALLZ {:}", addr),
             Rst(n) => write!(f, "RST $0000+${:x}", n),
@@ -326,8 +324,7 @@ impl HasDuration for Jump {
             JpCc(_, _) => (4, Some(3)),
             JpHlInd => (1, None),
             Jr(_) => (3, None),
-            JrNz(_) => (3, Some(2)),
-            JrZ(_) => (3, Some(2)),
+            JrCc(_, _) => (3, Some(2)),
             Call(_) => (6, None),
             CallZ(_) => (6, Some(3)),
             Rst(_) => (8, None),
@@ -577,7 +574,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x1f => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x20 => {
                 let pos1 = self.read8();
-                (Jump(JrNz(pos1 as i8)), vec![pos0, pos1])
+                (Jump(JrCc(RetCondition::Nz, pos1 as i8)), vec![pos0, pos1])
             }
             0x21 => {
                 let addr = self.read16();
@@ -595,7 +592,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x27 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x28 => {
                 let pos1 = self.read8();
-                (Jump(JrZ(pos1 as i8)), vec![pos0, pos1])
+                (Jump(JrCc(RetCondition::Z, pos1 as i8)), vec![pos0, pos1])
             }
             0x29 => (Arith(AddHl(Hl)), vec![pos0]),
             0x2a => (Ld(AGetsHlIndInc), vec![pos0]),
@@ -607,7 +604,10 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(RGetsN(L, pos1)), vec![pos0, pos1])
             }
             0x2f => (Arith(Cpl), vec![pos0]),
-            0x30 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x30 => {
+                let pos1 = self.read8();
+                (Jump(JrCc(RetCondition::Nc, pos1 as i8)), vec![pos0, pos1])
+            }
             0x31 => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
@@ -622,7 +622,10 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(HlIndGetsN(pos1)), vec![pos0, pos1])
             }
             0x37 => (Scf, vec![pos0]),
-            0x38 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x38 => {
+                let pos1 = self.read8();
+                (Jump(JrCc(RetCondition::C, pos1 as i8)), vec![pos0, pos1])
+            }
             0x39 => (Arith(AddHl(Sp)), vec![pos0]),
             0x3a => (Ld(AGetsHlIndDec), vec![pos0]),
             0x3b => (Arith(Dec16(Sp)), vec![pos0]),
