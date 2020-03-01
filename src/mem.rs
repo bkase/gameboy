@@ -494,15 +494,10 @@ impl Memory {
 
     fn start_dma(&mut self, n: u8) {
         use web_utils::*;
-        log(&format!("Initiating DMA from {:x}", u16::from(n) * 0x100));
         let base_addr = Addr::directly(u16::from(n) * 0x100);
         // TODO: Don't instantly DMA transfer, actually take the 160us
         // Right now this code instantly does the full transfer
         let bytes = self.ld_lots(base_addr, 0xa0);
-        log(&format!(
-            "DMA first few bytes {:x},{:x},{:x},{:x}",
-            bytes[0], bytes[1], bytes[2], bytes[3]
-        ));
         for (i, chunk) in bytes.chunks(4).enumerate() {
             self.sprite_oam[i] = OamEntry::unpack(chunk.try_into().expect("chunks are 4"))
                 .expect("oam entry expected");

@@ -86,11 +86,19 @@ fn setup_canvas(id: &str, asserted_width: u32, asserted_height: u32) -> CanvasIn
     CanvasInfo { width, height, ctx }
 }
 
-fn init_graphics() -> Canvi {
+fn init_graphics(debug: bool) -> Canvi {
     log("Init graphics");
-    let full_debug = setup_canvas("debug-canvas", 256, 256);
     let real = setup_canvas("canvas", 160, 144);
-    let tile_debug = setup_canvas("tile-canvas", 16 * 8, 24 * 8);
+    let full_debug = if debug {
+        setup_canvas("debug-canvas", 256, 256)
+    } else {
+        real.clone()
+    };
+    let tile_debug = if debug {
+        setup_canvas("tile-canvas", 16 * 8, 24 * 8)
+    } else {
+        real.clone()
+    };
 
     Canvi {
         real,
@@ -168,6 +176,8 @@ pub fn run() -> Result<(), JsValue> {
 
             let audio_ctx_ = audio_ctx.clone();
 
+            let debug = ppu::DEBUG;
+
             illicit::child_env![
                 Key<Rc<RefCell<Hardware>>> => hardware_
             ].enter(|| {
@@ -180,27 +190,31 @@ pub fn run() -> Result<(), JsValue> {
                                     <gameboy_view />
                                 </div>
                                 <div class="mw5">
-                                    <cpu_control_view _=(audio_ctx_, mode_) />
-                                    <breakpoints_view />
+                                     <cpu_control_view _=(audio_ctx_, mode_) />
+                                     {if debug { mox! { <breakpoints_view /> } } else { }}
                                     <canvas width="128" height="192" id="tile-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
                                 </div>
                             </div>
-                            <div class="mw6 w-100">
-                                <canvas width="256" height="256" id="debug-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
-                            </div>
-                            <div class="mw5 mt2">
-                                <reg_view />
-                            </div>
-                            <div class="mw7 mt2">
-                                <mem_view _=(0xc000, 0xc000) />
-                            </div>
-                            <div class="mw7 mt2">
-                                <mem_view _=(0xfe80, 0xfe80) />
-                            </div>
+                            {if debug { mox! {
+                                <div>
+                                <div class="mw6 w-100">
+                                    <canvas width="256" height="256" id="debug-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
+                                </div>
+                                <div class="mw5 mt2">
+                                     <reg_view />
+                                </div>
+                                <div class="mw7 mt2">
+                                     <mem_view _=(0xc000, 0xc000) />
+                                </div>
+                                <div class="mw7 mt2">
+                                     <mem_view _=(0xfe80, 0xfe80) />
+                                </div>
+                                </div>
+                             } } else { }}
                         </div>
                     };
 
-                    let mut canvi = once(|| init_graphics());
+                    let mut canvi = once(|| init_graphics(debug));
 
                     // Measure time delta
                     let now = performance.now();
@@ -220,23 +234,24 @@ pub fn run() -> Result<(), JsValue> {
                     blit_bytes(&mut hardware.borrow_mut(), &mut canvi.real.ctx, ppu::ScreenChoice::Real);
                     }
 
-                    {
-                    blit_bytes(&mut hardware.borrow_mut(), &mut canvi.full_debug.ctx, ppu::ScreenChoice::FullDebug);
+                    if debug {
+                        {
+                        blit_bytes(&mut hardware.borrow_mut(), &mut canvi.full_debug.ctx, ppu::ScreenChoice::FullDebug);
+                        }
+
+                        {
+                        blit_bytes(&mut hardware.borrow_mut(), &mut canvi.tile_debug.ctx, ppu::ScreenChoice::TileDebug);
+                        }
+
+                        // Draw extra debug graphics
+                        canvi.full_debug.ctx.set_stroke_style(&JsValue::from_str("green"));
+                        canvi.full_debug.ctx.stroke_rect(
+                            hardware.borrow().cpu.memory.ppu.scx.into(),
+                            hardware.borrow().cpu.memory.ppu.scy.into(),
+                            canvi.real.width.into(),
+                            canvi.real.height.into(),
+                            );
                     }
-
-                    {
-                    blit_bytes(&mut hardware.borrow_mut(), &mut canvi.tile_debug.ctx, ppu::ScreenChoice::TileDebug);
-                    }
-
-                    // Draw extra debug graphics
-                    canvi.full_debug.ctx.set_stroke_style(&JsValue::from_str("green"));
-                    canvi.full_debug.ctx.stroke_rect(
-                        hardware.borrow().cpu.memory.ppu.scx.into(),
-                        hardware.borrow().cpu.memory.ppu.scy.into(),
-                        canvi.real.width.into(),
-                        canvi.real.height.into(),
-                        );
-
 
                     // play sound
                     match hardware.borrow().sound.audio {

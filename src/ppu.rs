@@ -6,6 +6,8 @@ use packed_struct::prelude::*;
 use read_view_u8::*;
 use screen::{Coordinate, Rgb, Screen};
 
+pub const DEBUG: bool = true;
+
 #[derive(PackedStruct, Debug, Clone, Copy)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Palette {
@@ -495,10 +497,8 @@ impl Ppu {
             );
             // mux in the sprites
             match screen_choice {
-                ScreenChoice::Real | ScreenChoice::FullDebug => {
-                    self.sprite_mux(memory, effective_row, &mut pixels, i)
-                }
-                ScreenChoice::TileDebug => (),
+                ScreenChoice::Real => self.sprite_mux(memory, effective_row, &mut pixels, i),
+                ScreenChoice::TileDebug | ScreenChoice::FullDebug => (),
             };
             let pixel_lut: [(u8, u8, u8); 4] =
                 [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
@@ -587,10 +587,12 @@ impl Ppu {
             self.dirty = false;
 
             (0..=SCREEN_ROWS - 1).for_each(|row| self.paint_row(memory, row, ScreenChoice::Real));
-            (0..=BG_ROWS_SUB_ONE)
-                .for_each(|row| self.paint_row(memory, row, ScreenChoice::FullDebug));
-            (0..=TILE_DEBUG_ROWS - 1)
-                .for_each(|row| self.paint_row(memory, row, ScreenChoice::TileDebug));
+            if DEBUG {
+                (0..=BG_ROWS_SUB_ONE)
+                    .for_each(|row| self.paint_row(memory, row, ScreenChoice::FullDebug));
+                (0..=TILE_DEBUG_ROWS - 1)
+                    .for_each(|row| self.paint_row(memory, row, ScreenChoice::TileDebug));
+            }
         }
     }
 
