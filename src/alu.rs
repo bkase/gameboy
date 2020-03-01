@@ -231,6 +231,15 @@ pub fn shift_left_carry(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn shift_right_carry(flags: &mut Flags, x: u8) -> u8 {
+    let r = x >> 1;
+
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = x & 0x1 == 0x1;
+    r
+}
+
 #[cfg(test)]
 mod tests {
     use alu;

@@ -189,6 +189,7 @@ pub enum Arith {
     Dec(RegsHl),
     Swap(RegsHl),
     Sla(RegsHl),
+    Srl(RegsHl),
     Cpl,
 
     AddHl(RegisterKind16),
@@ -214,6 +215,7 @@ impl fmt::Display for Arith {
             Dec(x) => write!(f, "(DEC) {:}--", x),
             Swap(x) => write!(f, "(SWAP) nibs {:}", x),
             Sla(x) => write!(f, "(SLA) carry << {:}", x),
+            Srl(x) => write!(f, "(SRL) carry >> {:}", x),
             Cpl => write!(f, "(CPL) ~A"),
 
             // 16 bit
@@ -251,6 +253,10 @@ impl HasDuration for Arith {
                 RegsHl::Reg(_) => (2, None),
                 RegsHl::HlInd => (4, None),
             },
+            Srl(x) => match x {
+                RegsHl::Reg(_) => (2, None),
+                RegsHl::HlInd => (4, None),
+            },
         }
     }
 }
@@ -258,6 +264,7 @@ impl HasDuration for Arith {
 #[derive(Debug, Clone)]
 pub enum Rotate {
     Rla,
+    Rlca,
     Rl(RegisterKind8),
 }
 use self::Rotate::*;
@@ -266,6 +273,7 @@ impl fmt::Display for Rotate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Rla => write!(f, "(RLA) A <- A << 1"),
+            Rlca => write!(f, "(RLCA) A <- A << 1"),
             Rl(rk) => write!(f, "(RL n) {:} <- {:} << 1", rk, rk),
         }
     }
@@ -275,6 +283,7 @@ impl HasDuration for Rotate {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
             Rla => (1, None),
+            Rlca => (1, None),
             Rl(_) => (2, None),
         }
     }
@@ -525,7 +534,7 @@ impl<'a> LiveInstrPointer<'a> {
                 let pos1 = self.read8();
                 (Ld(RGetsN(B, pos1)), vec![pos0, pos1])
             }
-            0x07 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x07 => (Rotate(Rlca), vec![pos0]),
             0x08 => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0x09 => (Arith(AddHl(Bc)), vec![pos0]),
             0x0a => (Ld(AGetsBcInd), vec![pos0]),
@@ -785,21 +794,22 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0xcb => {
+                let reg_lookup = |index| match index {
+                    0x0 => RegsHl::Reg(B),
+                    0x1 => RegsHl::Reg(C),
+                    0x2 => RegsHl::Reg(D),
+                    0x3 => RegsHl::Reg(E),
+                    0x4 => RegsHl::Reg(H),
+                    0x5 => RegsHl::Reg(L),
+                    0x6 => RegsHl::HlInd,
+                    0x7 => RegsHl::Reg(A),
+                    x => panic!("Unexpected match value {:}", x),
+                };
                 let pos1 = self.read8();
                 match pos1 {
                     0x11 => (Rotate(Rl(RegisterKind8::C)), vec![pos0, pos1]),
                     0x20..=0x27 => {
-                        let r = match pos1 - 0x20 {
-                            0x0 => RegsHl::Reg(B),
-                            0x1 => RegsHl::Reg(C),
-                            0x2 => RegsHl::Reg(D),
-                            0x3 => RegsHl::Reg(E),
-                            0x4 => RegsHl::Reg(H),
-                            0x5 => RegsHl::Reg(L),
-                            0x6 => RegsHl::HlInd,
-                            0x7 => RegsHl::Reg(A),
-                            x => panic!("Unexpected match value {:}", x),
-                        };
+                        let r = reg_lookup(pos1 - 0x20);
                         (Arith(Sla(r)), vec![pos0, pos1])
                     }
                     0x30 => (Arith(Swap(RegsHl::Reg(B))), vec![pos0, pos1]),
@@ -810,6 +820,10 @@ impl<'a> LiveInstrPointer<'a> {
                     0x35 => (Arith(Swap(RegsHl::Reg(L))), vec![pos0, pos1]),
                     0x36 => (Arith(Swap(RegsHl::HlInd)), vec![pos0, pos1]),
                     0x37 => (Arith(Swap(RegsHl::Reg(A))), vec![pos0, pos1]),
+                    0x38..=0x3f => {
+                        let r = reg_lookup(pos1 - 0x38);
+                        (Arith(Srl(r)), vec![pos0, pos1])
+                    }
                     // bits, res, set
                     0x40..=0xff => {
                         let num = ((pos1 - 0x40) % 0x40) / 8;
@@ -916,7 +930,10 @@ impl<'a> LiveInstrPointer<'a> {
             0xeb => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xec => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xed => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xee => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xee => {
+                let pos1 = self.read8();
+                (Arith(Xor(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
             0xef => (Jump(Rst(0x28)), vec![pos0]),
             0xf0 => {
                 let pos1 = self.read8();

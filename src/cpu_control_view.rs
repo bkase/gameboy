@@ -95,7 +95,7 @@ fn instrs() {
     mox! {
         <div>
             <p style="font-family: PragmataPro, monospace;">
-                { text(format!("ip: ${:} joy: ${:}", ip_addr, joy)) }
+                { text(format!("ip: {:} joy: ${:x}", ip_addr, joy)) }
             </p>
             <ol style="font-family: PragmataPro, monospace;">
                 <instr _=(&mut new_ip) />
