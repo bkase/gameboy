@@ -78,9 +78,6 @@ impl Hardware {
             clocks_to_tick -= elapsed_duration;
 
             duration = self.cpu.peek_next();
-            if self.cpu.ip.0 >= Addr::directly(0x0100) {
-                self.cpu.memory.done_booting()
-            }
 
             // hit a breakpoint?
             if self.breakpoints.contains(&self.cpu.ip.0) {

@@ -371,11 +371,6 @@ impl Memory {
         }
     }
 
-    #[inline]
-    pub fn done_booting(&mut self) {
-        self.booting = false;
-    }
-
     pub fn ld_lots(&self, Addr(addr): Addr, length: u16) -> Vec<u8> {
         (0..length).map(|i| self.ld8(Addr(addr + i))).collect()
     }
@@ -516,13 +511,6 @@ impl Memory {
             0xffff => self.interrupt_enable.set(n),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
-            0xff4c..=0xff7f => {
-                // TODO: Why does tetris write to "unusable" memory?
-                log(&format!(
-                    "unusable addr ${:x} attempting to write ${:x}",
-                    addr, n
-                ))
-            }
             0xff00 => self.joypad.partial_set(n),
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
@@ -543,6 +531,20 @@ impl Memory {
             0xff47 => self.ppu.bgp.set(n),
             0xff48 => self.ppu.obp0.set(n),
             0xff49 => self.ppu.obp1.set(n),
+            0xff50 => {
+                if n == 0x01 {
+                    self.booting = false
+                } else {
+                    panic!("Unexpected value write to 0xff50 {:x}", n)
+                }
+            }
+            0xff4c..=0xff7f => {
+                // TODO: Why does tetris write to "unusable" memory?
+                log(&format!(
+                    "unusable addr ${:x} attempting to write ${:x}",
+                    addr, n
+                ))
+            }
             0xff01..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
