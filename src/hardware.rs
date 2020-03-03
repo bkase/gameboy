@@ -37,7 +37,7 @@ impl Hardware {
             self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
         // TODO: Is this okay that we ppu advance after the CPU tick? I.e. do we execute that
         // instruction before the vblank interrupt triggers?
-        // self.sound.advance(&mut self.cpu.memory, elapsed_duration);
+        self.sound.advance(&mut self.cpu.memory, elapsed_duration);
         if triggered_vblank {
             self.cpu.attempt_interrupt(InterruptKind::Vblank);
         }

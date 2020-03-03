@@ -264,7 +264,6 @@ impl Sound {
         }
     }
 
-    #[allow(dead_code)]
     fn frequency_of_gb_frequency(pulse_a: &PulseA) -> f32 {
         let high_bits: u8 = pulse_a.control.frequency_high_bits.into();
         let low_bits: u16 = u16::from(pulse_a.frequency.0);
@@ -275,7 +274,6 @@ impl Sound {
         131_072.0 / f32::from(2048 - raw_gb_frequency)
     }
 
-    #[allow(dead_code)]
     pub fn advance(&mut self, memory: &mut Memory, duration: u32) {
         let pulse_a_on = memory.sound.pulse_a.control.trigger;
 
