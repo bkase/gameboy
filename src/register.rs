@@ -85,7 +85,7 @@ mod r_tests {
 // 7 6 5 4 3 2 1 0
 // Z N H C 0 0 0 0
 //==================
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Flags {
     pub z: bool,
     pub n: bool,
@@ -107,6 +107,19 @@ impl Flags {
         self.n = false;
         self.h = false;
         self.c = false;
+    }
+}
+impl fmt::Display for Flags {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let f = |b| if b { 1 } else { 0 };
+        write!(
+            fmt,
+            "z:{:} n:{:} h:{:} c:{:}",
+            f(self.z),
+            f(self.n),
+            f(self.h),
+            f(self.c)
+        )
     }
 }
 

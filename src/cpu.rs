@@ -85,6 +85,11 @@ impl Cpu {
                 let n = self.registers.a;
                 self.memory.st8(nn, n.0);
             }
+            NnIndGetsSp(nn) => {
+                let n = self.registers.sp;
+                self.memory.st8(nn, n.lo().0);
+                self.memory.st8(nn.offset(1, Direction::Pos), n.hi().0);
+            }
             AGetsIOOffset(offset) => {
                 let addr = Addr::io_memory().offset(u16::from(offset), Direction::Pos);
                 let n = self.memory.ld8(addr);
@@ -129,6 +134,9 @@ impl Cpu {
             }
             SpGetsAddr(addr) => {
                 self.registers.sp = addr.into_register();
+            }
+            SpGetsHl => {
+                self.registers.sp = self.registers.hl;
             }
             HlGetsAddr(addr) => {
                 self.registers.hl = addr.into_register();
@@ -294,35 +302,55 @@ impl Cpu {
                 let result = alu::rl(&mut self.registers.flags, n.0);
                 self.registers.write8n(RegisterKind8::A, result);
             }
-            Rl(r) => {
+            Rra => {
+                let n = self.registers.read8(RegisterKind8::A);
+                let result = alu::rl(&mut self.registers.flags, n.0);
+                self.registers.write8n(RegisterKind8::A, result);
+            }
+            Rl(RegsHl::Reg(r)) => {
                 let n = self.registers.read8(r);
                 let result = alu::rl(&mut self.registers.flags, n.0);
                 self.registers.write8n(r, result);
+            }
+            Rl(RegsHl::HlInd) => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::rl(&mut self.registers.flags, n.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
+            Rr(RegsHl::Reg(r)) => {
+                let n = self.registers.read8(r);
+                let result = alu::rr(&mut self.registers.flags, n.0);
+                self.registers.write8n(r, result);
+            }
+            Rr(RegsHl::HlInd) => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::rr(&mut self.registers.flags, n.0);
+                self.indirect_st(RegisterKind16::Hl, result);
             }
         };
         BranchAction::Take
     }
 
     fn pop(&mut self) -> R8 {
-        self.registers.sp.inc();
         let (v, _) = self.indirect_ld(RegisterKind16::Sp);
+        self.registers.sp.inc();
         R8(v)
     }
 
     fn pop16(&mut self) -> R16 {
-        let hi = self.pop();
         let lo = self.pop();
+        let hi = self.pop();
         hi.concat(lo)
     }
 
     fn push(&mut self, n: R8) {
-        self.indirect_st(RegisterKind16::Sp, n.0);
         self.registers.sp.dec();
+        self.indirect_st(RegisterKind16::Sp, n.0);
     }
 
     fn push16(&mut self, n: R16) {
-        self.push(n.lo());
         self.push(n.hi());
+        self.push(n.lo());
     }
 }
 
@@ -450,14 +478,40 @@ impl Cpu {
                 self.do_call(addr);
                 BranchAction::Take
             }
-            CallZ(addr) => {
-                if self.registers.flags.z {
-                    self.do_call(addr);
-                    BranchAction::Take
-                } else {
-                    BranchAction::Skip
+            CallCc(cond, addr) => match cond {
+                RetCondition::Nz => {
+                    if !self.registers.flags.z {
+                        self.do_call(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
                 }
-            }
+                RetCondition::Z => {
+                    if self.registers.flags.z {
+                        self.do_call(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::Nc => {
+                    if !self.registers.flags.c {
+                        self.do_call(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+                RetCondition::C => {
+                    if self.registers.flags.c {
+                        self.do_call(addr);
+                        BranchAction::Take
+                    } else {
+                        BranchAction::Skip
+                    }
+                }
+            },
             Rst(n) => {
                 self.do_call(Addr::directly(u16::from(n)));
                 BranchAction::Take
@@ -615,6 +669,13 @@ impl Cpu {
                 self.registers.flags.n = false;
                 self.registers.flags.h = false;
                 self.registers.flags.c = true;
+                BranchAction::Take
+            }
+            Daa => {
+                let old_flags = self.registers.flags.clone();
+                let x = self.registers.read8(RegisterKind8::A);
+                let result = alu::daa(&mut self.registers.flags, x.0);
+                self.registers.write8n(RegisterKind8::A, result);
                 BranchAction::Take
             }
         }

@@ -7,6 +7,7 @@ use register::R16;
 use sound;
 use std::convert::TryInto;
 use std::fmt;
+use std::string::String;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -42,6 +43,9 @@ pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
 pub type Cartridge = &'static [u8; 0x8000];
 
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
+
+pub const TEST_01: Cartridge =
+    include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 #[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
@@ -290,6 +294,40 @@ impl Joypad {
 }
 
 #[derive(Debug)]
+struct SerialIo {
+    serial_byte: u8,
+    last_serial_byte_dumped: u8,
+    buffer: String,
+}
+
+impl SerialIo {
+    fn create() -> SerialIo {
+        SerialIo {
+            serial_byte: 0,
+            last_serial_byte_dumped: 0,
+            buffer: String::with_capacity(121),
+        }
+    }
+
+    fn clock_set(&mut self, n: u8) {
+        use web_utils::log;
+        if n == 0x81 {
+            if self.last_serial_byte_dumped != self.serial_byte {
+                self.buffer.push(self.serial_byte as char);
+                self.last_serial_byte_dumped = self.serial_byte;
+                if self.serial_byte == ('\n' as u8) {
+                    log(&format!("Serial: {:}", self.buffer));
+                    self.buffer.clear();
+                }
+                if self.buffer.len() > 120 {
+                    self.buffer.drain(0..1);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Memory {
     booting: bool,
     zero: Vec<u8>,
@@ -298,6 +336,7 @@ pub struct Memory {
     video: Vec<u8>,
     rom0: Vec<u8>,
     rom1: Vec<u8>,
+    serial: SerialIo,
     pub interrupt_enable: InterruptRegister,
     pub interrupt_flag: InterruptRegister,
     pub ppu: PpuRegisters,
@@ -361,6 +400,7 @@ impl Memory {
             sprite_oam: vec![OamEntry::create(); 40],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
+            serial: SerialIo::create(),
             rom0,
             rom1,
             interrupt_enable: InterruptRegister::create(),
@@ -381,8 +421,9 @@ impl Memory {
         match addr {
             0xffff => self.interrupt_enable.read(),
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize],
-            0xff4c..=0xff7f => panic!("unusable memory"),
+            0xff4c..=0xff7f => 0, // TODO: panic!("unusable memory"),
             0xff00 => self.joypad.poll_and_read(),
+            0xff01 => self.serial.serial_byte,
             0xff0f => self.interrupt_flag.read(),
             0xff10 => self.sound.pulse_a.sweep.read(),
             0xff11 => self.sound.pulse_a.length.read(),
@@ -512,6 +553,11 @@ impl Memory {
             0xff80..=0xfffe => self.zero[(addr - 0xff80) as usize] = n,
 
             0xff00 => self.joypad.partial_set(n),
+            0xff01 => self.serial.serial_byte = n,
+            0xff02 => {
+                // TODO: Implement serial clock properly
+                self.serial.clock_set(n);
+            }
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
@@ -521,12 +567,18 @@ impl Memory {
             0xff40 => self.ppu.lcdc.set(n),
             0xff41 => {
                 if n != 0 {
-                    panic!("Assuming that 0xff41 is always set to 0")
+                    log(&format!(
+                        "I assumed 0xff41 is always set to 0, but it's set to {:}",
+                        n
+                    ))
                 }
             }
             0xff42 => self.ppu.scy.set(n),
             0xff43 => self.ppu.scx.set(n),
-            0xff44 => panic!("Cannot write to LY register"),
+            0xff44 => log(&format!(
+                "unusable addr ${:x} (LY) attempting to write ${:x}",
+                addr, n
+            )),
             0xff46 => self.start_dma(n),
             0xff47 => self.ppu.bgp.set(n),
             0xff48 => self.ppu.obp0.set(n),
@@ -534,6 +586,9 @@ impl Memory {
             0xff50 => {
                 if n == 0x01 {
                     self.booting = false
+                } else if n == 0x00 {
+                    // TODO: What does 0x00 to ff50 mean? Mooneye-gb tests do it
+                    ()
                 } else {
                     panic!("Unexpected value write to 0xff50 {:x}", n)
                 }
@@ -545,7 +600,7 @@ impl Memory {
                     addr, n
                 ))
             }
-            0xff01..=0xff4b => println!("Passthrough"),
+            0xff03..=0xff4b => println!("Passthrough"),
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
                 // TODO: Why does tetris write to this "unusable" memory
@@ -558,7 +613,7 @@ impl Memory {
                 let addr_ = addr - 0xfe00;
                 self.sprite_oam[(addr_ / 4) as usize].pack()[(addr_ % 4) as usize] = n;
             }
-            0xe000..=0xfdff => panic!("echo ram"),
+            0xe000..=0xfdff => self.st8(Addr::directly(addr - (0xe000 - 0xc000)), n),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => self.main[(addr - 0xc000) as usize] = n,

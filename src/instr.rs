@@ -66,6 +66,7 @@ pub enum Ld {
     BcIndGetsA,
     DeIndGetsA,
     NnIndGetsA(Addr),
+    NnIndGetsSp(Addr),
     AGetsIOOffset(u8),
     IOOffsetGetsA(u8),
     AGetsIOOffsetByC,
@@ -77,6 +78,7 @@ pub enum Ld {
     AGetsHlIndDec,
 
     SpGetsAddr(Addr),
+    SpGetsHl,
     HlGetsAddr(Addr),
     DeGetsAddr(Addr),
     BcGetsAddr(Addr),
@@ -97,6 +99,7 @@ impl fmt::Display for Ld {
             BcIndGetsA => write!(f, "(LD) [BC] <- A"),
             DeIndGetsA => write!(f, "(LD) [DE] <- A"),
             NnIndGetsA(addr) => write!(f, "(LD) [{:}] <- A", addr),
+            NnIndGetsSp(addr) => write!(f, "(LD) [{:}] <- SP", addr),
             AGetsIOOffset(n) => write!(f, "(LD) A <- [$ff00+{:}]", R8(*n)),
             IOOffsetGetsA(n) => write!(f, "(LD) [$ff00+{:}] <- A", R8(*n)),
             AGetsIOOffsetByC => write!(f, "(LD) A <- [$ff00+C]"),
@@ -108,6 +111,7 @@ impl fmt::Display for Ld {
             AGetsHlIndDec => write!(f, "(LD) A <- [HL]++"),
 
             SpGetsAddr(addr) => write!(f, "(LD) SP <- {:}", addr),
+            SpGetsHl => write!(f, "(LD) SP <- {:}", RegisterKind16::Hl),
             HlGetsAddr(addr) => write!(f, "(LD) HL <- {:}", addr),
             DeGetsAddr(addr) => write!(f, "(LD) DE <- {:}", addr),
             BcGetsAddr(addr) => write!(f, "(LD) BC <- {:}", addr),
@@ -129,6 +133,7 @@ impl HasDuration for Ld {
             BcIndGetsA => (2, None),
             DeIndGetsA => (2, None),
             NnIndGetsA(_) => (4, None),
+            NnIndGetsSp(_) => (5, None),
             AGetsIOOffset(_) => (3, None),
             IOOffsetGetsA(_) => (3, None),
             AGetsIOOffsetByC => (4, None),
@@ -138,6 +143,7 @@ impl HasDuration for Ld {
             HlIndGetsADec => (4, None),
             AGetsHlIndDec => (4, None),
             SpGetsAddr(_) => (3, None),
+            SpGetsHl => (2, None),
             HlGetsAddr(_) => (3, None),
             DeGetsAddr(_) => (3, None),
             BcGetsAddr(_) => (3, None),
@@ -264,8 +270,10 @@ impl HasDuration for Arith {
 #[derive(Debug, Clone)]
 pub enum Rotate {
     Rla,
+    Rra,
     Rlca,
-    Rl(RegisterKind8),
+    Rl(RegsHl),
+    Rr(RegsHl),
 }
 use self::Rotate::*;
 
@@ -273,8 +281,10 @@ impl fmt::Display for Rotate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Rla => write!(f, "(RLA) A <- A << 1"),
+            Rra => write!(f, "(RRA) A <- A >> 1"),
             Rlca => write!(f, "(RLCA) A <- A << 1"),
-            Rl(rk) => write!(f, "(RL n) {:} <- {:} << 1", rk, rk),
+            Rl(r) => write!(f, "(RL n) {:} <- {:} << 1", r, r),
+            Rr(r) => write!(f, "(RR n) {:} <- {:} >> 1", r, r),
         }
     }
 }
@@ -283,8 +293,10 @@ impl HasDuration for Rotate {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
             Rla => (1, None),
+            Rra => (1, None),
             Rlca => (1, None),
             Rl(_) => (2, None),
+            Rr(_) => (2, None),
         }
     }
 }
@@ -297,7 +309,7 @@ pub enum Jump {
     Jr(i8),
     JrCc(RetCondition, i8),
     Call(Addr),
-    CallZ(Addr),
+    CallCc(RetCondition, Addr),
     Rst(u8),
 }
 use self::Jump::*;
@@ -311,7 +323,7 @@ impl fmt::Display for Jump {
             Jr(n) => write!(f, "JR {:}", n),
             JrCc(c, i) => write!(f, "JR {:?} {:}", c, i),
             Call(addr) => write!(f, "CALL {:}", addr),
-            CallZ(addr) => write!(f, "CALLZ {:}", addr),
+            CallCc(c, addr) => write!(f, "CALL {:?} {:}", c, addr),
             Rst(n) => write!(f, "RST $0000+${:x}", n),
         }
     }
@@ -326,7 +338,7 @@ impl HasDuration for Jump {
             Jr(_) => (3, None),
             JrCc(_, _) => (3, Some(2)),
             Call(_) => (6, None),
-            CallZ(_) => (6, Some(3)),
+            CallCc(_, _) => (6, Some(3)),
             Rst(_) => (8, None),
         }
     }
@@ -388,6 +400,7 @@ pub enum Instr {
     Di,
     Ei,
     Scf,
+    Daa,
 }
 use self::Instr::*;
 
@@ -411,6 +424,7 @@ impl fmt::Display for Instr {
             Ei => write!(f, "EI"),
             Di => write!(f, "DI"),
             Scf => write!(f, "SCF"),
+            Daa => write!(f, "DAA"),
         }
     }
 }
@@ -431,7 +445,7 @@ impl HasDuration for Instr {
             Ret | Reti => (4, None),
             RetCc(_) => (5, Some(2)),
             Nop => (1, None),
-            Di | Ei | Scf => (1, None),
+            Di | Ei | Scf | Daa => (1, None),
         }
     }
 }
@@ -532,7 +546,11 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(RGetsN(B, pos1)), vec![pos0, pos1])
             }
             0x07 => (Rotate(Rlca), vec![pos0]),
-            0x08 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x08 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (Ld(NnIndGetsSp(Addr::directly(addr))), vec![pos0, lo, hi])
+            }
             0x09 => (Arith(AddHl(Bc)), vec![pos0]),
             0x0a => (Ld(AGetsBcInd), vec![pos0]),
             0x0b => (Arith(Dec16(Bc)), vec![pos0]),
@@ -571,7 +589,7 @@ impl<'a> LiveInstrPointer<'a> {
                 let pos1 = self.read8();
                 (Ld(RGetsN(E, pos1)), vec![pos0, pos1])
             }
-            0x1f => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x1f => (Rotate(Rra), vec![pos0]),
             0x20 => {
                 let pos1 = self.read8();
                 (Jump(JrCc(RetCondition::Nz, pos1 as i8)), vec![pos0, pos1])
@@ -589,7 +607,7 @@ impl<'a> LiveInstrPointer<'a> {
                 let pos1 = self.read8();
                 (Ld(RGetsN(H, pos1)), vec![pos0, pos1])
             }
-            0x27 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x27 => (Daa, vec![pos0]),
             0x28 => {
                 let pos1 = self.read8();
                 (Jump(JrCc(RetCondition::Z, pos1 as i8)), vec![pos0, pos1])
@@ -779,7 +797,14 @@ impl<'a> LiveInstrPointer<'a> {
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Jump(Jp(Addr::directly(addr))), vec![pos0, lo, hi])
             }
-            0xc4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xc4 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(CallCc(RetCondition::Nz, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xc5 => (Push(RegisterKind16::Bc), vec![pos0]),
             0xc6 => {
                 let pos1 = self.read8();
@@ -810,7 +835,14 @@ impl<'a> LiveInstrPointer<'a> {
                 };
                 let pos1 = self.read8();
                 match pos1 {
-                    0x11 => (Rotate(Rl(RegisterKind8::C)), vec![pos0, pos1]),
+                    0x10..=0x17 => {
+                        let r = reg_lookup(pos1 - 0x10);
+                        (Rotate(Rl(r)), vec![pos0, pos1])
+                    }
+                    0x18..=0x1f => {
+                        let r = reg_lookup(pos1 - 0x18);
+                        (Rotate(Rr(r)), vec![pos0, pos1])
+                    }
                     0x20..=0x27 => {
                         let r = reg_lookup(pos1 - 0x20);
                         (Arith(Sla(r)), vec![pos0, pos1])
@@ -860,7 +892,10 @@ impl<'a> LiveInstrPointer<'a> {
             0xcc => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
-                (Jump(CallZ(Addr::directly(addr))), vec![pos0, lo, hi])
+                (
+                    Jump(CallCc(RetCondition::Z, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
             }
             0xcd => {
                 let addr = self.read16();
@@ -883,7 +918,14 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0xd3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xd4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xd4 => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(CallCc(RetCondition::Nc, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xd5 => (Push(RegisterKind16::De), vec![pos0]),
             0xd6 => {
                 let pos1 = self.read8();
@@ -902,7 +944,14 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0xdb => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xdc => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xdc => {
+                let addr = self.read16();
+                let (hi, lo) = hi_lo_decompose(addr);
+                (
+                    Jump(CallCc(RetCondition::C, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
+            }
             0xdd => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xde => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xdf => (Jump(Rst(0x18)), vec![pos0]),
@@ -953,7 +1002,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xf7 => (Jump(Rst(0x30)), vec![pos0]),
             0xf8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xf9 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xf9 => (Ld(SpGetsHl), vec![pos0]),
             0xfa => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);

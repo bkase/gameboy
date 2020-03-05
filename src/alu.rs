@@ -183,6 +183,14 @@ pub fn rl(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn rr(flags: &mut Flags, x: u8) -> u8 {
+    let r = (x >> 1) | (if flags.c { 0x80 } else { 0 });
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = x & 0x1 == 0x1;
+    r
+}
+
 pub fn bit(flags: &mut Flags, x: u8, b: u8) {
     assert!(b < 8);
     flags.z = x & (1 << b) == 0;
@@ -238,6 +246,33 @@ pub fn shift_right_carry(flags: &mut Flags, x: u8) -> u8 {
     flags.z = r == 0;
     flags.c = x & 0x1 == 0x1;
     r
+}
+
+// DAA instruction is weird
+// https://ehaskins.com/2018-01-30%20Z80%20DAA/
+pub fn daa(flags: &mut Flags, x: u8) -> u8 {
+    let mut correction = 0;
+
+    if flags.h || (!flags.n && (x & 0xf) > 9) {
+        correction |= 0x6;
+    }
+
+    if flags.c || (!flags.n && x > 0x99) {
+        correction |= 0x60;
+        flags.c = true;
+    } else {
+        flags.c = false;
+    }
+
+    let result = if flags.n {
+        x.wrapping_sub(correction)
+    } else {
+        x.wrapping_add(correction)
+    };
+
+    flags.z = result == 0;
+    flags.h = false;
+    result
 }
 
 #[cfg(test)]
@@ -312,6 +347,16 @@ mod tests {
         assert!(flags.n);
         assert!(!flags.h);
         assert!(!flags.c);
+    }
+
+    #[test]
+    fn daa() {
+        let mut flags = Flags::create();
+        //                               1   9         2   8
+        let x = alu::add(&mut flags, 0b0001_1001, 0b0010_1000);
+        let y = alu::daa(&mut flags, x);
+        //                 4    7
+        assert_eq!(y, 0b0100_0111);
     }
 
     proptest! {
