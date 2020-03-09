@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RegisterKind8 {
     A,
     B,
@@ -16,7 +16,7 @@ impl fmt::Display for RegisterKind8 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RegisterKind16 {
     Bc,
     De,
