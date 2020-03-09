@@ -1,6 +1,7 @@
 #![feature(proc_macro_hygiene)]
 #![feature(track_caller)]
 #![feature(exclusive_range_pattern)]
+#![feature(or_patterns)]
 #![recursion_limit = "512"]
 
 extern crate console_error_panic_hook;

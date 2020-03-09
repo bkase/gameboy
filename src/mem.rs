@@ -352,6 +352,7 @@ impl fmt::Display for Addr {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Direction {
     Pos,
     Neg,

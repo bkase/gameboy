@@ -6,28 +6,6 @@ use register_kind::{RegisterKind16, RegisterKind8};
 use std::error::Error;
 use std::fmt;
 
-/*   mneumonic       opcode clocks flag explanation
- *
-     ld   r,r         xx         4 ---- r=r
-     ld   r,n         xx nn      8 ---- r=n
-     ld   r,(HL)      xx         8 ---- r=(HL)
-     ld   (HL),r      7x         8 ---- (HL)=r
-     ld   (HL),n      36 nn     12 ----
-     ld   A,(BC)      0A         8 ----
-     ld   A,(DE)      1A         8 ----
-     ld   A,(nn)      FA        16 ----
-     ld   (BC),A      02         8 ----
-     ld   (DE),A      12         8 ----
-     ld   (nn),A      EA        16 ----
-     ld   A,(FF00+n)  F0 nn     12 ---- read from io-port n (memory FF00+n)
-     ld   (FF00+n),A  E0 nn     12 ---- write to io-port n (memory FF00+n)
-     ld   A,(FF00+C)  F2         8 ---- read from io-port C (memory FF00+C)
-     ld   (FF00+C),A  E2         8 ---- write to io-port C (memory FF00+C)
-     ldi  (HL),A      22         8 ---- (HL)=A, HL=HL+1
-     ldi  A,(HL)      2A         8 ---- A=(HL), HL=HL+1
-     ldd  (HL),A      32         8 ---- (HL)=A, HL=HL-1
-     ldd  A,(HL)      3A         8 ---- A=(HL), HL=HL-1
-*/
 #[derive(Debug, Clone)]
 pub struct BadOpcode;
 impl fmt::Display for BadOpcode {
@@ -53,100 +31,118 @@ pub trait HasDuration {
     fn duration(&self) -> (u32, Option<u32>);
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PutGet {
+    Put,
+    Get,
+}
+
 #[derive(Debug, Clone)]
 pub enum Ld {
-    RGetsN(RegisterKind8, u8),
-    RGetsR(RegisterKind8, RegisterKind8),
-    RGetsHlInd(RegisterKind8),
-    HlIndGetsR(RegisterKind8),
-    HlIndGetsN(u8),
-    AGetsBcInd,
-    AGetsDeInd,
-    AGetsNnInd(Addr),
-    BcIndGetsA,
-    DeIndGetsA,
-    NnIndGetsA(Addr),
+    Word(RegsHl, RegsHlN),
+    AOpInd(RegisterKind16, PutGet),
+    AOpNnInd(Addr, PutGet),
     NnIndGetsSp(Addr),
-    AGetsIOOffset(u8),
-    IOOffsetGetsA(u8),
-    AGetsIOOffsetByC,
-    IOOffsetByCGetsA,
-    // special instructions
-    HlIndGetsAInc,
-    AGetsHlIndInc,
-    HlIndGetsADec,
-    AGetsHlIndDec,
-
-    SpGetsAddr(Addr),
+    AOpIOOffset(u8, PutGet),
+    AOpIOOffsetByC(PutGet),
+    AOpHlInd(Direction, PutGet),
+    DwordGetsAddr(RegisterKind16, Addr),
     SpGetsHl,
-    HlGetsAddr(Addr),
-    DeGetsAddr(Addr),
-    BcGetsAddr(Addr),
 }
 use self::Ld::*;
 
 impl fmt::Display for Ld {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RGetsN(rk, v) => write!(f, "(LD) {:} <- {:}", rk, v),
-            RGetsR(rk1, rk2) => write!(f, "(LD) {:} <- {:}", rk1, rk2),
-            RGetsHlInd(rk) => write!(f, "(LD) {:} <- [HL]", rk),
-            HlIndGetsR(rk) => write!(f, "(LD) [HL] <- {:}", rk),
-            HlIndGetsN(n) => write!(f, "(LD) [HL] <- {:}", R8(*n)),
-            AGetsBcInd => write!(f, "(LD) A <- [BC]"),
-            AGetsDeInd => write!(f, "(LD) A <- [DE]"),
-            AGetsNnInd(nn) => write!(f, "(LD) A <- [{:}]", nn),
-            BcIndGetsA => write!(f, "(LD) [BC] <- A"),
-            DeIndGetsA => write!(f, "(LD) [DE] <- A"),
-            NnIndGetsA(addr) => write!(f, "(LD) [{:}] <- A", addr),
-            NnIndGetsSp(addr) => write!(f, "(LD) [{:}] <- SP", addr),
-            AGetsIOOffset(n) => write!(f, "(LD) A <- [$ff00+{:}]", R8(*n)),
-            IOOffsetGetsA(n) => write!(f, "(LD) [$ff00+{:}] <- A", R8(*n)),
-            AGetsIOOffsetByC => write!(f, "(LD) A <- [$ff00+C]"),
-            IOOffsetByCGetsA => write!(f, "(LD) [$ff00+C] <- A"),
-            // special instructions
-            HlIndGetsAInc => write!(f, "(LD) [HL]++ <- A"),
-            AGetsHlIndInc => write!(f, "(LD) A <- [HL]++"),
-            HlIndGetsADec => write!(f, "(LD) [HL]-- <- A"),
-            AGetsHlIndDec => write!(f, "(LD) A <- [HL]++"),
-
-            SpGetsAddr(addr) => write!(f, "(LD) SP <- {:}", addr),
-            SpGetsHl => write!(f, "(LD) SP <- {:}", RegisterKind16::Hl),
-            HlGetsAddr(addr) => write!(f, "(LD) HL <- {:}", addr),
-            DeGetsAddr(addr) => write!(f, "(LD) DE <- {:}", addr),
-            BcGetsAddr(addr) => write!(f, "(LD) BC <- {:}", addr),
+            Word(r1, r2) => write!(f, "(LD) {:} <- {:}", r1, r2),
+            AOpInd(r, PutGet::Get) => write!(f, "(LD) {:} <- [{:}]", RegisterKind8::A, r),
+            AOpInd(r, PutGet::Put) => write!(f, "(LD) [{:}] <- {:}", r, RegisterKind8::A),
+            AOpNnInd(addr, PutGet::Get) => write!(f, "(LD) {:} <- [{:}]", RegisterKind8::A, addr),
+            AOpNnInd(addr, PutGet::Put) => write!(f, "(LD) [{:}] <- {:}", addr, RegisterKind8::A),
+            NnIndGetsSp(addr) => write!(f, "(LD) [{:}] <- {:}", addr, RegisterKind16::Sp),
+            AOpIOOffset(n, PutGet::Get) => {
+                write!(f, "(LD) {:} <- [$ff00+{:}]", RegisterKind8::A, R8(*n))
+            }
+            AOpIOOffset(n, PutGet::Put) => {
+                write!(f, "(LD) [$ff00+{:}] <- {:}", R8(*n), RegisterKind8::A)
+            }
+            AOpIOOffsetByC(PutGet::Get) => write!(
+                f,
+                "(LD) {:} <- [$ff00+{:}]",
+                RegisterKind8::A,
+                RegisterKind8::C
+            ),
+            AOpIOOffsetByC(PutGet::Put) => write!(
+                f,
+                "(LD) [$ff00+{:}] <- {:}",
+                RegisterKind8::C,
+                RegisterKind8::A
+            ),
+            AOpHlInd(dir, putget) => {
+                let incdec = match dir {
+                    Direction::Pos => "++",
+                    Direction::Neg => "--",
+                };
+                match putget {
+                    PutGet::Put => write!(
+                        f,
+                        "(LD) [{:}]{:} <- {:}",
+                        RegsHl::HlInd,
+                        incdec,
+                        RegisterKind8::A
+                    ),
+                    PutGet::Get => write!(
+                        f,
+                        "(LD) {:} <- [{:}]{:}",
+                        RegisterKind8::A,
+                        RegsHl::HlInd,
+                        incdec
+                    ),
+                }
+            }
+            DwordGetsAddr(r, addr) => write!(f, "(LD) {:} <- {:}", r, addr),
+            SpGetsHl => write!(f, "(LD) {:} <- {:}", RegisterKind16::Sp, RegisterKind16::Hl),
         }
     }
 }
 
+/*   mneumonic       opcode clocks flag explanation
+ *
+     ld   r,r         xx         4 ---- r=r
+     ld   r,n         xx nn      8 ---- r=n
+     ld   r,(HL)      xx         8 ---- r=(HL)
+     ld   (HL),r      7x         8 ---- (HL)=r
+     ld   (HL),n      36 nn     12 ----
+     ld   A,(BC)      0A         8 ----
+     ld   A,(DE)      1A         8 ----
+     ld   A,(nn)      FA        16 ----
+     ld   (BC),A      02         8 ----
+     ld   (DE),A      12         8 ----
+     ld   (nn),A      EA        16 ----
+     ld   A,(FF00+n)  F0 nn     12 ---- read from io-port n (memory FF00+n)
+     ld   (FF00+n),A  E0 nn     12 ---- write to io-port n (memory FF00+n)
+     ld   A,(FF00+C)  F2         8 ---- read from io-port C (memory FF00+C)
+     ld   (FF00+C),A  E2         8 ---- write to io-port C (memory FF00+C)
+     ldi  (HL),A      22         8 ---- (HL)=A, HL=HL+1
+     ldi  A,(HL)      2A         8 ---- A=(HL), HL=HL+1
+     ldd  (HL),A      32         8 ---- (HL)=A, HL=HL-1
+     ldd  A,(HL)      3A         8 ---- A=(HL), HL=HL-1
+*/
 impl HasDuration for Ld {
     fn duration(&self) -> (u32, Option<u32>) {
         match self {
-            RGetsR(_, _) => (1, None),
-            RGetsN(_, _) => (2, None),
-            RGetsHlInd(_) => (2, None),
-            HlIndGetsR(_) => (2, None),
-            HlIndGetsN(_) => (3, None),
-            AGetsBcInd => (2, None),
-            AGetsDeInd => (2, None),
-            AGetsNnInd(_) => (4, None),
-            BcIndGetsA => (2, None),
-            DeIndGetsA => (2, None),
-            NnIndGetsA(_) => (4, None),
+            Word(RegsHl::Reg(_), RegsHlN::Reg(_)) => (1, None),
+            Word(RegsHl::Reg(_), RegsHlN::N(_) | RegsHlN::HlInd) => (2, None),
+            Word(RegsHl::HlInd, RegsHlN::Reg(_)) => (2, None),
+            Word(RegsHl::HlInd, RegsHlN::N(_)) => (3, None),
+            AOpInd(_, _) => (2, None),
+            AOpNnInd(_, _) => (4, None),
             NnIndGetsSp(_) => (5, None),
-            AGetsIOOffset(_) => (3, None),
-            IOOffsetGetsA(_) => (3, None),
-            AGetsIOOffsetByC => (4, None),
-            IOOffsetByCGetsA => (4, None),
-            HlIndGetsAInc => (4, None),
-            AGetsHlIndInc => (4, None),
-            HlIndGetsADec => (4, None),
-            AGetsHlIndDec => (4, None),
-            SpGetsAddr(_) => (3, None),
+            AOpIOOffset(_, _) => (3, None),
+            AOpIOOffsetByC(_) => (2, None),
+            AOpHlInd(_, _) => (2, None),
+            DwordGetsAddr(_, _) => (3, None),
             SpGetsHl => (2, None),
-            HlGetsAddr(_) => (3, None),
-            DeGetsAddr(_) => (3, None),
-            BcGetsAddr(_) => (3, None),
         }
     }
 }
@@ -518,6 +514,8 @@ impl<'a> LiveInstrPointer<'a> {
     }
 }
 
+// See the following chart for inspiration on organization
+// https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 use register_kind::RegisterKind16::*;
 use register_kind::RegisterKind8::*;
 impl<'a> LiveInstrPointer<'a> {
@@ -532,18 +530,24 @@ impl<'a> LiveInstrPointer<'a> {
         //log(&format!("Decode ${:x}", pos0));
         match pos0 {
             0x00 => (Nop, vec![pos0]),
-            0x01 => {
+            // loads
+            0x02 | 0x06 | 0x0a | 0x0e | 0x12 | 0x16 | 0x1a | 0x1e |
+            0x22 | 0x26 | 0x2a | 0x2e | 0x32 | 0x36 | 0x3a | 0x3e |
+            0x40..0x76 | 0x77..0x80 => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
-                (Ld(BcGetsAddr(Addr::directly(addr))), vec![pos0, lo, hi])
+                (
+                    Ld(DwordGetsAddr(Bc, Addr::directly(addr))),
+                    vec![pos0, lo, hi],
+                )
             }
-            0x02 => (Ld(BcIndGetsA), vec![pos0]),
+            0x02 => (Ld(AOpInd(Bc, PutGet::Put), vec![pos0]),
             0x03 => (Arith(Inc16(Bc)), vec![pos0]),
             0x04 => (Arith(Inc(RegsHl::Reg(B))), vec![pos0]),
             0x05 => (Arith(Dec(RegsHl::Reg(B))), vec![pos0]),
             0x06 => {
                 let pos1 = self.read8();
-                (Ld(RGetsN(B, pos1)), vec![pos0, pos1])
+                (Ld(Word(B, RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0x07 => (Rotate(Rlca), vec![pos0]),
             0x08 => {
@@ -552,7 +556,7 @@ impl<'a> LiveInstrPointer<'a> {
                 (Ld(NnIndGetsSp(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0x09 => (Arith(AddHl(Bc)), vec![pos0]),
-            0x0a => (Ld(AGetsBcInd), vec![pos0]),
+            0x0a => (Ld(AOpInd(Bc, PutGet::Get)), vec![pos0]),
             0x0b => (Arith(Dec16(Bc)), vec![pos0]),
             0x0c => (Arith(Inc(RegsHl::Reg(C))), vec![pos0]),
             0x0d => (Arith(Dec(RegsHl::Reg(C))), vec![pos0]),
