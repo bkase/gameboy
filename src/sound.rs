@@ -323,8 +323,15 @@ impl Sound {
                 },
                 // TODO: Use volume info and length to determine behavior
                 behavior: Behavior::Decaying({
-                    let sweep: u8 = memory.sound.pulse_a.volume.envelope_sweep.into();
-                    assert!(sweep < 16 && sweep > 0);
+                    let mut sweep: u8 = memory.sound.pulse_a.volume.envelope_sweep.into();
+                    if !(sweep < 16 && sweep > 0) {
+                        use web_utils::log;
+                        log(&format!(
+                            "WARNING: sweep is supposed to be between 0 and 16 but was {:}",
+                            sweep,
+                        ));
+                        sweep = 1;
+                    }
                     ONE_SIXTY_FOURTH_SECS_IN_TICKS * u32::from(sweep)
                 }),
                 ticks_passed: 0,

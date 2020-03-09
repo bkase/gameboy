@@ -47,6 +47,8 @@ pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 pub const TEST_01: Cartridge =
     include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
+pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
+
 #[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct InterruptRegister {
@@ -449,7 +451,7 @@ impl Memory {
                 let addr_ = addr - 0xfe00;
                 self.sprite_oam[(addr_ / 4) as usize].pack()[(addr_ % 4) as usize]
             }
-            0xe000..=0xfdff => panic!("echo ram"),
+            0xe000..=0xfdff => 0, // panic!("echo ram"),
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => self.main[(addr - 0xc000) as usize],

@@ -183,6 +183,15 @@ pub fn rl(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn rlc(flags: &mut Flags, x: u8) -> u8 {
+    let bit0 = if x & 0x80 == 0x80 { 1 } else { 0 };
+    let r = (x << 1) | bit0;
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = bit0 == 0x1;
+    r
+}
+
 pub fn rr(flags: &mut Flags, x: u8) -> u8 {
     let r = (x >> 1) | (if flags.c { 0x80 } else { 0 });
     flags.reset();

@@ -281,6 +281,7 @@ pub enum Rotate {
     Rra,
     Rlca,
     Rl(RegsHl),
+    Rlc(RegsHl),
     Rr(RegsHl),
 }
 use self::Rotate::*;
@@ -292,6 +293,7 @@ impl fmt::Display for Rotate {
             Rra => write!(f, "(RRA) A <- A >> 1"),
             Rlca => write!(f, "(RLCA) A <- A << 1"),
             Rl(r) => write!(f, "(RL n) {:} <- {:} << 1", r, r),
+            Rlc(r) => write!(f, "(RLC n) {:} <- {:} << 1", r, r),
             Rr(r) => write!(f, "(RR n) {:} <- {:} >> 1", r, r),
         }
     }
@@ -303,8 +305,12 @@ impl HasDuration for Rotate {
             Rla => (1, None),
             Rra => (1, None),
             Rlca => (1, None),
-            Rl(_) => (2, None),
-            Rr(_) => (2, None),
+            Rl(RegsHl::HlInd) => (4, None),
+            Rl(RegsHl::Reg(_)) => (2, None),
+            Rlc(RegsHl::HlInd) => (4, None),
+            Rlc(RegsHl::Reg(_)) => (2, None),
+            Rr(RegsHl::HlInd) => (4, None),
+            Rr(RegsHl::Reg(_)) => (2, None),
         }
     }
 }
@@ -410,6 +416,7 @@ pub enum Instr {
     Scf,
     Daa,
     Halt,
+    InvalidOp(u8),
 }
 use self::Instr::*;
 
@@ -435,6 +442,7 @@ impl fmt::Display for Instr {
             Scf => write!(f, "SCF"),
             Daa => write!(f, "DAA"),
             Halt => write!(f, "HALT"),
+            InvalidOp(n) => write!(f, "bad {:x}", n),
         }
     }
 }
@@ -455,6 +463,7 @@ impl HasDuration for Instr {
             Ret | Reti => (4, None),
             RetCc(_) => (5, Some(2)),
             Nop => (1, None),
+            InvalidOp(_) => (1, None),
             Di | Ei | Scf | Daa | Halt => (1, None),
         }
     }
@@ -828,6 +837,10 @@ impl<'a> LiveInstrPointer<'a> {
                 };
                 let pos1 = self.read8();
                 match pos1 {
+                    0x00..=0x07 => {
+                        let r = reg_lookup(pos1);
+                        (Rotate(Rlc(r)), vec![pos0, pos1])
+                    }
                     0x10..=0x17 => {
                         let r = reg_lookup(pos1 - 0x10);
                         (Rotate(Rl(r)), vec![pos0, pos1])
@@ -910,7 +923,7 @@ impl<'a> LiveInstrPointer<'a> {
                     vec![pos0, lo, hi],
                 )
             }
-            0xd3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xd3 => (InvalidOp(pos0), vec![pos0]),
             0xd4 => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
@@ -936,7 +949,7 @@ impl<'a> LiveInstrPointer<'a> {
                     vec![pos0, lo, hi],
                 )
             }
-            0xdb => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xdb => (InvalidOp(pos0), vec![pos0]),
             0xdc => {
                 let addr = self.read16();
                 let (hi, lo) = hi_lo_decompose(addr);
@@ -945,12 +958,12 @@ impl<'a> LiveInstrPointer<'a> {
                     vec![pos0, lo, hi],
                 )
             }
-            0xdd => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xdd => (InvalidOp(pos0), vec![pos0]),
             0xde => panic!(format!("unimplemented instruction ${:x}", pos0)),
             0xdf => (Jump(Rst(0x18)), vec![pos0]),
             0xe1 => (Pop(RegisterKind16::Hl), vec![pos0]),
-            0xe3 => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xe4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xe3 => (InvalidOp(pos0), vec![pos0]),
+            0xe4 => (InvalidOp(pos0), vec![pos0]),
             0xe5 => (Push(RegisterKind16::Hl), vec![pos0]),
             0xe6 => {
                 let pos1 = self.read8();
@@ -962,9 +975,9 @@ impl<'a> LiveInstrPointer<'a> {
                 (Arith(AddSp(pos1 as i8)), vec![pos0, pos1])
             }
             0xe9 => (Jump(JpHlInd), vec![pos0]),
-            0xeb => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xec => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xed => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xeb => (InvalidOp(pos0), vec![pos0]),
+            0xec => (InvalidOp(pos0), vec![pos0]),
+            0xed => (InvalidOp(pos0), vec![pos0]),
             0xee => {
                 let pos1 = self.read8();
                 (Arith(Xor(RegsHlN::N(pos1))), vec![pos0, pos1])
@@ -972,7 +985,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xef => (Jump(Rst(0x28)), vec![pos0]),
             0xf1 => (PopAf, vec![pos0]),
             0xf3 => (Di, vec![pos0]),
-            0xf4 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xf4 => (InvalidOp(pos0), vec![pos0]),
             0xf5 => (PushAf, vec![pos0]),
             0xf6 => {
                 let pos1 = self.read8();
@@ -980,8 +993,8 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xf7 => (Jump(Rst(0x30)), vec![pos0]),
             0xfb => (Ei, vec![pos0]),
-            0xfc => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0xfd => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xfc => (InvalidOp(pos0), vec![pos0]),
+            0xfd => (InvalidOp(pos0), vec![pos0]),
             0xfe => {
                 let pos1 = self.read8();
                 (Arith(Cp(RegsHlN::N(pos1))), vec![pos0, pos1])

@@ -265,10 +265,14 @@ impl Cpu {
         use self::Rotate::*;
 
         match rotate {
-            Rla | Rlca => {
-                // TODO: figure out how RLA and RLCA are different
+            Rla => {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rl(&mut self.registers.flags, n.0);
+                self.registers.write8n(RegisterKind8::A, result);
+            }
+            Rlca => {
+                let n = self.registers.read8(RegisterKind8::A);
+                let result = alu::rlc(&mut self.registers.flags, n.0);
                 self.registers.write8n(RegisterKind8::A, result);
             }
             Rra => {
@@ -284,6 +288,16 @@ impl Cpu {
             Rl(RegsHl::HlInd) => {
                 let n = self.indirect_ld(RegisterKind16::Hl);
                 let result = alu::rl(&mut self.registers.flags, n.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
+            Rlc(RegsHl::Reg(r)) => {
+                let n = self.registers.read8(r);
+                let result = alu::rlc(&mut self.registers.flags, n.0);
+                self.registers.write8n(r, result);
+            }
+            Rlc(RegsHl::HlInd) => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::rlc(&mut self.registers.flags, n.0);
                 self.indirect_st(RegisterKind16::Hl, result);
             }
             Rr(RegsHl::Reg(r)) => {
@@ -626,6 +640,7 @@ impl Cpu {
                     }
                 }
             },
+            InvalidOp(_) => BranchAction::Take,
             Di => {
                 self.interrupt_master_enable = false;
                 BranchAction::Take

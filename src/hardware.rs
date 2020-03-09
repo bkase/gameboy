@@ -1,5 +1,5 @@
 use cpu::{Cpu, InterruptKind};
-use mem::{Addr, TEST_01, TETRIS};
+use mem::{Addr, TEST_01, TETRIS, TIC_TAC_TOE};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
@@ -20,7 +20,7 @@ impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
         Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
+            cpu: Cpu::create(Some(TIC_TAC_TOE)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
