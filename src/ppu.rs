@@ -382,10 +382,11 @@ impl Ppu {
     }
 
     fn sprite_mux(&self, memory: &Memory, row: u8, row_pixels: &mut Vec<Pixel>) {
-        self.visible_sprites_mask.iter().for_each(|i| match i {
-            None => (),
-            Some(i) => {
-                let entry = memory.sprite_oam[*i];
+        self.visible_sprites_mask
+            .iter()
+            .filter_map(|x| *x)
+            .for_each(|i| {
+                let entry = memory.sprite_oam[i];
 
                 // TODO: Implement flip_x and flip_y
                 let sprite_pixels = self.pixels_for_tile_number(
@@ -393,7 +394,7 @@ impl Ppu {
                     entry.tile_number,
                     Addr::directly(0x8000),
                     row,
-                    Some(*i),
+                    Some(i),
                 );
 
                 let width = row_pixels.len();
@@ -409,8 +410,7 @@ impl Ppu {
                         row_pixels[idx - 8] = sprite_pixels[j];
                     }
                 })
-            }
-        });
+            });
     }
 
     fn pixels_for_tile_number(
@@ -434,8 +434,6 @@ impl Ppu {
     }
 
     fn paint_row(&mut self, memory: &Memory, row: u8, screen_choice: ScreenChoice) {
-        self.oam_search(memory, row);
-
         let scx = match screen_choice {
             ScreenChoice::Real => memory.ppu.scx,
             ScreenChoice::FullDebug => 0,
@@ -447,6 +445,7 @@ impl Ppu {
             ScreenChoice::TileDebug => 0,
         };
         let effective_row = row.wrapping_add(scy);
+        self.oam_search(memory, effective_row);
 
         let tiles_base_addr = match screen_choice {
             ScreenChoice::Real | ScreenChoice::FullDebug => {
@@ -558,7 +557,7 @@ impl Ppu {
             .iter()
             .enumerate()
             // keep those that are visible on this row
-            .filter(|(_, e)| e.pos_x != 0 && row + 16 >= e.pos_y && row + 16 < e.pos_y + h)
+            .filter(|(_, e)| e.pos_x != 0 && e.pos_y <= row + 16 && e.pos_y + h > row + 16)
             .collect();
         // lower x earlier, for ties delegate to the earlier entry
         entries.sort_by(|(ai, a), (bi, b)| a.pos_x.cmp(&b.pos_x).then(ai.cmp(bi)));
@@ -568,11 +567,12 @@ impl Ppu {
 
         // reversing so we can put the ones that are drawn earlier first
         // in the visible mask
-        entries
-            .iter()
-            .rev()
-            .enumerate()
-            .for_each(|(i, (ei, _))| self.visible_sprites_mask[i] = Some(*ei));
+        let len = self.visible_sprites_mask.len();
+        entries.iter().rev().enumerate().for_each(|(i, (ei, _))| {
+            if i < len {
+                self.visible_sprites_mask[i] = Some(*ei)
+            }
+        });
     }
 
     pub fn repaint(&mut self, memory: &Memory) {

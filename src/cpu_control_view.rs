@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::AudioContext;
 use web_utils::log;
+use web_utils::*;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Mode {
@@ -88,23 +89,40 @@ fn instr(new_ip: &mut InstrPointer) {
 #[topo::nested]
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 fn instrs() {
-    let ip_addr = hardware.borrow().cpu.ip.0;
-    let timer = &hardware.borrow().cpu.memory.timer;
-    let mut new_ip = InstrPointer(ip_addr);
+    let vblanks = {
+        let ip_addr = hardware.borrow().cpu.ip.0;
+        let timer = &hardware.borrow().cpu.memory.timer;
+        let mut new_ip = InstrPointer(ip_addr);
 
-    mox! {
-        <div>
-            <p style="font-family: PragmataPro, monospace;">
-                { text(format!("ip: {:} timer: {:}", ip_addr, timer)) }
-            </p>
-            <ol style="font-family: PragmataPro, monospace;">
-                <instr _=(&mut new_ip) />
-                <instr _=(&mut new_ip) />
-                <instr _=(&mut new_ip) />
-                <instr _=(&mut new_ip) />
-                <instr _=(&mut new_ip) />
-            </ol>
-        </div>
+        let vblanks = hardware.borrow().vblanks;
+        let start_time = hardware.borrow().start_time;
+        let vblankps = vblanks as f64 / (performance.now() - start_time);
+
+        mox! {
+            <div>
+                <p style="font-family: PragmataPro, monospace;">
+                    { text(format!("ip: {:} timer: {:} vblankps: {:}", ip_addr, timer, vblankps)) }
+                </p>
+                <ol style="font-family: PragmataPro, monospace;">
+                    <instr _=(&mut new_ip) />
+                    <instr _=(&mut new_ip) />
+                    <instr _=(&mut new_ip) />
+                    <instr _=(&mut new_ip) />
+                    <instr _=(&mut new_ip) />
+                </ol>
+            </div>
+        }
+
+        vblanks
+    };
+
+    if vblanks > 100 {
+        {
+            hardware.borrow_mut().vblanks = 0;
+        }
+        {
+            hardware.borrow_mut().start_time = performance.now();
+        }
     }
 }
 

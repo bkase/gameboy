@@ -1,9 +1,10 @@
 use cpu::{Cpu, InterruptKind};
-use mem::{Addr, TriggeredTimer, TEST_01, TETRIS, TIC_TAC_TOE};
+use mem::{Addr, TriggeredTimer, DR_MARIO, TEST_01, TETRIS, TIC_TAC_TOE};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
 use web_utils::log;
+use web_utils::*;
 
 #[derive(Debug)]
 pub struct Hardware {
@@ -16,6 +17,9 @@ pub struct Hardware {
     pub breakpoints: HashSet<Addr>,
     // between 0 and 4194304
     pub clocks_elapsed_mod_seconds: u32,
+    // for vblank measurement
+    pub vblanks: usize,
+    pub start_time: f64,
 }
 
 impl Hardware {
@@ -29,6 +33,8 @@ impl Hardware {
             dirty: false,
             breakpoints: _set,
             clocks_elapsed_mod_seconds: 0,
+            vblanks: 0,
+            start_time: performance.now(),
         }
     }
 
@@ -52,6 +58,7 @@ impl Hardware {
 
         // attempt interrupts
         if triggered_vblank {
+            self.vblanks += 1;
             self.cpu.attempt_interrupt(InterruptKind::Vblank);
         }
         if triggered_timer {

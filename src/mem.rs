@@ -48,6 +48,7 @@ pub const TEST_01: Cartridge =
     include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
+pub const DR_MARIO: Cartridge = include_bytes!("../drmario.gb");
 
 #[derive(Copy, Clone, Debug)]
 pub struct TriggeredTimer(pub bool);
@@ -390,6 +391,7 @@ pub struct Memory {
     video: Vec<u8>,
     rom0: Vec<u8>,
     rom1: Vec<u8>,
+    cartridge_ram: Vec<u8>,
     pub timer: Timer,
     serial: SerialIo,
     pub interrupt_enable: InterruptRegister,
@@ -460,6 +462,7 @@ impl Memory {
             serial: SerialIo::create(),
             rom0,
             rom1,
+            cartridge_ram: vec![0; 0x2000],
             interrupt_enable: InterruptRegister::create(),
             interrupt_flag: InterruptRegister::create(),
             ppu: PpuRegisters::create(),
@@ -533,12 +536,7 @@ impl Memory {
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => self.main[(addr - 0xc000) as usize],
-            0xa000..=0xbfff => {
-                // cartridge ram
-                // not sure what to do here...
-                println!("Passthrough...");
-                0
-            }
+            0xa000..=0xbfff => self.cartridge_ram[(addr - 0xa000) as usize],
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
@@ -586,7 +584,7 @@ impl Memory {
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => u16read(&self.main, addr - 0xc000),
-            0xa000..=0xbfff => panic!("cartridge ram"),
+            0xa000..=0xbfff => u16read(&self.cartridge_ram, addr - 0xa000),
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
@@ -701,14 +699,14 @@ impl Memory {
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => self.main[(addr - 0xc000) as usize] = n,
-            0xa000..=0xbfff => panic!("cartridge ram"),
+            0xa000..=0xbfff => self.cartridge_ram[(addr - 0xa000) as usize] = n,
             // end video ram
             // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
             // 0x9800 ... 0x9bff => panic!("bg map data 1"),
             // 0x8000 ... 0x97ff => panic!("character ram"),
             0x8000..=0x9fff => self.video[(addr - 0x8000) as usize] = n,
             // begin video ram
-            0x4000..=0x7fff => panic!("switchable rom banks xx"),
+            0x4000..=0x7fff => println!("switchable rom banks xx"),
             0x0150..=0x3fff => {
                 println!("(header) ROM write; do we need to implement bank switching here?")
             }
