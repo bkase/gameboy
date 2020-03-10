@@ -1,5 +1,5 @@
 use cpu::{Cpu, InterruptKind};
-use mem::{Addr, TEST_01, TETRIS, TIC_TAC_TOE};
+use mem::{Addr, TriggeredTimer, TEST_01, TETRIS, TIC_TAC_TOE};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
@@ -14,18 +14,21 @@ pub struct Hardware {
     // dirty bit, aka we need to redraw things with this is true
     pub dirty: bool,
     pub breakpoints: HashSet<Addr>,
+    // between 0 and 4194304
+    pub clocks_elapsed_mod_seconds: u32,
 }
 
 impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
         Hardware {
-            cpu: Cpu::create(Some(TIC_TAC_TOE)),
+            cpu: Cpu::create(Some(TETRIS)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
             dirty: false,
             breakpoints: _set,
+            clocks_elapsed_mod_seconds: 0,
         }
     }
 
@@ -38,9 +41,23 @@ impl Hardware {
         // TODO: Is this okay that we ppu advance after the CPU tick? I.e. do we execute that
         // instruction before the vblank interrupt triggers?
         self.sound.advance(&mut self.cpu.memory, elapsed_duration);
+
+        // update timers
+        self.clocks_elapsed_mod_seconds =
+            (self.clocks_elapsed_mod_seconds + elapsed_duration) % 4194304;
+        let TriggeredTimer(triggered_timer) = self
+            .cpu
+            .memory
+            .advance_timers(self.clocks_elapsed_mod_seconds);
+
+        // attempt interrupts
         if triggered_vblank {
             self.cpu.attempt_interrupt(InterruptKind::Vblank);
         }
+        if triggered_timer {
+            self.cpu.attempt_interrupt(InterruptKind::Timer);
+        }
+
         elapsed_duration
     }
 

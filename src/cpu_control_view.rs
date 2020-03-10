@@ -89,13 +89,13 @@ fn instr(new_ip: &mut InstrPointer) {
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 fn instrs() {
     let ip_addr = hardware.borrow().cpu.ip.0;
-    let joy = hardware.borrow().cpu.memory.ld8(Addr::directly(0xff00));
+    let timer = &hardware.borrow().cpu.memory.timer;
     let mut new_ip = InstrPointer(ip_addr);
 
     mox! {
         <div>
             <p style="font-family: PragmataPro, monospace;">
-                { text(format!("ip: {:} joy: ${:x}", ip_addr, joy)) }
+                { text(format!("ip: {:} timer: {:}", ip_addr, timer)) }
             </p>
             <ol style="font-family: PragmataPro, monospace;">
                 <instr _=(&mut new_ip) />

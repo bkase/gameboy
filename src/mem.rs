@@ -49,6 +49,9 @@ pub const TEST_01: Cartridge =
 
 pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
 
+#[derive(Copy, Clone, Debug)]
+pub struct TriggeredTimer(pub bool);
+
 #[derive(PackedStruct, Debug)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct InterruptRegister {
@@ -329,6 +332,55 @@ impl SerialIo {
     }
 }
 
+#[derive(PackedStruct, Debug, Clone, Copy)]
+#[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
+pub struct TimerControl {
+    #[packed_field(bits = "0:1")]
+    input_clock_select: Integer<u8, packed_bits::Bits2>,
+    #[packed_field(bits = "2")]
+    timer_enable: bool,
+}
+impl ReadViewU8 for TimerControl {
+    fn read(&self) -> u8 {
+        self.pack()[0]
+    }
+}
+impl ViewU8 for TimerControl {
+    fn set(&mut self, n: u8) {
+        *self = TimerControl::unpack(&[n]).expect("it's 8bits")
+    }
+}
+
+#[derive(Debug)]
+pub struct Timer {
+    div: u8,
+    tima: u8,
+    tma: u8,
+    tac: TimerControl,
+}
+impl Timer {
+    fn create() -> Timer {
+        Timer {
+            div: 0,
+            tima: 0,
+            tma: 0,
+            tac: TimerControl::unpack(&[0]).unwrap(),
+        }
+    }
+}
+impl fmt::Display for Timer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "div:${:x} tima:${:x} tma:${:x} tac:${:x}",
+            self.div,
+            self.tima,
+            self.tma,
+            self.tac.read()
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct Memory {
     booting: bool,
@@ -338,6 +390,7 @@ pub struct Memory {
     video: Vec<u8>,
     rom0: Vec<u8>,
     rom1: Vec<u8>,
+    pub timer: Timer,
     serial: SerialIo,
     pub interrupt_enable: InterruptRegister,
     pub interrupt_flag: InterruptRegister,
@@ -403,6 +456,7 @@ impl Memory {
             sprite_oam: vec![OamEntry::create(); 40],
             main: vec![0; 0x2000],
             video: vec![0; 0x2000],
+            timer: Timer::create(),
             serial: SerialIo::create(),
             rom0,
             rom1,
@@ -416,6 +470,30 @@ impl Memory {
 
     pub fn ld_lots(&self, Addr(addr): Addr, length: u16) -> Vec<u8> {
         (0..length).map(|i| self.ld8(Addr(addr + i))).collect()
+    }
+
+    pub fn advance_timers(&mut self, cpu_ticks_elapsed: u32) -> TriggeredTimer {
+        self.timer.div = (cpu_ticks_elapsed / 0xff) as u8;
+        if !self.timer.tac.timer_enable {
+            TriggeredTimer(false)
+        } else {
+            let old_tima = self.timer.tima;
+            let divisor = match self.timer.tac.input_clock_select.into() {
+                0b00 => 1024,
+                0b01 => 16,
+                0b10 => 64,
+                0b11 => 256,
+                x => panic!("Unexpected input clock select value {:}", x),
+            };
+            self.timer.tima = (cpu_ticks_elapsed / divisor) as u8;
+            // if tima is smaller than old_tima, we overflowed
+            if self.timer.tima < old_tima {
+                self.timer.tima = self.timer.tma;
+                TriggeredTimer(true)
+            } else {
+                TriggeredTimer(false)
+            }
+        }
     }
 
     #[allow(clippy::match_overlapping_arm)]
@@ -561,6 +639,9 @@ impl Memory {
                 // TODO: Implement serial clock properly
                 self.serial.clock_set(n);
             }
+            0xff04 => self.timer.div = 0,
+            0xff06 => self.timer.tma = n,
+            0xff07 => self.timer.tac.set(n),
             0xff0f => self.interrupt_flag.set(n),
             0xff10 => self.sound.pulse_a.sweep.set(n),
             0xff11 => self.sound.pulse_a.length.set(n),
