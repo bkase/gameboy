@@ -381,19 +381,14 @@ impl Ppu {
             .collect()
     }
 
-    fn sprite_mux(&self, memory: &Memory, row: u8, pixels: &mut Vec<Pixel>, tile_col: u8) {
+    fn sprite_mux(&self, memory: &Memory, row: u8, row_pixels: &mut Vec<Pixel>) {
         self.visible_sprites_mask.iter().for_each(|i| match i {
             None => (),
             Some(i) => {
                 let entry = memory.sprite_oam[*i];
-                // we already know the sprite is visible on the row due to the oam search
-                // but we still need to make sure it's visible on in the col
-                if entry.pos_x - 8 < tile_col * 8 || entry.pos_x - 8 >= (tile_col + 1) * 8 {
-                    return;
-                }
 
                 // TODO: Implement flip_x and flip_y
-                let pixels_ = self.pixels_for_tile_number(
+                let sprite_pixels = self.pixels_for_tile_number(
                     memory,
                     entry.tile_number,
                     Addr::directly(0x8000),
@@ -401,23 +396,17 @@ impl Ppu {
                     Some(*i),
                 );
 
-                let offset = usize::from((entry.pos_x - 8) - (tile_col * 8));
-                if !(offset < 8) {
-                    panic!(
-                        "Why offset is less than 8, {:}, tile_col {:}, pos_x {:}",
-                        offset, tile_col, entry.pos_x
-                    );
-                }
-
-                // TODO: figure out how to use offset
-                // (offset..8+offset).for_each(|j| {
+                let width = row_pixels.len();
                 (0..8).for_each(|j| {
+                    let idx = usize::from(entry.pos_x) + j;
+                    // at the offset, we're still on the screen
+                    if idx >= 8 && idx < width - 8 &&
                     // we only overwrite when the priority is above everything
                     // or the existing value is transparent (0x00)
-                    if entry.priority == OamEntryPriority::AboveEverything
-                        || pixels[j].value == 0.into()
+                      (entry.priority == OamEntryPriority::AboveEverything
+                        || row_pixels[idx-8].value == 0.into())
                     {
-                        pixels[j] = pixels_[j];
+                        row_pixels[idx - 8] = sprite_pixels[j];
                     }
                 })
             }
@@ -477,74 +466,78 @@ impl Ppu {
         };
 
         // for each of the tiles on screen on the row
-        ((scx / 8)..(total_tiles + (scx / 8))).for_each(|i| {
-            let tile_number = match screen_choice {
-                ScreenChoice::Real | ScreenChoice::FullDebug => memory.ld8(map_base_addr.offset(
-                    u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
-                    Direction::Pos,
-                )),
-                ScreenChoice::TileDebug => {
-                    // when this overflows, it coincides with shifting to the
-                    // 0x9000 base addr
-                    (row / 8) * TILES_PER_ROW_TILE_VIEW + i
-                }
-            };
+        // get all the bg pixels
+        let mut pixels: Vec<Pixel> = ((scx / 8)..(total_tiles + (scx / 8)))
+            .flat_map(|i| {
+                let tile_number = match screen_choice {
+                    ScreenChoice::Real | ScreenChoice::FullDebug => {
+                        memory.ld8(map_base_addr.offset(
+                            u16::from(effective_row / 8) * u16::from(TILES_PER_ROW) + u16::from(i),
+                            Direction::Pos,
+                        ))
+                    }
+                    ScreenChoice::TileDebug => {
+                        // when this overflows, it coincides with shifting to the
+                        // 0x9000 base addr
+                        (row / 8) * TILES_PER_ROW_TILE_VIEW + i
+                    }
+                };
 
-            let mut pixels = self.pixels_for_tile_number(
-                memory,
-                tile_number,
-                tiles_base_addr,
-                effective_row,
-                None,
-            );
-            // mux in the sprites
+                self.pixels_for_tile_number(
+                    memory,
+                    tile_number,
+                    tiles_base_addr,
+                    effective_row,
+                    None,
+                )
+            })
+            .collect();
+
+        // mux in the sprites
+        match screen_choice {
+            ScreenChoice::Real => self.sprite_mux(memory, effective_row, &mut pixels),
+            ScreenChoice::TileDebug | ScreenChoice::FullDebug => (),
+        };
+
+        // color and blit
+        let pixel_lut: [(u8, u8, u8); 4] =
+            [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
+        pixels.into_iter().enumerate().for_each(|(j, pixel)| {
+            let pallette = match pixel.source {
+                PixelSource::Bg => memory.ppu.bgp,
+                PixelSource::Sprite(i) => memory.sprite_oam[i].get_palette(memory),
+            };
+            let idx: u8 = match pixel.value.into() {
+                0b00 => pallette.dot00,
+                0b01 => pallette.dot01,
+                0b10 => pallette.dot10,
+                0b11 => pallette.dot11,
+                _ => panic!("Invariant violation"),
+            }
+            .into();
+
+            let (r, g, b) = pixel_lut[idx as usize];
+            let rgb = Rgb { r, g, b };
+            let coord = Coordinate { x: j as u8, y: row };
+
             match screen_choice {
-                ScreenChoice::Real => self.sprite_mux(memory, effective_row, &mut pixels, i),
-                ScreenChoice::TileDebug | ScreenChoice::FullDebug => (),
-            };
-            let pixel_lut: [(u8, u8, u8); 4] =
-                [(255, 255, 255), (98, 78, 81), (220, 176, 181), (0, 0, 0)];
-
-            pixels.into_iter().enumerate().for_each(|(j, pixel)| {
-                let pallette = match pixel.source {
-                    PixelSource::Bg => memory.ppu.bgp,
-                    PixelSource::Sprite(i) => memory.sprite_oam[i].get_palette(memory),
-                };
-                let idx: u8 = match pixel.value.into() {
-                    0b00 => pallette.dot00,
-                    0b01 => pallette.dot01,
-                    0b10 => pallette.dot10,
-                    0b11 => pallette.dot11,
-                    _ => panic!("Invariant violation"),
+                ScreenChoice::Real => {
+                    if memory.ppu.lcdc.lcd_control_operation {
+                        self.screen.bang(rgb, coord)
+                    } else {
+                        self.screen.bang(Rgb::white(), coord)
+                    }
                 }
-                .into();
-
-                let (r, g, b) = pixel_lut[idx as usize];
-                let rgb = Rgb { r, g, b };
-                let coord = Coordinate {
-                    x: ((i as u8) * 8 + (j as u8)) as u8,
-                    y: row,
-                };
-
-                match screen_choice {
-                    ScreenChoice::Real => {
-                        if memory.ppu.lcdc.lcd_control_operation {
-                            self.screen.bang(rgb, coord)
-                        } else {
-                            self.screen.bang(Rgb::white(), coord)
-                        }
+                ScreenChoice::FullDebug => {
+                    if memory.ppu.lcdc.lcd_control_operation {
+                        self.debug_wide_screen.bang(rgb, coord)
+                    } else {
+                        self.debug_wide_screen.bang(Rgb::white(), coord)
                     }
-                    ScreenChoice::FullDebug => {
-                        if memory.ppu.lcdc.lcd_control_operation {
-                            self.debug_wide_screen.bang(rgb, coord)
-                        } else {
-                            self.debug_wide_screen.bang(Rgb::white(), coord)
-                        }
-                    }
-                    ScreenChoice::TileDebug => self.debug_tile_screen.bang(rgb, coord),
-                };
-            });
-        })
+                }
+                ScreenChoice::TileDebug => self.debug_tile_screen.bang(rgb, coord),
+            };
+        });
     }
 
     pub fn advance(&mut self, memory: &mut Memory, duration: u32) -> TriggeredVblank {
