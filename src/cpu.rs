@@ -655,6 +655,12 @@ impl Cpu {
                 self.registers.flags.c = true;
                 BranchAction::Take
             }
+            Ccf => {
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
+                self.registers.flags.c = !self.registers.flags.c;
+                BranchAction::Take
+            }
             Daa => {
                 let x = self.registers.read8(RegisterKind8::A);
                 let result = alu::daa(&mut self.registers.flags, x.0);

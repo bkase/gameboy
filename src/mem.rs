@@ -566,45 +566,10 @@ impl Memory {
         }
     }
 
-    pub fn ld16(&self, Addr(addr): Addr) -> u16 {
-        fn u16read(vec: &[u8], addr: u16) -> u16 {
-            (u16::from(vec[(addr + 1) as usize]) << 8) | u16::from(vec[addr as usize])
-        }
-
-        match addr {
-            0xffff => panic!("interrupt enable register"),
-            0xff80..=0xfffe => u16read(&self.zero, addr - 0xff80),
-            0xff4c..=0xff7f => panic!("unusable"),
-            0xff00..=0xff4b => panic!("I/O ports"),
-            0xfea0..=0xfeff => panic!("unusable"),
-            0xfe00..=0xfe9f => {
-                u16::from(self.ld8(Addr(addr + 1))) << 8 | u16::from(self.ld8(Addr(addr)))
-            }
-            0xe000..=0xfdff => panic!("echo ram"),
-            // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
-            // 0xc000 ... 0xcfff => panic!("ram bank 0"),
-            0xc000..=0xdfff => u16read(&self.main, addr - 0xc000),
-            0xa000..=0xbfff => u16read(&self.cartridge_ram, addr - 0xa000),
-            // end video ram
-            // 0x9c00 ... 0x9fff => panic!("bg map data 2"),
-            // 0x9800 ... 0x9bff => panic!("bg map data 1"),
-            // 0x8000 ... 0x97ff => panic!("character ram"),
-            0x8000..=0x9fff => u16read(&self.video, addr - 0x8000),
-            // begin video ram
-            0x4000..=0x7fff => u16read(&self.rom1, addr - 0x4000),
-            0x0150..=0x3fff => u16read(&self.rom0, addr),
-
-            0x0100..=0x014f => u16read(&self.rom0, addr),
-            0x0000..=0x00ff =>
-            // bootrom
-            {
-                if self.booting {
-                    u16read(BOOTROM, addr)
-                } else {
-                    u16read(&self.rom0, addr)
-                }
-            }
-        }
+    pub fn ld16(&self, addr: Addr) -> u16 {
+        let lo = self.ld8(addr);
+        let hi = self.ld8(addr.offset(1, Direction::Pos));
+        (u16::from(hi) << 8) | u16::from(lo)
     }
 
     fn start_dma(&mut self, n: u8) {

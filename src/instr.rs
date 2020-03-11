@@ -416,6 +416,7 @@ pub enum Instr {
     Scf,
     Daa,
     Halt,
+    Ccf,
     InvalidOp(u8),
 }
 use self::Instr::*;
@@ -440,6 +441,7 @@ impl fmt::Display for Instr {
             Ei => write!(f, "EI"),
             Di => write!(f, "DI"),
             Scf => write!(f, "SCF"),
+            Ccf => write!(f, "CCF"),
             Daa => write!(f, "DAA"),
             Halt => write!(f, "HALT"),
             InvalidOp(n) => write!(f, "bad {:x}", n),
@@ -464,7 +466,7 @@ impl HasDuration for Instr {
             RetCc(_) => (5, Some(2)),
             Nop => (1, None),
             InvalidOp(_) => (1, None),
-            Di | Ei | Scf | Daa | Halt => (1, None),
+            Di | Ei | Scf | Ccf | Daa | Halt => (1, None),
         }
     }
 }
@@ -719,7 +721,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x3b => (Arith(Dec16(Sp)), vec![pos0]),
             0x3c => (Arith(Inc(RegsHl::Reg(A))), vec![pos0]),
             0x3d => (Arith(Dec(RegsHl::Reg(A))), vec![pos0]),
-            0x3f => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x3f => (Ccf, vec![pos0]),
             0x80 => (Arith(Add(RegsHlN::Reg(B))), vec![pos0]),
             0x81 => (Arith(Add(RegsHlN::Reg(C))), vec![pos0]),
             0x82 => (Arith(Add(RegsHlN::Reg(D))), vec![pos0]),

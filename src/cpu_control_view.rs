@@ -1,10 +1,10 @@
 use hardware::Hardware;
 use instr::InstrPointer;
-use mem::Addr;
 use moxie_dom::{
     elements::{button, div, li, ol, p},
     prelude::*,
 };
+use ppu;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::AudioContext;
@@ -141,7 +141,7 @@ fn view() {
        <run_button _=("Pause", Mode::Paused, disabled2) />
        <step_button _=("Step", disabled1) />
        <repaint_button _=("Repaint") />
-       <instrs />
+       { if ppu::DEBUG { mox! { <instrs /> } } }
      </div>
     }
 }

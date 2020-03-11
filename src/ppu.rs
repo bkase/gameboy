@@ -6,7 +6,7 @@ use packed_struct::prelude::*;
 use read_view_u8::*;
 use screen::{Coordinate, Rgb, Screen};
 
-pub const DEBUG: bool = true;
+pub const DEBUG: bool = false;
 
 #[derive(PackedStruct, Debug, Clone, Copy)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
@@ -253,7 +253,7 @@ impl Moment {
     }
 
     fn advance(&mut self, amount: u32) -> TriggeredVblank {
-        let pre_mod = u32::from(self.0).wrapping_add(amount);
+        let pre_mod = u32::from(self.0).wrapping_add(amount * 4);
         *self = Moment((pre_mod % (u32::from(COLS) * u32::from(ROWS))) as u16);
         if pre_mod >= u32::from(COLS) * u32::from(SCREEN_ROWS) {
             TriggeredVblank(true)
