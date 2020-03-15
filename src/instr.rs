@@ -61,6 +61,7 @@ pub enum Ld {
     AOpHlInd(Direction, PutGet),
     DwordGetsAddr(RegisterKind16, Addr),
     SpGetsHl,
+    HlGetsSpOffset(i8),
 }
 use self::Ld::*;
 
@@ -103,6 +104,13 @@ impl fmt::Display for Ld {
             }
             DwordGetsAddr(r, addr) => write!(f, "(LD) {:} <- {:}", r, addr),
             SpGetsHl => write!(f, "(LD) {:} <- {:}", RegisterKind16::Sp, RegisterKind16::Hl),
+            HlGetsSpOffset(x) => write!(
+                f,
+                "(LD {:} <- {:} + {:}",
+                RegisterKind16::Hl,
+                RegisterKind16::Sp,
+                x
+            ),
         }
     }
 }
@@ -147,6 +155,7 @@ impl HasDuration for Ld {
             AOpHlInd(_, _) => (2, None),
             DwordGetsAddr(_, _) => (3, None),
             SpGetsHl => (2, None),
+            HlGetsSpOffset(_) => (3, None),
         }
     }
 }
@@ -662,7 +671,10 @@ impl<'a> LiveInstrPointer<'a> {
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Ld(NnIndGetsSp(Addr::directly(addr))), vec![pos0, lo, hi])
             }
-            0xf8 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xf8 => {
+                let pos1 = self.read8();
+                (Ld(HlGetsSpOffset(pos1 as i8)), vec![pos0, pos1])
+            }
             0xf9 => (Ld(SpGetsHl), vec![pos0]),
             // rest
             0x03 => (Arith(Inc16(Bc)), vec![pos0]),

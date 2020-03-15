@@ -45,7 +45,8 @@ pub type Cartridge = &'static [u8; 0x8000];
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 
 pub const TEST_01: Cartridge =
-    include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
+    include_bytes!("../gb-test-roms/cpu_instrs/individual/02-interrupts.gb");
+// include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
 pub const DR_MARIO: Cartridge = include_bytes!("../drmario.gb");
@@ -436,6 +437,14 @@ impl Addr {
             Direction::Neg => self.0.wrapping_sub(by),
         };
         Addr(new_val)
+    }
+
+    pub fn offset_signed(self, by: i8) -> Addr {
+        if by < 0 {
+            self.offset((-by) as u16, Direction::Neg)
+        } else {
+            self.offset(by as u16, Direction::Pos)
+        }
     }
 
     pub fn into_register(self) -> R16 {

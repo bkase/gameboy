@@ -26,7 +26,7 @@ impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
         Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
+            cpu: Cpu::create(Some(TEST_01)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,

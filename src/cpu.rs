@@ -116,6 +116,11 @@ impl Cpu {
             }
             DwordGetsAddr(r16, addr) => self.registers.write16r(r16, addr.into_register()),
             SpGetsHl => self.registers.sp = self.registers.hl,
+            HlGetsSpOffset(r8) => {
+                self.registers.hl = Addr::indirectly(self.registers.sp)
+                    .offset_signed(r8)
+                    .into_register()
+            }
         };
         BranchAction::Take
     }
