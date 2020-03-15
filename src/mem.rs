@@ -527,12 +527,15 @@ impl Memory {
                 0
             }
             // panic!("rest of I/O ports"),
-            0xfea0..=0xfeff => 0, // unusable memory
+            0xfea0..=0xfeff => 0xff, // unusable memory
             0xfe00..=0xfe9f => {
                 let addr_ = addr - 0xfe00;
                 self.sprite_oam[(addr_ / 4) as usize].pack()[(addr_ % 4) as usize]
             }
-            0xe000..=0xfdff => 0, // panic!("echo ram"),
+            0xe000..=0xfdff => {
+                // echo ram
+                self.main[(addr - 0xe000) as usize]
+            }
             // 0xd000 ... 0xdfff => panic!("(cgb) ram banks 1-7"),
             // 0xc000 ... 0xcfff => panic!("ram bank 0"),
             0xc000..=0xdfff => self.main[(addr - 0xc000) as usize],
