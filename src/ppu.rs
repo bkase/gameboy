@@ -101,6 +101,10 @@ impl Lcdc {
     fn create() -> Lcdc {
         Lcdc::unpack(&[0x00]).expect("Fits within a u8")
     }
+
+    pub fn display(&self) -> bool {
+        self.lcd_control_operation
+    }
 }
 
 impl ReadViewU8 for Lcdc {

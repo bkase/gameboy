@@ -385,7 +385,7 @@ impl fmt::Display for Timer {
 
 #[derive(Debug)]
 pub struct Memory {
-    booting: bool,
+    pub booting: bool,
     zero: Vec<u8>,
     pub sprite_oam: Vec<OamEntry>,
     main: Vec<u8>,

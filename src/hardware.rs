@@ -3,6 +3,7 @@ use mem::{Addr, TriggeredTimer, DR_MARIO, TEST_01, TETRIS, TIC_TAC_TOE};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
+use std::fmt;
 use web_utils::log;
 use web_utils::*;
 
@@ -15,32 +16,106 @@ pub struct Hardware {
     // dirty bit, aka we need to redraw things with this is true
     pub dirty: bool,
     pub breakpoints: HashSet<Addr>,
-    // between 0 and 4194304
-    pub clocks_elapsed_mod_seconds: u32,
+    pub clocks_elapsed: u64,
+    clocks_zero: u64,
     // for vblank measurement
     pub vblanks: usize,
     pub start_time: f64,
+}
+
+struct SpacedBytes(Vec<u8>);
+impl fmt::Display for SpacedBytes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.iter().map(|b| write!(f, "{:02x} ", b)).collect()
+    }
 }
 
 impl Hardware {
     pub fn create() -> Hardware {
         let mut _set = HashSet::new();
         Hardware {
-            cpu: Cpu::create(Some(TEST_01)),
+            cpu: Cpu::create(Some(TETRIS)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
             dirty: false,
             breakpoints: _set,
-            clocks_elapsed_mod_seconds: 0,
+            clocks_elapsed: 0,
+            clocks_zero: 1,
             vblanks: 0,
             start_time: performance.now(),
         }
     }
 
+    fn trace_state(&mut self) {
+        if self.clocks_zero == 1 {
+            self.clocks_zero = self.clocks_elapsed;
+        }
+        if (self.clocks_elapsed - self.clocks_zero) > 4000 {
+            return;
+        }
+
+        let f = |b, s| if b { s } else { "-" };
+        let s1 = {
+            let regs = &self.cpu.registers;
+            format!(
+                "A:{:02x} F:{:}{:}{:}{:} BC:{:04x} DE:{:04x} HL:{:04x} SP:{:04x} PC:{:04x}",
+                regs.a.0,
+                f(regs.flags.z, "Z"),
+                f(regs.flags.n, "N"),
+                f(regs.flags.h, "H"),
+                f(regs.flags.c, "C"),
+                regs.bc.0,
+                regs.de.0,
+                regs.hl.0,
+                regs.sp.0,
+                (self.cpu.ip.0).into_register().0
+            )
+        };
+        let s2 = format!(" (cy: {:})", (self.clocks_elapsed - self.clocks_zero) * 4);
+        let s3 = format!(
+            " ppu:{:}{:}",
+            if self.cpu.memory.ppu.lcdc.display() {
+                "+"
+            } else {
+                "-"
+            },
+            self.cpu.memory.ppu.lcdc_stat_controller_mode()
+        );
+        let s4 = format!(" |[00]0x{:04x}: {:}", (self.cpu.ip.0).into_register().0, {
+            let (i, bs) = self.cpu.ip.peek_(&mut self.cpu.memory);
+            let (b1, b2, b3) = {
+                let b1 = format!("{:02x}", bs[0]);
+                let b2 = {
+                    if bs.len() > 1 {
+                        format!("{:02x}", bs[1])
+                    } else {
+                        format!("  ")
+                    }
+                };
+                let b3 = {
+                    if bs.len() > 2 {
+                        format!("{:02x}", bs[2])
+                    } else {
+                        format!("  ")
+                    }
+                };
+                (b1, b2, b3)
+            };
+            format!("{:} {:} {:}  {:<15}", b1, b2, b3, i)
+        });
+
+        log(&format!("{:}{:}{:}{:}", s1, s2, s3, s4));
+        // A:01 F:Z-HC BC:0013 DE:00d8 HL:014d SP:fffe PC:0100 (cy: 0) ppu:+0 |[00]0x0100: 00        nop
+    }
+
     // step the hardware forwards once
     // useful for step-debugging
     fn step_(&mut self) -> u32 {
+        if !self.cpu.memory.booting {
+            self.trace_state();
+        }
+
         let elapsed_duration = self.cpu.execute();
         let TriggeredVblank(triggered_vblank) =
             self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
@@ -49,12 +124,11 @@ impl Hardware {
         self.sound.advance(&mut self.cpu.memory, elapsed_duration);
 
         // update timers
-        self.clocks_elapsed_mod_seconds =
-            (self.clocks_elapsed_mod_seconds + elapsed_duration) % 4194304;
+        self.clocks_elapsed += u64::from(elapsed_duration);
         let TriggeredTimer(triggered_timer) = self
             .cpu
             .memory
-            .advance_timers(self.clocks_elapsed_mod_seconds);
+            .advance_timers((self.clocks_elapsed % 4194304) as u32);
 
         // attempt interrupts
         if triggered_vblank {

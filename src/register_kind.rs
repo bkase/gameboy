@@ -12,7 +12,15 @@ pub enum RegisterKind8 {
 }
 impl fmt::Display for RegisterKind8 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            RegisterKind8::A => write!(f, "a"),
+            RegisterKind8::B => write!(f, "b"),
+            RegisterKind8::C => write!(f, "c"),
+            RegisterKind8::D => write!(f, "d"),
+            RegisterKind8::E => write!(f, "e"),
+            RegisterKind8::H => write!(f, "h"),
+            RegisterKind8::L => write!(f, "l"),
+        }
     }
 }
 
@@ -27,10 +35,10 @@ pub enum RegisterKind16 {
 impl fmt::Display for RegisterKind16 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RegisterKind16::Bc => write!(f, "BC"),
-            RegisterKind16::De => write!(f, "DE"),
-            RegisterKind16::Hl => write!(f, "HL"),
-            RegisterKind16::Sp => write!(f, "SP"),
+            RegisterKind16::Bc => write!(f, "bc"),
+            RegisterKind16::De => write!(f, "de"),
+            RegisterKind16::Hl => write!(f, "hl"),
+            RegisterKind16::Sp => write!(f, "sp"),
         }
     }
 }

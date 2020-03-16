@@ -45,8 +45,8 @@ pub enum OffsetBy {
 impl fmt::Display for OffsetBy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OffsetBy::C => write!(f, "C"),
-            OffsetBy::N(x) => write!(f, "{:x}", x),
+            OffsetBy::C => write!(f, "c"),
+            OffsetBy::N(x) => write!(f, "{:02x}", x),
         }
     }
 }
@@ -68,45 +68,49 @@ use self::Ld::*;
 impl fmt::Display for Ld {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Word(r1, r2) => write!(f, "(LD) {:} <- {:}", r1, r2),
-            AOpInd(r, PutGet::Get) => write!(f, "(LD) {:} <- [{:}]", RegisterKind8::A, r),
-            AOpInd(r, PutGet::Put) => write!(f, "(LD) [{:}] <- {:}", r, RegisterKind8::A),
-            AOpNnInd(addr, PutGet::Get) => write!(f, "(LD) {:} <- [{:}]", RegisterKind8::A, addr),
-            AOpNnInd(addr, PutGet::Put) => write!(f, "(LD) [{:}] <- {:}", addr, RegisterKind8::A),
-            NnIndGetsSp(addr) => write!(f, "(LD) [{:}] <- {:}", addr, RegisterKind16::Sp),
-            AOpIOOffset(offset_by, PutGet::Get) => {
-                write!(f, "(LD) {:} <- [$ff00+{:}]", RegisterKind8::A, offset_by)
-            }
-            AOpIOOffset(offset_by, PutGet::Put) => {
-                write!(f, "(LD) [$ff00+{:}] <- {:}", offset_by, RegisterKind8::A)
+            Word(r1, r2) => write!(f, "ld {:},{:}", r1, r2),
+            AOpInd(r, PutGet::Get) => write!(f, "ld {:},[{:}]", RegisterKind8::A, r),
+            AOpInd(r, PutGet::Put) => write!(f, "ld [{:}],{:}", r, RegisterKind8::A),
+            AOpNnInd(addr, PutGet::Get) => write!(f, "ld {:},[{:}]", RegisterKind8::A, addr),
+            AOpNnInd(addr, PutGet::Put) => write!(f, "ld [{:}],{:}", addr, RegisterKind8::A),
+            NnIndGetsSp(addr) => write!(f, "ld [{:}],{:}", addr, RegisterKind16::Sp),
+            AOpIOOffset(offset_by, putget) => {
+                let arg = match offset_by {
+                    OffsetBy::C => format!("[$ff00+c]"),
+                    OffsetBy::N(x) => format!("[$ff{:02x}]", x),
+                };
+                match putget {
+                    PutGet::Get => write!(f, "ldh {:},{:}", RegisterKind8::A, arg),
+                    PutGet::Put => write!(f, "ldh {:},{:}", arg, RegisterKind8::A),
+                }
             }
             AOpHlInd(dir, putget) => {
                 let incdec = match dir {
-                    Direction::Pos => "++",
-                    Direction::Neg => "--",
+                    Direction::Pos => "+",
+                    Direction::Neg => "-",
                 };
                 match putget {
                     PutGet::Put => write!(
                         f,
-                        "(LD) [{:}]{:} <- {:}",
-                        RegsHl::HlInd,
+                        "ld [{:}{:}],{:}",
+                        RegisterKind16::Hl,
                         incdec,
                         RegisterKind8::A
                     ),
                     PutGet::Get => write!(
                         f,
-                        "(LD) {:} <- [{:}]{:}",
+                        "ld {:},[{:}{:}]",
                         RegisterKind8::A,
-                        RegsHl::HlInd,
+                        RegisterKind16::Hl,
                         incdec
                     ),
                 }
             }
-            DwordGetsAddr(r, addr) => write!(f, "(LD) {:} <- {:}", r, addr),
-            SpGetsHl => write!(f, "(LD) {:} <- {:}", RegisterKind16::Sp, RegisterKind16::Hl),
+            DwordGetsAddr(r, addr) => write!(f, "ld {:},{:}", r, addr),
+            SpGetsHl => write!(f, "ld {:},{:}", RegisterKind16::Sp, RegisterKind16::Hl),
             HlGetsSpOffset(x) => write!(
                 f,
-                "(LD {:} <- {:} + {:}",
+                "ld {:},{:}+{:02x}",
                 RegisterKind16::Hl,
                 RegisterKind16::Sp,
                 x
@@ -145,7 +149,7 @@ impl HasDuration for Ld {
             Word(RegsHl::HlInd, RegsHlN::Reg(_)) => (2, None),
             Word(RegsHl::HlInd, RegsHlN::N(_)) => (3, None),
             Word(RegsHl::HlInd, RegsHlN::HlInd) => {
-                panic!("ld (HL), (HL) isn't a valid instruction")
+                panic!("ld [hl], [hl] isn't a valid instruction")
             }
             AOpInd(_, _) => (2, None),
             AOpNnInd(_, _) => (4, None),
@@ -170,7 +174,7 @@ pub enum RegsHlN {
 impl fmt::Display for RegsHlN {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RegsHlN::HlInd => write!(f, "[HL]"),
+            RegsHlN::HlInd => write!(f, "[hl]"),
             RegsHlN::N(n) => write!(f, "{:}", R8(*n)),
             RegsHlN::Reg(rk) => write!(f, "{:}", rk),
         }
@@ -192,7 +196,7 @@ impl RegsHl {
 impl fmt::Display for RegsHl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RegsHl::HlInd => write!(f, "[HL]"),
+            RegsHl::HlInd => write!(f, "[hl]"),
             RegsHl::Reg(rk) => write!(f, "{:}", rk),
         }
     }
@@ -226,26 +230,26 @@ impl fmt::Display for Arith {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             // 8 bit
-            Add(x) => write!(f, "(ADD) A <- A + {:}", x),
-            Adc(x) => write!(f, "(ADC) A <- A + {:} + c", x),
-            Sub(x) => write!(f, "(SUB) A <- A - {:}", x),
-            Sbc(x) => write!(f, "(SBC) A <- A - {:} + c", x),
-            And(x) => write!(f, "(AND) A <- A & {:}", x),
-            Or(x) => write!(f, "(OR) A <- A | {:}", x),
-            Xor(x) => write!(f, "(OR) A <- A ^ {:}", x),
-            Cp(x) => write!(f, "(CP) A ==? {:}", x),
-            Inc(x) => write!(f, "(INC) {:}++", x),
-            Dec(x) => write!(f, "(DEC) {:}--", x),
-            Swap(x) => write!(f, "(SWAP) nibs {:}", x),
-            Sla(x) => write!(f, "(SLA) carry << {:}", x),
-            Srl(x) => write!(f, "(SRL) carry >> {:}", x),
-            Cpl => write!(f, "(CPL) ~A"),
+            Add(x) => write!(f, "add a,{:}", x),
+            Adc(x) => write!(f, "adc a,{:}", x),
+            Sub(x) => write!(f, "sub a,{:}", x),
+            Sbc(x) => write!(f, "sbc a,{:}", x),
+            And(x) => write!(f, "and a,{:}", x),
+            Or(x) => write!(f, "or a,{:}", x),
+            Xor(x) => write!(f, "or a,{:}", x),
+            Cp(x) => write!(f, "cp a,{:}", x),
+            Inc(x) => write!(f, "inc {:}", x),
+            Dec(x) => write!(f, "dec {:}", x),
+            Swap(x) => write!(f, "swap {:}", x),
+            Sla(x) => write!(f, "sla {:}", x),
+            Srl(x) => write!(f, "srl {:}", x),
+            Cpl => write!(f, "cpl"),
 
             // 16 bit
-            AddHl(rk) => write!(f, "(ADD) HL <- HL + {:}", rk),
-            AddSp(x) => write!(f, "(ADD) SP <- SP + {:}", x),
-            Inc16(rk) => write!(f, "(INC) {:}++", rk),
-            Dec16(rk) => write!(f, "(DEC) {:}--", rk),
+            AddHl(rk) => write!(f, "add hl,{:}", rk),
+            AddSp(x) => write!(f, "add sp,{:}", x),
+            Inc16(rk) => write!(f, "inc {:}", rk),
+            Dec16(rk) => write!(f, "dec {:}", rk),
         }
     }
 }
@@ -298,12 +302,12 @@ use self::Rotate::*;
 impl fmt::Display for Rotate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Rla => write!(f, "(RLA) A <- A << 1"),
-            Rra => write!(f, "(RRA) A <- A >> 1"),
-            Rlca => write!(f, "(RLCA) A <- A << 1"),
-            Rl(r) => write!(f, "(RL n) {:} <- {:} << 1", r, r),
-            Rlc(r) => write!(f, "(RLC n) {:} <- {:} << 1", r, r),
-            Rr(r) => write!(f, "(RR n) {:} <- {:} >> 1", r, r),
+            Rla => write!(f, "rla"),
+            Rra => write!(f, "rra"),
+            Rlca => write!(f, "rlca"),
+            Rl(r) => write!(f, "rl {:}", r),
+            Rlc(r) => write!(f, "rlc {:}", r),
+            Rr(r) => write!(f, "rr {:}", r),
         }
     }
 }
@@ -340,14 +344,14 @@ use self::Jump::*;
 impl fmt::Display for Jump {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Jp(addr) => write!(f, "JP {:}", addr),
-            JpCc(c, addr) => write!(f, "JP {:?} {:}", c, addr),
-            JpHlInd => write!(f, "JP (HL)"),
-            Jr(n) => write!(f, "JR {:}", n),
-            JrCc(c, i) => write!(f, "JR {:?} {:}", c, i),
-            Call(addr) => write!(f, "CALL {:}", addr),
-            CallCc(c, addr) => write!(f, "CALL {:?} {:}", c, addr),
-            Rst(n) => write!(f, "RST $0000+${:x}", n),
+            Jp(addr) => write!(f, "jp {:}", addr),
+            JpCc(c, addr) => write!(f, "jp {:},{:}", c, addr),
+            JpHlInd => write!(f, "jp hl"),
+            Jr(n) => write!(f, "jr {:02x}", n),
+            JrCc(c, i) => write!(f, "jr {:},{:02x}", c, i),
+            Call(addr) => write!(f, "call {:}", addr),
+            CallCc(c, addr) => write!(f, "call {:},{:}", c, addr),
+            Rst(n) => write!(f, "RST ${:02x}", n),
         }
     }
 }
@@ -378,9 +382,9 @@ use self::Bits::*;
 impl fmt::Display for Bits {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Bit(b, r) => write!(f, "BIT {:} ^ {:}", b, r),
-            Res(b, r) => write!(f, "RES {:} ^ {:}", b, r),
-            Set(b, r) => write!(f, "SET {:} ^ {:}", b, r),
+            Bit(b, r) => write!(f, "bit {:},{:}", b, r),
+            Res(b, r) => write!(f, "res {:},{:}", b, r),
+            Set(b, r) => write!(f, "set {:},{:}", b, r),
         }
     }
 }
@@ -402,6 +406,17 @@ pub enum RetCondition {
     Z,
     Nc,
     C,
+}
+
+impl fmt::Display for RetCondition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RetCondition::Nz => write!(f, "nz"),
+            RetCondition::Z => write!(f, "z"),
+            RetCondition::Nc => write!(f, "nc"),
+            RetCondition::C => write!(f, "c"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -438,21 +453,21 @@ impl fmt::Display for Instr {
             Rotate(r) => write!(f, "{:}", r),
             Jump(j) => write!(f, "{:}", j),
             Bits(b) => write!(f, "{:}", b),
-            CpHlInd => write!(f, "(CP) A ==? [HL]"),
-            Pop(r16) => write!(f, "POP {:}", r16),
-            PopAf => write!(f, "POP A+Flags"),
-            Push(r16) => write!(f, "PUSH {:}", r16),
-            PushAf => write!(f, "PUSH A+Flags"),
-            Ret => write!(f, "RET"),
-            RetCc(cond) => write!(f, "RET {:?}", cond),
-            Reti => write!(f, "RETI"),
-            Nop => write!(f, "NOP"),
-            Ei => write!(f, "EI"),
-            Di => write!(f, "DI"),
-            Scf => write!(f, "SCF"),
-            Ccf => write!(f, "CCF"),
-            Daa => write!(f, "DAA"),
-            Halt => write!(f, "HALT"),
+            CpHlInd => write!(f, "cp a,[hl]"),
+            Pop(r16) => write!(f, "pop {:}", r16),
+            PopAf => write!(f, "pop af"),
+            Push(r16) => write!(f, "push {:}", r16),
+            PushAf => write!(f, "push af"),
+            Ret => write!(f, "ret"),
+            RetCc(cond) => write!(f, "ret {:}", cond),
+            Reti => write!(f, "reti"),
+            Nop => write!(f, "nop"),
+            Ei => write!(f, "ei"),
+            Di => write!(f, "di"),
+            Scf => write!(f, "scf"),
+            Ccf => write!(f, "ccf"),
+            Daa => write!(f, "daa"),
+            Halt => write!(f, "halt"),
             InvalidOp(n) => write!(f, "bad {:x}", n),
         }
     }
@@ -1022,9 +1037,14 @@ impl<'a> LiveInstrPointer<'a> {
         i
     }
 
-    fn peek(&'a mut self) -> Instr {
+    fn peek_(&'a mut self) -> (Instr, Vec<u8>) {
         let (i, n) = { self.read_() };
         self.ptr.rewind(n.len() as u16);
+        (i, n)
+    }
+
+    fn peek(&'a mut self) -> Instr {
+        let (i, _) = self.peek_();
         i
     }
 }
@@ -1040,6 +1060,10 @@ impl InstrPointer {
 
     pub fn peek(&mut self, memory: &Memory) -> Instr {
         LiveInstrPointer::create(self, memory).peek()
+    }
+
+    pub fn peek_(&mut self, memory: &Memory) -> (Instr, Vec<u8>) {
+        LiveInstrPointer::create(self, memory).peek_()
     }
 }
 
