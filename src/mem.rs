@@ -45,7 +45,7 @@ pub type Cartridge = &'static [u8; 0x8000];
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 
 pub const TEST_01: Cartridge =
-    include_bytes!("../gb-test-roms/cpu_instrs/individual/02-interrupts.gb");
+    include_bytes!("../gb-test-roms/cpu_instrs/individual/01-special.gb");
 // include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
@@ -531,10 +531,7 @@ impl Memory {
             0xff47 => self.ppu.bgp.read(),
             0xff48 => self.ppu.obp0.read(),
             0xff49 => self.ppu.obp1.read(),
-            0xff00..=0xff4b => {
-                println!("Passthrough other interrupts...");
-                0
-            }
+            0xff00..=0xff4b => 0,
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => 0xff, // unusable memory
             0xfe00..=0xfe9f => {
@@ -659,7 +656,7 @@ impl Memory {
                     addr, n
                 ))
             }
-            0xff03..=0xff4b => println!("Passthrough"),
+            0xff03..=0xff4b => (),
             // panic!("rest of I/O ports"),
             0xfea0..=0xfeff => {
                 // TODO: Why does tetris write to this "unusable" memory
@@ -683,7 +680,7 @@ impl Memory {
             // 0x8000 ... 0x97ff => panic!("character ram"),
             0x8000..=0x9fff => self.video[(addr - 0x8000) as usize] = n,
             // begin video ram
-            0x4000..=0x7fff => println!("switchable rom banks xx"),
+            0x4000..=0x7fff => (),
             0x0150..=0x3fff => {
                 println!("(header) ROM write; do we need to implement bank switching here?")
             }

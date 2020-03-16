@@ -89,6 +89,7 @@ fn instr(new_ip: &mut InstrPointer) {
 #[topo::nested]
 #[illicit::from_env(hardware: &Key<Rc<RefCell<Hardware>>>)]
 fn instrs() {
+    let performance = Performance::create();
     let vblanks = {
         let ip_addr = hardware.borrow().cpu.ip.0;
         let timer = &hardware.borrow().cpu.memory.timer;
@@ -96,7 +97,7 @@ fn instrs() {
 
         let vblanks = hardware.borrow().vblanks;
         let start_time = hardware.borrow().start_time;
-        let vblankps = vblanks as f64 / (performance.now() - start_time);
+        let vblankps = vblanks as f64 / ((&performance).now() - start_time);
 
         mox! {
             <div>
@@ -121,7 +122,7 @@ fn instrs() {
             hardware.borrow_mut().vblanks = 0;
         }
         {
-            hardware.borrow_mut().start_time = performance.now();
+            hardware.borrow_mut().start_time = (&performance).now();
         }
     }
 }

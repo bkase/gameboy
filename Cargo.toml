@@ -6,6 +6,10 @@ authors = ["Brandon Kase <bkase@o1labs.org>"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "headless"
+path = "src/main.rs"
+
 [features]
 default = ["console_error_panic_hook"]
 

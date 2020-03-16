@@ -30,36 +30,23 @@ impl fmt::Display for SpacedBytes {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 impl Hardware {
-    pub fn create() -> Hardware {
-        let mut _set = HashSet::new();
-        Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
-            ppu: Ppu::create(),
-            sound: Sound::create(),
-            paused: true,
-            dirty: false,
-            breakpoints: _set,
-            clocks_elapsed: 0,
-            clocks_zero: 1,
-            vblanks: 0,
-            start_time: performance.now(),
-        }
-    }
+    fn trace_state(&mut self) {}
+}
 
+#[cfg(not(target_arch = "wasm32"))]
+impl Hardware {
     fn trace_state(&mut self) {
         if self.clocks_zero == 1 {
             self.clocks_zero = self.clocks_elapsed;
-        }
-        if (self.clocks_elapsed - self.clocks_zero) > 4000 {
-            return;
         }
 
         let f = |b, s| if b { s } else { "-" };
         let s1 = {
             let regs = &self.cpu.registers;
             format!(
-                "A:{:02x} F:{:}{:}{:}{:} BC:{:04x} DE:{:04x} HL:{:04x} SP:{:04x} PC:{:04x}",
+                "A:{:02X} F:{:}{:}{:}{:} BC:{:04X} DE:{:04x} HL:{:04x} SP:{:04x} PC:{:04x}",
                 regs.a.0,
                 f(regs.flags.z, "Z"),
                 f(regs.flags.n, "N"),
@@ -74,13 +61,12 @@ impl Hardware {
         };
         let s2 = format!(" (cy: {:})", (self.clocks_elapsed - self.clocks_zero) * 4);
         let s3 = format!(
-            " ppu:{:}{:}",
+            " ppu:{:}",
             if self.cpu.memory.ppu.lcdc.display() {
                 "+"
             } else {
                 "-"
-            },
-            self.cpu.memory.ppu.lcdc_stat_controller_mode()
+            }
         );
         let s4 = format!(" |[00]0x{:04x}: {:}", (self.cpu.ip.0).into_register().0, {
             let (i, bs) = self.cpu.ip.peek_(&mut self.cpu.memory);
@@ -102,11 +88,29 @@ impl Hardware {
                 };
                 (b1, b2, b3)
             };
-            format!("{:} {:} {:}  {:<15}", b1, b2, b3, i)
+            format!("{:} {:} {:} {:<15}", b1, b2, b3, i)
         });
 
         log(&format!("{:}{:}{:}{:}", s1, s2, s3, s4));
         // A:01 F:Z-HC BC:0013 DE:00d8 HL:014d SP:fffe PC:0100 (cy: 0) ppu:+0 |[00]0x0100: 00        nop
+    }
+}
+
+impl Hardware {
+    pub fn create(performance: &Performance) -> Hardware {
+        let mut _set = HashSet::new();
+        Hardware {
+            cpu: Cpu::create(Some(TEST_01)),
+            ppu: Ppu::create(),
+            sound: Sound::create(),
+            paused: true,
+            dirty: false,
+            breakpoints: _set,
+            clocks_elapsed: 0,
+            clocks_zero: 1,
+            vblanks: 0,
+            start_time: performance.now(),
+        }
     }
 
     // step the hardware forwards once

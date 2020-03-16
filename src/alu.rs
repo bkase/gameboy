@@ -155,7 +155,7 @@ pub fn inc(flags: &mut Flags, x: u8) -> u8 {
     let r = x.wrapping_add(1);
     flags.z = r == 0;
     flags.n = false;
-    flags.h = x & 0b111 == 0b111;
+    flags.h = x & 0b1111 == 0b1111;
     // c not affected
     r
 }

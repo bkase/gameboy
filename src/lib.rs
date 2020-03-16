@@ -139,8 +139,9 @@ fn blit_bytes(
 pub fn run() -> Result<(), JsValue> {
     utils::set_panic_hook();
 
+    let performance = Performance::create();
     // For now hardware has it's own memory
-    let hardware = Rc::new(RefCell::new(Hardware::create()));
+    let hardware = Rc::new(RefCell::new(Hardware::create(&performance)));
 
     // Note: Safari refuses to play any audio unless it's resumed from a
     //       callstack originating at a button press, so we also hook it into
