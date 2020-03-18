@@ -1,4 +1,4 @@
-use instr::{InstrPointer, Tape};
+use instr::{InstrPointer, ReadOnlyTape};
 use register::{Registers, R16, R8};
 use register_kind;
 use std::fmt;
@@ -12,36 +12,17 @@ pub struct Record {
     ppu_display: bool,
     bank: Option<u8>,
     instr_bytes: Vec<u8>,
-
-    // for Tape implementation only
-    offset: i8,
 }
 
-impl Tape for Record {
+impl ReadOnlyTape for Record {
     fn peek8_offset(&self, by: i8) -> u8 {
-        self.instr_bytes[(self.offset + by) as usize]
-    }
-
-    fn read8(&mut self) -> u8 {
-        let r = self.peek8();
-        self.offset += 1;
-        r
+        self.instr_bytes[by as usize]
     }
 
     fn peek16_offset(&self, by: i8) -> u16 {
-        let lo = self.instr_bytes[(self.offset + by) as usize];
-        let hi = self.instr_bytes[(self.offset + 1 + by) as usize];
+        let lo = self.instr_bytes[by as usize];
+        let hi = self.instr_bytes[(1 + by) as usize];
         (u16::from(hi) << 8) | u16::from(lo)
-    }
-
-    fn read16(&mut self) -> u16 {
-        let r = self.peek16();
-        self.offset += 2;
-        r
-    }
-
-    fn advance(&mut self, by: i8) {
-        self.offset += by;
     }
 }
 

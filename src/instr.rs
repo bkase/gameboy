@@ -533,12 +533,9 @@ impl InstrPointer {
     }
 }
 
-// Memory-like tape
-pub trait Tape {
+pub trait ReadOnlyTape {
     fn peek8_offset(&self, by: i8) -> u8;
     fn peek16_offset(&self, by: i8) -> u16;
-    fn read8(&mut self) -> u8;
-    fn read16(&mut self) -> u16;
 
     fn peek8(&self) -> u8 {
         self.peek8_offset(0)
@@ -548,20 +545,7 @@ pub trait Tape {
         self.peek16_offset(0)
     }
 
-    fn advance(&mut self, by: i8);
-
-    fn read(&mut self) -> Instr {
-        let (i, _) = self.read_();
-        i
-    }
-
-    fn read_(&mut self) -> (Instr, Vec<u8>) {
-        let (i, n) = { self.peek_() };
-        self.advance(n.len() as i8);
-        (i, n)
-    }
-
-    fn peek(&mut self) -> Instr {
+    fn peek(&self) -> Instr {
         let (i, _) = self.peek_();
         i
     }
@@ -1027,6 +1011,25 @@ pub trait Tape {
     }
 }
 
+// Memory-like tape
+pub trait Tape: ReadOnlyTape {
+    fn read8(&mut self) -> u8;
+    fn read16(&mut self) -> u16;
+
+    fn advance(&mut self, by: i8);
+
+    fn read(&mut self) -> Instr {
+        let (i, _) = self.read_();
+        i
+    }
+
+    fn read_(&mut self) -> (Instr, Vec<u8>) {
+        let (i, n) = { self.peek_() };
+        self.advance(n.len() as i8);
+        (i, n)
+    }
+}
+
 struct LiveInstrPointer<'a> {
     ptr: &'a mut InstrPointer,
     memory: &'a Memory,
@@ -1037,19 +1040,21 @@ impl<'a> LiveInstrPointer<'a> {
     }
 }
 
-impl<'a> Tape for LiveInstrPointer<'a> {
+impl<'a> ReadOnlyTape for LiveInstrPointer<'a> {
     fn peek8_offset(&self, by: i8) -> u8 {
         self.memory.ld8(self.ptr.0.offset_signed(by))
     }
 
+    fn peek16_offset(&self, by: i8) -> u16 {
+        self.memory.ld16(self.ptr.0.offset_signed(by))
+    }
+}
+
+impl<'a> Tape for LiveInstrPointer<'a> {
     fn read8(&mut self) -> u8 {
         let v = self.peek8();
         self.ptr.inc();
         v
-    }
-
-    fn peek16_offset(&self, by: i8) -> u16 {
-        self.memory.ld16(self.ptr.0.offset_signed(by))
     }
 
     fn read16(&mut self) -> u16 {
