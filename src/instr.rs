@@ -533,47 +533,41 @@ impl InstrPointer {
     }
 }
 
-struct LiveInstrPointer<'a> {
-    ptr: &'a mut InstrPointer,
-    memory: &'a Memory,
-}
-impl<'a> LiveInstrPointer<'a> {
-    fn create<'b>(ptr: &'b mut InstrPointer, memory: &'b Memory) -> LiveInstrPointer<'b> {
-        LiveInstrPointer { ptr, memory }
-    }
+// Memory-like tape
+pub trait Tape {
+    fn peek8_offset(&self, by: i8) -> u8;
+    fn peek16_offset(&self, by: i8) -> u16;
+    fn read8(&mut self) -> u8;
+    fn read16(&mut self) -> u16;
 
     fn peek8(&self) -> u8 {
-        self.memory.ld8(self.ptr.0)
-    }
-
-    fn read8(&mut self) -> u8 {
-        let v = self.peek8();
-        self.ptr.inc();
-        v
+        self.peek8_offset(0)
     }
 
     fn peek16(&self) -> u16 {
-        self.memory.ld16(self.ptr.0)
+        self.peek16_offset(0)
     }
 
-    fn read16(&mut self) -> u16 {
-        let v = self.peek16();
-        self.ptr.inc_by(2);
-        v
+    fn advance(&mut self, by: i8);
+
+    fn read(&mut self) -> Instr {
+        let (i, _) = self.read_();
+        i
     }
-}
 
-pub fn hi_lo_decompose(x: u16) -> (u8, u8) {
-    (((x & 0xff00) >> 8) as u8, (x & 0xff) as u8)
-}
-
-// See the following chart for inspiration on organization
-// https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
-use register_kind::RegisterKind16::*;
-use register_kind::RegisterKind8::*;
-impl<'a> LiveInstrPointer<'a> {
-    // returns instruction and bytes read by the PC
     fn read_(&mut self) -> (Instr, Vec<u8>) {
+        let (i, n) = { self.peek_() };
+        self.advance(n.len() as i8);
+        (i, n)
+    }
+
+    fn peek(&mut self) -> Instr {
+        let (i, _) = self.peek_();
+        i
+    }
+
+    // returns instruction and bytes read by the PC
+    fn peek_(&self) -> (Instr, Vec<u8>) {
         fn word_regshl(x: u8) -> RegsHl {
             match x {
                 0 => RegsHl::Reg(B),
@@ -588,7 +582,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
         }
 
-        let pos0 = self.read8();
+        let pos0 = self.peek8();
         //use web_utils::log;
         //log(&format!("Decode ${:x}", pos0));
         match pos0 {
@@ -622,7 +616,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0x06 | 0x16 | 0x26 | 0x36 | 0x0e | 0x1e | 0x2e | 0x3e => {
                 let reg = word_regshl(pos0 / 8);
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Ld(Word(reg, RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0x40..0x80 => {
@@ -643,7 +637,7 @@ impl<'a> LiveInstrPointer<'a> {
                 };
                 let (offset_by, instrs) = match pos0 % 0x10 {
                     0 => {
-                        let pos1 = self.read8();
+                        let pos1 = self.peek8_offset(1);
                         (OffsetBy::N(pos1), vec![pos0, pos1])
                     }
                     2 => (OffsetBy::C, vec![pos0]),
@@ -657,7 +651,7 @@ impl<'a> LiveInstrPointer<'a> {
                     0xf => PutGet::Get,
                     x => panic!("Unexpected putget value {:}", x),
                 };
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Ld(AOpNnInd(Addr::directly(addr), put_get)),
@@ -674,7 +668,7 @@ impl<'a> LiveInstrPointer<'a> {
                     x => panic!("Unexpected reg value {:}", x),
                 };
 
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Ld(DwordGetsAddr(reg, Addr::directly(addr))),
@@ -682,12 +676,12 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0x08 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Ld(NnIndGetsSp(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0xf8 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Ld(HlGetsSpOffset(pos1 as i8)), vec![pos0, pos1])
             }
             0xf9 => (Ld(SpGetsHl), vec![pos0]),
@@ -707,7 +701,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x15 => (Arith(Dec(RegsHl::Reg(D))), vec![pos0]),
             0x17 => (Rotate(Rla), vec![pos0]),
             0x18 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Jump(Jr(pos1 as i8)), vec![pos0, pos1])
             }
             0x19 => (Arith(AddHl(De)), vec![pos0]),
@@ -716,7 +710,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x1d => (Arith(Dec(RegsHl::Reg(E))), vec![pos0]),
             0x1f => (Rotate(Rra), vec![pos0]),
             0x20 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Jump(JrCc(RetCondition::Nz, pos1 as i8)), vec![pos0, pos1])
             }
             0x23 => (Arith(Inc16(Hl)), vec![pos0]),
@@ -724,7 +718,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x25 => (Arith(Dec(RegsHl::Reg(H))), vec![pos0]),
             0x27 => (Daa, vec![pos0]),
             0x28 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Jump(JrCc(RetCondition::Z, pos1 as i8)), vec![pos0, pos1])
             }
             0x29 => (Arith(AddHl(Hl)), vec![pos0]),
@@ -733,7 +727,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x2d => (Arith(Dec(RegsHl::Reg(L))), vec![pos0]),
             0x2f => (Arith(Cpl), vec![pos0]),
             0x30 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Jump(JrCc(RetCondition::Nc, pos1 as i8)), vec![pos0, pos1])
             }
             0x33 => (Arith(Inc16(Sp)), vec![pos0]),
@@ -741,7 +735,7 @@ impl<'a> LiveInstrPointer<'a> {
             0x35 => (Arith(Dec(RegsHl::HlInd)), vec![pos0]),
             0x37 => (Scf, vec![pos0]),
             0x38 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Jump(JrCc(RetCondition::C, pos1 as i8)), vec![pos0, pos1])
             }
             0x39 => (Arith(AddHl(Sp)), vec![pos0]),
@@ -816,7 +810,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xc0 => (RetCc(RetCondition::Nz), vec![pos0]),
             0xc1 => (Pop(RegisterKind16::Bc), vec![pos0]),
             0xc2 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(JpCc(RetCondition::Nz, Addr::directly(addr))),
@@ -824,12 +818,12 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0xc3 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Jump(Jp(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0xc4 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(CallCc(RetCondition::Nz, Addr::directly(addr))),
@@ -838,14 +832,14 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xc5 => (Push(RegisterKind16::Bc), vec![pos0]),
             0xc6 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Add(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xc7 => (Jump(Rst(0x00)), vec![pos0]),
             0xc8 => (RetCc(RetCondition::Z), vec![pos0]),
             0xc9 => (Instr::Ret, vec![pos0]),
             0xca => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(JpCc(RetCondition::Z, Addr::directly(addr))),
@@ -864,7 +858,7 @@ impl<'a> LiveInstrPointer<'a> {
                     0x7 => RegsHl::Reg(A),
                     x => panic!("Unexpected match value {:}", x),
                 };
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 match pos1 {
                     0x00..=0x07 => {
                         let r = reg_lookup(pos1);
@@ -925,7 +919,7 @@ impl<'a> LiveInstrPointer<'a> {
                 }
             }
             0xcc => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(CallCc(RetCondition::Z, Addr::directly(addr))),
@@ -933,19 +927,19 @@ impl<'a> LiveInstrPointer<'a> {
                 )
             }
             0xcd => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (Jump(Call(Addr::directly(addr))), vec![pos0, lo, hi])
             }
             0xce => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Adc(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xcf => (Jump(Rst(0x08)), vec![pos0]),
             0xd0 => (RetCc(RetCondition::Nc), vec![pos0]),
             0xd1 => (Pop(RegisterKind16::De), vec![pos0]),
             0xd2 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(JpCc(RetCondition::Nc, Addr::directly(addr))),
@@ -954,7 +948,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xd3 => (InvalidOp(pos0), vec![pos0]),
             0xd4 => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(CallCc(RetCondition::Nc, Addr::directly(addr))),
@@ -963,7 +957,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xd5 => (Push(RegisterKind16::De), vec![pos0]),
             0xd6 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Sub(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
 
@@ -971,7 +965,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xd8 => (RetCc(RetCondition::C), vec![pos0]),
             0xd9 => (Reti, vec![pos0]),
             0xda => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(JpCc(RetCondition::C, Addr::directly(addr))),
@@ -980,7 +974,7 @@ impl<'a> LiveInstrPointer<'a> {
             }
             0xdb => (InvalidOp(pos0), vec![pos0]),
             0xdc => {
-                let addr = self.read16();
+                let addr = self.peek16_offset(1);
                 let (hi, lo) = hi_lo_decompose(addr);
                 (
                     Jump(CallCc(RetCondition::C, Addr::directly(addr))),
@@ -995,12 +989,12 @@ impl<'a> LiveInstrPointer<'a> {
             0xe4 => (InvalidOp(pos0), vec![pos0]),
             0xe5 => (Push(RegisterKind16::Hl), vec![pos0]),
             0xe6 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(And(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xe7 => (Jump(Rst(0x20)), vec![pos0]),
             0xe8 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(AddSp(pos1 as i8)), vec![pos0, pos1])
             }
             0xe9 => (Jump(JpHlInd), vec![pos0]),
@@ -1008,7 +1002,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xec => (InvalidOp(pos0), vec![pos0]),
             0xed => (InvalidOp(pos0), vec![pos0]),
             0xee => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Xor(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xef => (Jump(Rst(0x28)), vec![pos0]),
@@ -1017,7 +1011,7 @@ impl<'a> LiveInstrPointer<'a> {
             0xf4 => (InvalidOp(pos0), vec![pos0]),
             0xf5 => (PushAf, vec![pos0]),
             0xf6 => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Or(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xf7 => (Jump(Rst(0x30)), vec![pos0]),
@@ -1025,29 +1019,59 @@ impl<'a> LiveInstrPointer<'a> {
             0xfc => (InvalidOp(pos0), vec![pos0]),
             0xfd => (InvalidOp(pos0), vec![pos0]),
             0xfe => {
-                let pos1 = self.read8();
+                let pos1 = self.peek8_offset(1);
                 (Arith(Cp(RegsHlN::N(pos1))), vec![pos0, pos1])
             }
             0xff => (Jump(Rst(0x38)), vec![pos0]),
         }
     }
+}
 
-    fn read(&'a mut self) -> Instr {
-        let (i, _) = self.read_();
-        i
-    }
-
-    fn peek_(&'a mut self) -> (Instr, Vec<u8>) {
-        let (i, n) = { self.read_() };
-        self.ptr.rewind(n.len() as u16);
-        (i, n)
-    }
-
-    fn peek(&'a mut self) -> Instr {
-        let (i, _) = self.peek_();
-        i
+struct LiveInstrPointer<'a> {
+    ptr: &'a mut InstrPointer,
+    memory: &'a Memory,
+}
+impl<'a> LiveInstrPointer<'a> {
+    fn create<'b>(ptr: &'b mut InstrPointer, memory: &'b Memory) -> LiveInstrPointer<'b> {
+        LiveInstrPointer { ptr, memory }
     }
 }
+
+impl<'a> Tape for LiveInstrPointer<'a> {
+    fn peek8_offset(&self, by: i8) -> u8 {
+        self.memory.ld8(self.ptr.0.offset_signed(by))
+    }
+
+    fn read8(&mut self) -> u8 {
+        let v = self.peek8();
+        self.ptr.inc();
+        v
+    }
+
+    fn peek16_offset(&self, by: i8) -> u16 {
+        self.memory.ld16(self.ptr.0.offset_signed(by))
+    }
+
+    fn read16(&mut self) -> u16 {
+        let v = self.peek16();
+        self.ptr.inc_by(2);
+        v
+    }
+
+    fn advance(&mut self, by: i8) {
+        self.ptr.offset_by(by)
+    }
+}
+
+pub fn hi_lo_decompose(x: u16) -> (u8, u8) {
+    (((x & 0xff00) >> 8) as u8, (x & 0xff) as u8)
+}
+
+// See the following chart for inspiration on organization
+// https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+use register_kind::RegisterKind16::*;
+use register_kind::RegisterKind8::*;
+impl<'a> LiveInstrPointer<'a> {}
 
 impl InstrPointer {
     pub fn read(&mut self, memory: &Memory) -> Instr {

@@ -40,6 +40,7 @@ mod register_kind;
 mod screen;
 mod sound;
 mod tile_debug;
+mod trace;
 mod utils;
 mod web_utils;
 
