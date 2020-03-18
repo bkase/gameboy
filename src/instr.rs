@@ -495,7 +495,7 @@ impl HasDuration for Instr {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InstrPointer(pub Addr);
 impl InstrPointer {
     pub fn create() -> InstrPointer {

@@ -3,9 +3,9 @@
 use register_kind::{RegisterKind16, RegisterKind8};
 use std::fmt;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct R16(pub u16);
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct R8(pub u8);
 
 impl R16 {
@@ -85,7 +85,7 @@ mod r_tests {
 // 7 6 5 4 3 2 1 0
 // Z N H C 0 0 0 0
 //==================
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flags {
     pub z: bool,
     pub n: bool,
@@ -123,7 +123,7 @@ impl fmt::Display for Flags {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Registers {
     pub bc: R16,
     pub de: R16,

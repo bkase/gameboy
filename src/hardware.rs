@@ -4,6 +4,7 @@ use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::collections::HashSet;
 use std::fmt;
+use trace;
 use web_utils::log;
 use web_utils::*;
 
@@ -42,56 +43,17 @@ impl Hardware {
             self.clocks_zero = self.clocks_elapsed;
         }
 
-        let f = |b, s| if b { s } else { "-" };
-        let s1 = {
-            let regs = &self.cpu.registers;
-            format!(
-                "A:{:02X} F:{:}{:}{:}{:} BC:{:04X} DE:{:04x} HL:{:04x} SP:{:04x} PC:{:04x}",
-                regs.a.0,
-                f(regs.flags.z, "Z"),
-                f(regs.flags.n, "N"),
-                f(regs.flags.h, "H"),
-                f(regs.flags.c, "C"),
-                regs.bc.0,
-                regs.de.0,
-                regs.hl.0,
-                regs.sp.0,
-                (self.cpu.ip.0).into_register().0
-            )
-        };
-        let s2 = format!(" (cy: {:})", (self.clocks_elapsed - self.clocks_zero) * 4);
-        let s3 = format!(
-            " ppu:{:}",
-            if self.cpu.memory.ppu.lcdc.display() {
-                "+"
-            } else {
-                "-"
-            }
+        let (_, bs) = self.cpu.ip.peek_(&mut self.cpu.memory);
+        let record = trace::Record::create(
+            self.cpu.registers.clone(),
+            self.cpu.ip,
+            (self.clocks_elapsed - self.clocks_zero) * 4,
+            self.cpu.memory.ppu.lcdc.display(),
+            Some(0x00),
+            bs,
         );
-        let s4 = format!(" |[00]0x{:04x}: {:}", (self.cpu.ip.0).into_register().0, {
-            let (i, bs) = self.cpu.ip.peek_(&mut self.cpu.memory);
-            let (b1, b2, b3) = {
-                let b1 = format!("{:02x}", bs[0]);
-                let b2 = {
-                    if bs.len() > 1 {
-                        format!("{:02x}", bs[1])
-                    } else {
-                        format!("  ")
-                    }
-                };
-                let b3 = {
-                    if bs.len() > 2 {
-                        format!("{:02x}", bs[2])
-                    } else {
-                        format!("  ")
-                    }
-                };
-                (b1, b2, b3)
-            };
-            format!("{:} {:} {:} {:<15}", b1, b2, b3, i)
-        });
 
-        log(&format!("{:}{:}{:}{:}", s1, s2, s3, s4));
+        log(&format!("{:}", record));
         // A:01 F:Z-HC BC:0013 DE:00d8 HL:014d SP:fffe PC:0100 (cy: 0) ppu:+0 |[00]0x0100: 00        nop
     }
 }
@@ -100,7 +62,7 @@ impl Hardware {
     pub fn create(performance: &Performance) -> Hardware {
         let mut _set = HashSet::new();
         Hardware {
-            cpu: Cpu::create(Some(TETRIS)),
+            cpu: Cpu::create(Some(TEST_01)),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,

@@ -402,7 +402,7 @@ pub struct Memory {
     pub joypad: Joypad,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Addr(u16);
 impl fmt::Display for Addr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -16,6 +16,7 @@ extern crate wasm_bindgen;
 extern crate web_sys;
 #[macro_use]
 extern crate packed_struct_codegen;
+extern crate nom;
 
 #[cfg(test)]
 pub mod test {
