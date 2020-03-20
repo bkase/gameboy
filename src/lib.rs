@@ -208,10 +208,10 @@ pub fn run() -> Result<(), JsValue> {
                                      <reg_view />
                                 </div>
                                 <div class="mw7 mt2">
-                                     <mem_view _=(0xff80, 0xff80) />
+                                     <mem_view _=(0x9880, 0x9880) />
                                 </div>
                                 <div class="mw7 mt2">
-                                     <mem_view _=(0xfe80, 0xfe80) />
+                                     <mem_view _=(0xd800, 0xd800) />
                                 </div>
                                 </div>
                              } } else { }}
