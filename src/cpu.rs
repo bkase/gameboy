@@ -178,7 +178,7 @@ impl Cpu {
             Add(x) => self.handle_alu_regshln(alu::add, x),
             Adc(x) => self.handle_alu_regshln(alu::adc, x),
             Sub(x) => self.handle_alu_regshln(alu::sub, x),
-            Sbc(x) => self.handle_alu_regshl(alu::sbc, x),
+            Sbc(x) => self.handle_alu_regshln(alu::sbc, x),
             And(x) => self.handle_alu_regshln(alu::and, x),
             Or(x) => self.handle_alu_regshln(alu::or, x),
             Xor(x) => self.handle_alu_regshln(alu::xor, x),

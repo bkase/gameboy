@@ -207,7 +207,7 @@ pub enum Arith {
     Add(RegsHlN),
     Adc(RegsHlN),
     Sub(RegsHlN),
-    Sbc(RegsHl),
+    Sbc(RegsHlN),
     And(RegsHlN),
     Or(RegsHlN),
     Xor(RegsHlN),
@@ -262,8 +262,9 @@ impl HasDuration for Arith {
                 RegsHlN::N(_) => (2, None),
                 RegsHlN::Reg(_) => (1, None),
             },
-            Sbc(RegsHl::HlInd) => (2, None),
-            Sbc(RegsHl::Reg(_)) => (1, None),
+            Sbc(RegsHlN::N(_)) => (2, None),
+            Sbc(RegsHlN::HlInd) => (2, None),
+            Sbc(RegsHlN::Reg(_)) => (1, None),
             Inc(x) | Dec(x) => match x {
                 RegsHl::HlInd => (3, None),
                 RegsHl::Reg(_) => (1, None),
@@ -751,14 +752,14 @@ pub trait ReadOnlyTape {
             0x95 => (Arith(Sub(RegsHlN::Reg(L))), vec![pos0]),
             0x96 => (Arith(Sub(RegsHlN::HlInd)), vec![pos0]),
             0x97 => (Arith(Sub(RegsHlN::Reg(A))), vec![pos0]),
-            0x98 => (Arith(Sbc(RegsHl::Reg(B))), vec![pos0]),
-            0x99 => (Arith(Sbc(RegsHl::Reg(C))), vec![pos0]),
-            0x9a => (Arith(Sbc(RegsHl::Reg(D))), vec![pos0]),
-            0x9b => (Arith(Sbc(RegsHl::Reg(E))), vec![pos0]),
-            0x9c => (Arith(Sbc(RegsHl::Reg(H))), vec![pos0]),
-            0x9d => (Arith(Sbc(RegsHl::Reg(L))), vec![pos0]),
-            0x9e => (Arith(Sbc(RegsHl::HlInd)), vec![pos0]),
-            0x9f => (Arith(Sbc(RegsHl::Reg(A))), vec![pos0]),
+            0x98 => (Arith(Sbc(RegsHlN::Reg(B))), vec![pos0]),
+            0x99 => (Arith(Sbc(RegsHlN::Reg(C))), vec![pos0]),
+            0x9a => (Arith(Sbc(RegsHlN::Reg(D))), vec![pos0]),
+            0x9b => (Arith(Sbc(RegsHlN::Reg(E))), vec![pos0]),
+            0x9c => (Arith(Sbc(RegsHlN::Reg(H))), vec![pos0]),
+            0x9d => (Arith(Sbc(RegsHlN::Reg(L))), vec![pos0]),
+            0x9e => (Arith(Sbc(RegsHlN::HlInd)), vec![pos0]),
+            0x9f => (Arith(Sbc(RegsHlN::Reg(A))), vec![pos0]),
             0xa0 => (Arith(And(RegsHlN::Reg(B))), vec![pos0]),
             0xa1 => (Arith(And(RegsHlN::Reg(C))), vec![pos0]),
             0xa2 => (Arith(And(RegsHlN::Reg(D))), vec![pos0]),
@@ -966,7 +967,10 @@ pub trait ReadOnlyTape {
                 )
             }
             0xdd => (InvalidOp(pos0), vec![pos0]),
-            0xde => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0xde => {
+                let pos1 = self.peek8_offset(1);
+                (Arith(Sbc(RegsHlN::N(pos1))), vec![pos0, pos1])
+            }
             0xdf => (Jump(Rst(0x18)), vec![pos0]),
             0xe1 => (Pop(RegisterKind16::Hl), vec![pos0]),
             0xe3 => (InvalidOp(pos0), vec![pos0]),
