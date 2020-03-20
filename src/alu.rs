@@ -21,7 +21,11 @@ fn sbc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
 
     let borrow_at_4 = (bottom_nibble_approx & 0x10) == 0x10;
     let borrow_at_end = ((left16 | 0x8000) - (right16 + old_carry_num)) & 0x100 == 0x100;
-    (left.wrapping_sub(right), borrow_at_4, borrow_at_end)
+    (
+        left.wrapping_sub(right).wrapping_sub(old_carry_num as u8),
+        borrow_at_4,
+        borrow_at_end,
+    )
 }
 
 fn sub_(left: u8, right: u8) -> (u8, bool, bool) {
@@ -55,7 +59,11 @@ fn adc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
     let bottom_nibble = (left16 & 0x0f) + ((right16 + old_carry_num) & 0x0f);
     let carry_at_3 = (bottom_nibble & 0x10) == 0x10;
     let carry_at_end = (left16 + right16 + old_carry_num) & 0x100 == 0x100;
-    (left.wrapping_add(right), carry_at_3, carry_at_end)
+    (
+        left.wrapping_add(right).wrapping_add(old_carry_num as u8),
+        carry_at_3,
+        carry_at_end,
+    )
 }
 
 fn add_(left: u8, right: u8) -> (u8, bool, bool) {
@@ -289,6 +297,14 @@ mod tests {
     use alu;
     use register::Flags;
     use test::proptest::prelude::*;
+
+    #[test]
+    fn adc_with_carry() {
+        let mut flags = Flags::create();
+        let r1 = alu::adc(&mut flags, 0xfe, 0x1);
+        assert_eq!(r1, 0);
+        assert_eq!(flags.c, true);
+    }
 
     #[test]
     fn set_bit() {
