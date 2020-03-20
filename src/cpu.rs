@@ -204,7 +204,7 @@ impl Cpu {
             }
             Dec(RegsHl::HlInd) => {
                 let operand = self.indirect_ld(RegisterKind16::Hl);
-                let result = alu::inc(&mut self.registers.flags, operand.0);
+                let result = alu::dec(&mut self.registers.flags, operand.0);
                 self.indirect_st(RegisterKind16::Hl, result);
             }
             AddHl(r) => {
