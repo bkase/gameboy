@@ -180,7 +180,8 @@ pub fn run() -> Result<(), JsValue> {
 
             let mode_ = Rc::new(RefCell::new(cpu_control_view::Mode::Paused));
 
-            let audio_ctx_ = audio_ctx.clone();
+            let audio_ctx1 = audio_ctx.clone();
+            let audio_ctx2 = audio_ctx.clone();
 
             let debug = ppu::DEBUG;
 
@@ -189,19 +190,18 @@ pub fn run() -> Result<(), JsValue> {
             ].enter(|| {
                 topo::call(|| {
 
-                    mox! {
+                    if debug { mox! {
                         <div class="mw8 ph4 mt2">
                             <div class="flex">
                                 <div class="mw6 w-100">
-                                    <gameboy_view />
+                                    <gameboy_view _=(audio_ctx1) />
                                 </div>
                                 <div class="mw5">
-                                     <cpu_control_view _=(audio_ctx_, mode_) />
-                                     {if debug { mox! { <breakpoints_view /> } } else { }}
+                                     <cpu_control_view _=(audio_ctx2, mode_) />
+                                     <breakpoints_view />
                                     <canvas width="128" height="192" id="tile-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
                                 </div>
                             </div>
-                            {if debug { mox! {
                                 <div>
                                 <div class="mw6 w-100">
                                     <canvas width="256" height="256" id="debug-canvas" style="width: 100%;image-rendering: pixelated;"></canvas>
@@ -216,9 +216,14 @@ pub fn run() -> Result<(), JsValue> {
                                      <mem_view _=(0xd800, 0xd800) />
                                 </div>
                                 </div>
-                             } } else { }}
                         </div>
-                    };
+                    }; } else {
+                        mox! {
+                           <div class="w-100">
+                               <gameboy_view _=(audio_ctx1) />
+                           </div>
+                        }
+                    }
 
                     let mut canvi = once(|| init_graphics(debug));
 

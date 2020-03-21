@@ -60,6 +60,7 @@ features = [
 
 # audio
   'AudioContext',
+  'AudioContextState',
   'AudioDestinationNode',
   'AudioNode',
   'AudioParam',
