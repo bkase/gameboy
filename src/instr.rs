@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use mem::{Addr, Direction, Memory};
+#[cfg(test)]
+use proptest_derive::Arbitrary;
 use register::R8;
 use register_kind::{RegisterKind16, RegisterKind8};
 use std::error::Error;
@@ -497,6 +499,7 @@ impl HasDuration for Instr {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct InstrPointer(pub Addr);
 impl InstrPointer {
     pub fn create() -> InstrPointer {

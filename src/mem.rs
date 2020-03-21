@@ -2,6 +2,8 @@
 
 use packed_struct::prelude::*;
 use ppu::{OamEntry, PpuRegisters};
+#[cfg(test)]
+use proptest_derive::Arbitrary;
 use read_view_u8::*;
 use register::R16;
 use sound;
@@ -403,6 +405,7 @@ pub struct Memory {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct Addr(u16);
 impl fmt::Display for Addr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

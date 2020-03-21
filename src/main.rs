@@ -13,6 +13,8 @@ extern crate nom;
 pub mod test {
     pub extern crate proptest;
 }
+#[cfg(test)]
+pub extern crate proptest_derive;
 
 mod alu;
 mod cpu;

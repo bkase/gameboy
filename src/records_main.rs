@@ -33,6 +33,8 @@ use std::collections::BTreeSet;
 use std::io;
 use std::io::prelude::*;
 use trace::Record;
+#[cfg(test)]
+pub extern crate proptest_derive;
 
 pub fn main() {
     let mut s = BTreeSet::new();

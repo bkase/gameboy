@@ -1,11 +1,15 @@
 #![allow(dead_code)]
 
+#[cfg(test)]
+use proptest_derive::Arbitrary;
 use register_kind::{RegisterKind16, RegisterKind8};
 use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct R16(pub u16);
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct R8(pub u8);
 
 impl R16 {
@@ -86,6 +90,7 @@ mod r_tests {
 // Z N H C 0 0 0 0
 //==================
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct Flags {
     pub z: bool,
     pub n: bool,
@@ -124,6 +129,7 @@ impl fmt::Display for Flags {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct Registers {
     pub bc: R16,
     pub de: R16,

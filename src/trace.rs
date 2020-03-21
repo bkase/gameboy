@@ -8,6 +8,8 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
 };
+#[cfg(test)]
+use proptest_derive::Arbitrary;
 use register::{Flags, Registers, R16, R8};
 use register_kind::RegisterKind16;
 use std::cmp::Ordering;
@@ -26,12 +28,15 @@ fn from_decimal64(input: &str) -> Result<u64, std::num::ParseIntError> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct Record {
     registers: Registers,
     ip: InstrPointer,
     cy: u64,
     ppu_display: bool,
     bank: Option<u8>,
+    // fixing the value for instructions since not all instrs are implemented yet
+    #[cfg_attr(test, proptest(value = "vec![0x18, 0x29, 0x13]"))]
     instr_bytes: Vec<u8>,
 }
 impl PartialEq for Record {
@@ -274,8 +279,8 @@ impl fmt::Display for Record {
 
 #[cfg(test)]
 mod tests {
+    use test::proptest::prelude::*;
     use trace::*;
-    //use test::proptest::prelude::*;
 
     #[test]
     fn parse_print_roundtrip() {
@@ -284,5 +289,13 @@ mod tests {
         let (_, parsed) = Record::of_line(&line).unwrap();
         let printed = format!("{:}", parsed);
         assert_eq!(line, printed);
+    }
+    proptest! {
+        #[test]
+        fn print_parse_partial_iso(r: Record) {
+            let printed = format!("{:}", r);
+            let (_, parsed) = Record::of_line(&printed).unwrap();
+            assert_eq!(r, parsed)
+        }
     }
 }
