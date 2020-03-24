@@ -8,7 +8,7 @@ use screen::{Coordinate, Rgb, Screen};
 
 pub const DEBUG: bool = false;
 
-#[derive(PackedStruct, Debug, Clone, Copy)]
+#[derive(PackedStruct, Debug, Clone, Copy, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Palette {
     #[packed_field(bits = "0:1")]
@@ -75,7 +75,7 @@ impl BgWindowTileData {
     }
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Lcdc {
     #[packed_field(bits = "0")]
@@ -119,7 +119,7 @@ impl ViewU8 for Lcdc {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PpuRegisters {
     pub lcdc: Lcdc,
     pub scy: u8,
@@ -227,7 +227,7 @@ const BG_COLS_SUB_ONE: u8 = 255;
 const TILE_DEBUG_ROWS: u8 = 192;
 const VBLANK_ROWS: u8 = 10;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 /// Invariant: .0 <= COLS * ROWS
 struct Moment(u16);
 
@@ -309,7 +309,7 @@ pub enum OamEntryPalette {
     ObjectPalette1 = 1,
 }
 
-#[derive(PackedStruct, Debug, Clone, Copy)]
+#[derive(PackedStruct, Debug, Clone, Copy, PartialEq)]
 #[packed_struct(size_bytes = "4", bit_numbering = "msb0")]
 pub struct OamEntry {
     #[packed_field(bytes = "0")]

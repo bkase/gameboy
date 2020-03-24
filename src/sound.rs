@@ -6,7 +6,7 @@ use read_view_u8::*;
 // PulseA  Control Frequency  Volume  Length   Sweep
 //
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Control {
     #[packed_field(bits = "7")]
@@ -29,7 +29,7 @@ impl ViewU8 for Control {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FrequencyLowBits(u8);
 impl ReadViewU8 for FrequencyLowBits {
     fn read(&self) -> u8 {
@@ -42,7 +42,7 @@ impl ViewU8 for FrequencyLowBits {
     }
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Volume {
     #[packed_field(bits = "4:7")]
@@ -67,7 +67,7 @@ impl ViewU8 for Volume {
     }
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Length {
     // 00 = 12.5
@@ -92,7 +92,7 @@ impl ViewU8 for Length {
     }
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct Sweep {
     #[packed_field(bits = "7")]
@@ -129,7 +129,7 @@ impl ViewU8 for Sweep {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PulseA {
     pub control: Control,
     pub frequency: FrequencyLowBits,
@@ -149,7 +149,7 @@ impl PulseA {
     }
 }
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct SoundOnOff {
     // 0 = off
@@ -180,7 +180,7 @@ impl ViewU8 for SoundOnOff {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Registers {
     pub pulse_a: PulseA,
     pub sound_on_off: SoundOnOff,
@@ -203,7 +203,7 @@ impl Registers {
 // VOL=$F----$E-----$D
 //
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PulseKind {
     FirstEigth,   // 00
     FirstQuarter, // 01
@@ -222,13 +222,13 @@ impl PulseKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Oscillator {
     Pulse(PulseKind),
 }
 
 const GAIN_EPSLION: f32 = 0.000_000_01;
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Channel {
     pub gain: f32,
     pub oscillator: Oscillator,
@@ -236,19 +236,19 @@ pub struct Channel {
 }
 
 const ONE_SIXTY_FOURTH_SECS_IN_TICKS: u32 = 16384;
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Behavior {
     Decaying(u32), // decrease gain by one unit every u32 ticks
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Audio {
     pub channel: Channel,
     pub behavior: Behavior,
     pub ticks_passed: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Sound {
     pub dirty: bool,
     // TODO: Support multiple channels

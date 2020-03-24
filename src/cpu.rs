@@ -9,7 +9,7 @@ use mem::{Addr, Cartridge, Direction, Memory};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Cpu {
     pub registers: Registers,
     pub memory: Memory,
@@ -28,6 +28,15 @@ impl Cpu {
         Cpu {
             registers: Registers::create(),
             memory: Memory::create(cartridge),
+            ip: InstrPointer::create(),
+            interrupt_master_enable: true,
+        }
+    }
+
+    pub fn create_with_registers(registers: Registers) -> Cpu {
+        Cpu {
+            registers,
+            memory: Memory::create(None),
             ip: InstrPointer::create(),
             interrupt_master_enable: true,
         }
@@ -343,7 +352,7 @@ impl Cpu {
 }
 
 #[cfg(test)]
-mod instr_tests {
+mod push_pop_tests {
     use cpu::Cpu;
     use register::R16;
     use test::proptest::prelude::*;
@@ -759,5 +768,306 @@ impl Cpu {
                 self.do_call(addr);
             }
         }
+    }
+}
+
+// Tests each instruction against the Gekkio specs
+// https://gekkio.fi/files/gb-docs/gbctr.pdf (pg. 8)
+//
+// At first glance these tests seem redundant w.r.t. the implementation
+// However, see https://bkase.dev/posts/gameboy-debugging-parable
+// I'd much rather duplicate myself than run into one of these again
+//
+// Think of it as a form of double-accounting to catch any other dumb mistakes
+#[cfg(test)]
+mod cpu_to_spec {
+    use cpu::Cpu;
+    use instr::{
+        Arith, Bits, HasDuration, Instr, InstrPointer, Jump, Ld, OffsetBy, PutGet, RegsHl, RegsHlN,
+        RetCondition, Rotate,
+    };
+    use mem::{Addr, Direction};
+    use register::{Flags, Registers, R16, R8};
+    use register_kind::{RegisterKind16, RegisterKind8};
+    use test::proptest::prelude::*;
+
+    struct InstrSpec<F: Fn(&mut Cpu) -> ()> {
+        duration: (u32, Option<u32>),
+        run: F,
+    }
+
+    impl<F: Fn(&mut Cpu) -> ()> InstrSpec<F> {
+        fn validate(&self, regs: Registers, instr: Instr) {
+            assert_eq!(instr.duration(), self.duration);
+
+            let mut cpu1 = Cpu::create_with_registers(regs.clone());
+            cpu1.execute_instr(instr);
+
+            let mut cpu2 = Cpu::create_with_registers(regs.clone());
+            (self.run)(&mut cpu2);
+
+            assert_eq!(cpu1, cpu2);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn ld_r_r_(regs: Registers) {
+            let rs = [RegisterKind8::B, RegisterKind8::C, RegisterKind8::D, RegisterKind8::H, RegisterKind8::L, RegisterKind8::A];
+
+            rs.iter().for_each(|r1| {
+                rs.iter().for_each(|r2| {
+                    let spec = InstrSpec {
+                        duration: (1, None),
+                        run: |cpu| {
+                            let old_r2 = cpu.registers.read8(*r2);
+                            cpu.registers.write8r(*r1, old_r2);
+                        }
+                    };
+                    let instr = Instr::Ld(Ld::Word(RegsHl::Reg(*r1), RegsHlN::Reg(*r2)));
+                    spec.validate(regs.clone(), instr);
+                });
+            });
+        }
+
+        #[test]
+        fn ld_r_n(regs: Registers, n: u8) {
+            let rs = [RegisterKind8::B, RegisterKind8::C, RegisterKind8::D, RegisterKind8::H, RegisterKind8::L, RegisterKind8::A];
+
+            rs.iter().for_each(|r1| {
+                let spec = InstrSpec {
+                    duration: (2, None),
+                    run: |cpu| {
+                        cpu.registers.write8n(*r1, n)
+                    }
+                };
+                let instr = Instr::Ld(Ld::Word(RegsHl::Reg(*r1), RegsHlN::N(n)));
+                spec.validate(regs.clone(), instr);
+            });
+        }
+
+        #[test]
+        fn ld_r_hl(regs: Registers) {
+            let rs = [RegisterKind8::B, RegisterKind8::C, RegisterKind8::D, RegisterKind8::H, RegisterKind8::L, RegisterKind8::A];
+
+            rs.iter().for_each(|r1| {
+                let spec = InstrSpec {
+                    duration: (2, None),
+                    run: |cpu| {
+                        let (n, _) = cpu.indirect_ld(RegisterKind16::Hl);
+                        cpu.registers.write8n(*r1, n);
+                    }
+                };
+                let instr = Instr::Ld(Ld::Word(RegsHl::Reg(*r1), RegsHlN::HlInd));
+                spec.validate(regs.clone(), instr);
+            });
+        }
+
+        #[test]
+        fn ld_hl_r(regs: Registers) {
+            let rs = [RegisterKind8::B, RegisterKind8::C, RegisterKind8::D, RegisterKind8::H, RegisterKind8::L, RegisterKind8::A];
+
+            rs.iter().for_each(|r1| {
+                let spec = InstrSpec {
+                    duration: (2, None),
+                    run: |cpu| {
+                        let r1 = cpu.registers.read8(*r1);
+                        cpu.indirect_st(RegisterKind16::Hl, r1.0)
+                    }
+                };
+                let instr = Instr::Ld(Ld::Word(RegsHl::HlInd, RegsHlN::Reg(*r1)));
+                spec.validate(regs.clone(), instr);
+            });
+        }
+
+        #[test]
+        fn ld_hl_n(regs: Registers, n: u8) {
+            let spec = InstrSpec {
+                duration: (3, None),
+                run: |cpu| {
+                    cpu.indirect_st(RegisterKind16::Hl, n)
+                }
+            };
+            let instr = Instr::Ld(Ld::Word(RegsHl::HlInd, RegsHlN::N(n)));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_a_bc(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let (n, _) = cpu.indirect_ld(RegisterKind16::Bc);
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpInd(RegisterKind16::Bc, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_a_de(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let (n, _) = cpu.indirect_ld(RegisterKind16::De);
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpInd(RegisterKind16::De, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_bc_a(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let r = cpu.registers.read8(RegisterKind8::A);
+                    cpu.indirect_st(RegisterKind16::Bc, r.0);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpInd(RegisterKind16::Bc, PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_de_a(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let r = cpu.registers.read8(RegisterKind8::A);
+                    cpu.indirect_st(RegisterKind16::De, r.0);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpInd(RegisterKind16::De, PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_a_nn(regs: Registers, addr: Addr) {
+            let spec = InstrSpec {
+                duration: (4, None),
+                run: |cpu| {
+                    let n = cpu.memory.ld8(addr);
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpNnInd(addr, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ldh_a_c(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let r = cpu.registers.read8(RegisterKind8::C);
+                    let n = cpu.memory.ld8(Addr::directly(0xFF00 + u16::from(r.0)));
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpIOOffset(OffsetBy::C, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ldh_c_a(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let r = cpu.registers.read8(RegisterKind8::C);
+                    let a = cpu.registers.read8(RegisterKind8::A);
+                    cpu.memory.st8(Addr::directly(0xFF00 + u16::from(r.0)), a.0);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpIOOffset(OffsetBy::C, PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ldh_a_n(regs: Registers, n: u8) {
+            let spec = InstrSpec {
+                duration: (3, None),
+                run: |cpu| {
+                    let n = cpu.memory.ld8(Addr::directly(0xFF00 + u16::from(n)));
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpIOOffset(OffsetBy::N(n), PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ldh_n_a(regs: Registers, n: u8) {
+            let spec = InstrSpec {
+                duration: (3, None),
+                run: |cpu| {
+                    let a = cpu.registers.read8(RegisterKind8::A);
+                    cpu.memory.st8(Addr::directly(0xFF00 + u16::from(n)), a.0);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpIOOffset(OffsetBy::N(n), PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_a_hl_minus(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let (n, addr) = cpu.indirect_ld(RegisterKind16::Hl);
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                    cpu.registers.write16r(RegisterKind16::Hl, addr.offset_signed(-1).into_register());
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpHlInd(Direction::Neg, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_hl_minus_a(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let a = cpu.registers.read8(RegisterKind8::A);
+                    cpu.indirect_st(RegisterKind16::Hl, a.0);
+                    let hl = cpu.registers.read16(RegisterKind16::Hl);
+                    cpu.registers.write16n(RegisterKind16::Hl, hl.0 - 1);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpHlInd(Direction::Neg, PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_a_hl_plus(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let (n, addr) = cpu.indirect_ld(RegisterKind16::Hl);
+                    cpu.registers.write8n(RegisterKind8::A, n);
+                    cpu.registers.write16r(RegisterKind16::Hl, addr.offset_signed(1).into_register());
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpHlInd(Direction::Pos, PutGet::Get));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_hl_plus_a(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let a = cpu.registers.read8(RegisterKind8::A);
+                    cpu.indirect_st(RegisterKind16::Hl, a.0);
+                    let hl = cpu.registers.read16(RegisterKind16::Hl);
+                    cpu.registers.write16n(RegisterKind16::Hl, hl.0 + 1);
+                }
+            };
+            let instr = Instr::Ld(Ld::AOpHlInd(Direction::Pos, PutGet::Put));
+            spec.validate(regs.clone(), instr);
+        }
+
     }
 }

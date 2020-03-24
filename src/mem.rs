@@ -56,7 +56,7 @@ pub const DR_MARIO: Cartridge = include_bytes!("../drmario.gb");
 #[derive(Copy, Clone, Debug)]
 pub struct TriggeredTimer(pub bool);
 
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct InterruptRegister {
     #[packed_field(bits = "0")]
@@ -94,7 +94,7 @@ impl ViewU8 for InterruptRegister {
 
 // emulate the physical hardware, ie. hook this up to the actual events
 // reading from the IO register will poll the hardware
-#[derive(PackedStruct, Debug)]
+#[derive(PackedStruct, Debug, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct JoypadHardware {
     #[packed_field(bits = "0", ty = "enum")]
@@ -167,7 +167,7 @@ pub enum JoypadKey {
     Button(JoypadButton),
 }
 
-#[derive(PackedStruct, Debug, Clone, Copy)]
+#[derive(PackedStruct, Debug, Clone, Copy, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct JoypadRegister {
     #[packed_field(bits = "0", ty = "enum")]
@@ -197,7 +197,7 @@ impl JoypadRegister {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Joypad {
     pub register: JoypadRegister,
     hardware: JoypadHardware,
@@ -302,7 +302,7 @@ impl Joypad {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct SerialIo {
     serial_byte: u8,
     last_serial_byte_dumped: u8,
@@ -336,7 +336,7 @@ impl SerialIo {
     }
 }
 
-#[derive(PackedStruct, Debug, Clone, Copy)]
+#[derive(PackedStruct, Debug, Clone, Copy, PartialEq)]
 #[packed_struct(size_bytes = "1", bit_numbering = "lsb0")]
 pub struct TimerControl {
     #[packed_field(bits = "0:1")]
@@ -355,7 +355,7 @@ impl ViewU8 for TimerControl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Timer {
     div: u8,
     tima: u8,
@@ -385,7 +385,7 @@ impl fmt::Display for Timer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Memory {
     pub booting: bool,
     zero: Vec<u8>,
@@ -649,7 +649,7 @@ impl Memory {
                     // TODO: What does 0x00 to ff50 mean? Mooneye-gb tests do it
                     ()
                 } else {
-                    panic!("Unexpected value write to 0xff50 {:x}", n)
+                    println!("Unexpected value write to 0xff50 {:x}", n)
                 }
             }
             0xff4c..=0xff7f => {
