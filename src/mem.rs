@@ -385,7 +385,7 @@ impl fmt::Display for Timer {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct Memory {
     pub booting: bool,
     zero: Vec<u8>,
@@ -402,6 +402,36 @@ pub struct Memory {
     pub ppu: PpuRegisters,
     pub sound: sound::Registers,
     pub joypad: Joypad,
+}
+
+impl fmt::Debug for Memory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Memory")
+            .field("booting", &self.booting)
+            .field("zero", &".")
+            .field("sprite_oam", &".")
+            .field("main", &".")
+            .field(
+                "video",
+                &vec![
+                    self.video[0],
+                    self.video[1],
+                    self.video[2],
+                    self.video[3],
+                    self.video[4],
+                ],
+            )
+            .field(
+                "bootrom",
+                &vec![BOOTROM[0], BOOTROM[1], BOOTROM[2], BOOTROM[3]],
+            )
+            .field("rom0", &".")
+            .field("rom1", &".")
+            .field("cartridge_ram", &".")
+            .field("timer", &".")
+            .field("serial", &".")
+            .finish()
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

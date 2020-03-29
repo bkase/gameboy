@@ -340,14 +340,11 @@ impl Cpu {
         hi.concat(lo)
     }
 
-    fn push(&mut self, n: R8) {
-        self.registers.sp.dec();
-        self.indirect_st(RegisterKind16::Sp, n.0);
-    }
-
     fn push16(&mut self, n: R16) {
-        self.push(n.hi());
-        self.push(n.lo());
+        self.registers.sp.dec();
+        self.indirect_st(RegisterKind16::Sp, n.hi().0);
+        self.registers.sp.dec();
+        self.indirect_st(RegisterKind16::Sp, n.lo().0);
     }
 }
 
@@ -588,10 +585,10 @@ impl Cpu {
                 let new16 = self.pop16();
                 self.registers.a = new16.hi();
                 let low = new16.lo().0;
-                self.registers.flags.z = (low & 0b10000000) > 0;
-                self.registers.flags.n = (low & 0b01000000) > 0;
-                self.registers.flags.h = (low & 0b00100000) > 0;
-                self.registers.flags.c = (low & 0b00010000) > 0;
+                self.registers.flags.z = (low & 0b1000) > 0;
+                self.registers.flags.n = (low & 0b0100) > 0;
+                self.registers.flags.h = (low & 0b0010) > 0;
+                self.registers.flags.c = (low & 0b0001) > 0;
                 BranchAction::Take
             }
             Push(reg) => {
@@ -1069,5 +1066,136 @@ mod cpu_to_spec {
             spec.validate(regs.clone(), instr);
         }
 
+        #[test]
+        fn ld_rr_nn(regs: Registers, nn: u16) {
+            let rs = [RegisterKind16::Bc, RegisterKind16::De, RegisterKind16::Hl, RegisterKind16::Sp];
+
+            rs.iter().for_each(|rr| {
+                let spec = InstrSpec {
+                    duration: (3, None),
+                    run: |cpu| {
+                        cpu.registers.write16n(*rr, nn);
+                    }
+                };
+                let instr = Instr::Ld(Ld::DwordGetsAddr(*rr, Addr::directly(nn)));
+                spec.validate(regs.clone(), instr);
+            });
+        }
+
+        #[test]
+        fn ld_nn_ind_sp(regs: Registers, nn: u16) {
+            let spec = InstrSpec {
+                duration: (5, None),
+                run: |cpu| {
+                    let addr = Addr::directly(nn);
+                    let sp = cpu.registers.read16(RegisterKind16::Sp);
+                    cpu.memory.st8(addr, (sp.0 & 0xff) as u8);
+                    cpu.memory.st8(addr.offset_signed(1), ((sp.0 & 0xff00) >> 8) as u8);
+                }
+            };
+            let instr = Instr::Ld(Ld::NnIndGetsSp(Addr::directly(nn)));
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn ld_sp_hl(regs: Registers) {
+            let spec = InstrSpec {
+                duration: (2, None),
+                run: |cpu| {
+                    let hl = cpu.registers.read16(RegisterKind16::Hl);
+                    cpu.registers.write16r(RegisterKind16::Sp, hl);
+                }
+            };
+            let instr = Instr::Ld(Ld::SpGetsHl);
+            spec.validate(regs.clone(), instr);
+        }
+
+        #[test]
+        fn push_rr(regs: Registers) {
+            let rs = [Some(RegisterKind16::Bc), Some(RegisterKind16::De), Some(RegisterKind16::Hl), None];
+
+            let f = |b| if b { 1 } else { 0 };
+
+            rs.iter().for_each(|rr| {
+                let spec = InstrSpec {
+                    duration: (4, None),
+                    run: |cpu| {
+                        let rr =
+                            match rr {
+                                Some(k) => cpu.registers.read16(*k).0,
+                                None => {
+                                    let flags = &cpu.registers.flags;
+                                    (u16::from(cpu.registers.a.0) << 8) |
+                                        (f(flags.z) << 7) |
+                                        (f(flags.n) << 6) |
+                                        (f(flags.h) << 5) |
+                                        (f(flags.c) << 4)
+                                }
+                            };
+
+                        let sp = cpu.registers.read16(RegisterKind16::Sp);
+                        let sp1 = sp.0.wrapping_sub(1);
+
+                        cpu.memory.st8(Addr::directly(sp1), ((rr & 0xff00) >> 8) as u8);
+                        let sp2 = sp1.wrapping_sub(1);
+
+                        cpu.memory.st8(Addr::directly(sp2), (rr & 0xff) as u8);
+
+                        cpu.registers.write16n(RegisterKind16::Sp, sp2);
+                    }
+                };
+                let instr = match rr {
+                    Some(k) => Instr::Push(*k),
+                    None => Instr::PushAf
+                };
+                spec.validate(regs.clone(), instr);
+            });
+        }
+
+        #[test]
+        fn pop_rr(regs: Registers) {
+            let rs = [
+                Some(RegisterKind16::Bc),
+                Some(RegisterKind16::De),
+                Some(RegisterKind16::Hl),
+                None,
+            ];
+
+            rs.iter().for_each(|rr| {
+                let spec = InstrSpec {
+                    duration: (3, None),
+                    run: |cpu| {
+                        let sp = cpu.registers.read16(RegisterKind16::Sp);
+
+                        let sp = sp.0;
+                        let lo = cpu.memory.ld8(Addr::directly(sp));
+                        let sp1 = sp.wrapping_add(1);
+
+                        let hi = cpu.memory.ld8(Addr::directly(sp1));
+                        let sp2 = sp1.wrapping_add(1);
+
+                        match rr {
+                            Some(k) => cpu.registers.write16n(*k, (u16::from(hi) << 8) | u16::from(lo)),
+                            None => {
+                                cpu.registers.a = R8(hi);
+                                cpu.registers.flags = Flags {
+                                    z: (lo & 0b1000) > 0,
+                                    n: (lo & 0b0100) > 0,
+                                    h: (lo & 0b0010) > 0,
+                                    c: (lo & 0b0001) > 0,
+                                }
+                            }
+                        };
+
+                        cpu.registers.write16n(RegisterKind16::Sp, sp2);
+                    },
+                };
+                let instr = match rr {
+                    Some(k) => Instr::Pop(*k),
+                    None => Instr::PopAf,
+                };
+                spec.validate(regs.clone(), instr);
+            });
+        }
     }
 }
