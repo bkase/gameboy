@@ -34,7 +34,6 @@ pub struct Record {
     ip: InstrPointer,
     cy: u64,
     ppu_display: bool,
-    bank: Option<u8>,
     // fixing the value for instructions since not all instrs are implemented yet
     #[cfg_attr(test, proptest(value = "vec![0x18, 0x29, 0x13]"))]
     instr_bytes: Vec<u8>,
@@ -172,7 +171,6 @@ impl Record {
         ip: InstrPointer,
         cy: u64,
         ppu_display: bool,
-        bank: Option<u8>,
         instr_bytes: Vec<u8>,
     ) -> Record {
         Record {
@@ -180,7 +178,6 @@ impl Record {
             ip,
             cy,
             ppu_display,
-            bank,
             instr_bytes,
         }
     }
@@ -201,10 +198,7 @@ impl Record {
             "Two pcs need to be the same"
         );
 
-        Ok((
-            input,
-            Self::create(regs, pc_addr, cy, ppu, bank, instr_bytes),
-        ))
+        Ok((input, Self::create(regs, pc_addr, cy, ppu, instr_bytes)))
     }
 }
 
@@ -241,7 +235,12 @@ impl fmt::Display for Record {
         };
         let s2 = format!(" (cy: {:})", self.cy);
         let s3 = format!(" ppu:{:}0", if self.ppu_display { "+" } else { "-" });
-        let bank = match self.bank {
+        let bank_raw = if self.ip.into_u16() >= 0xc000 {
+            None
+        } else {
+            Some(0x00)
+        };
+        let bank = match bank_raw {
             Some(x) => format!("{:02x}", x),
             None => format!("{:}", "??"),
         };

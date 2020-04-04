@@ -49,7 +49,6 @@ impl Hardware {
             self.cpu.ip,
             (self.clocks_elapsed - self.clocks_zero) * 4,
             self.cpu.memory.ppu.lcdc.display(),
-            Some(0x00),
             bs,
         );
 
