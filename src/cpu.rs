@@ -801,6 +801,9 @@ impl Cpu {
 
 // Tests each instruction against the Gekkio specs
 // https://gekkio.fi/files/gb-docs/gbctr.pdf (pg. 8)
+// ALU info is missing from these docs. In those cases, the spec is taken from
+// the official Gameboy manual
+// https://ia801906.us.archive.org/19/items/GameBoyProgManVer1.1/GameBoyProgManVer1.1.pdf
 //
 // At first glance these tests seem redundant w.r.t. the implementation
 // However, see https://bkase.dev/posts/gameboy-debugging-parable
