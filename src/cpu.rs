@@ -282,6 +282,9 @@ impl Cpu {
             Rla => {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rl(&mut self.registers.flags, n.0);
+                self.registers.flags.z = false;
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
                 self.registers.write8n(RegisterKind8::A, result);
             }
             Rlca => {
@@ -292,6 +295,9 @@ impl Cpu {
             Rra => {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rr(&mut self.registers.flags, n.0);
+                self.registers.flags.z = false;
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
                 self.registers.write8n(RegisterKind8::A, result);
             }
             Rl(RegsHl::Reg(r)) => {
