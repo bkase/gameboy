@@ -354,9 +354,21 @@ impl Cpu {
     }
 }
 
+// for tests
+impl Cpu {
+    // TODO: Accept parsed instrs instead of just raw bytes
+    fn inject_instrs_update_ip(&mut self, raw: Vec<u8>) {
+        self.ip.jump(Addr::directly(0xc000));
+        raw.iter()
+            .enumerate()
+            .for_each(|(i, n)| self.memory.st8(Addr::directly(0xc000 + i as u16), *n))
+    }
+}
+
 #[cfg(test)]
 mod push_pop_tests {
     use cpu::Cpu;
+    use register::Registers;
     use register::R16;
     use test::proptest::prelude::*;
 
@@ -370,6 +382,19 @@ mod push_pop_tests {
             cpu.push16(r16);
             let res = cpu.pop16();
             assert_eq!(res, r16);
+        }
+
+        #[test]
+        fn push_pop_af_self_inverse_cpu(regs: Registers) {
+            let mut cpu = Cpu::create_with_registers(regs.clone());
+            // PushAf, PopAf
+            cpu.inject_instrs_update_ip(vec![0xf5, 0xf1]);
+
+            cpu.execute();
+            cpu.execute();
+
+            assert_eq!(cpu.registers.a, regs.a, "The A register");
+            assert_eq!(cpu.registers.flags, regs.flags, "The flags");
         }
     }
 }
@@ -591,10 +616,10 @@ impl Cpu {
                 let new16 = self.pop16();
                 self.registers.a = new16.hi();
                 let low = new16.lo().0;
-                self.registers.flags.z = (low & 0b1000) > 0;
-                self.registers.flags.n = (low & 0b0100) > 0;
-                self.registers.flags.h = (low & 0b0010) > 0;
-                self.registers.flags.c = (low & 0b0001) > 0;
+                self.registers.flags.z = (low & 0b1000_0000) > 0;
+                self.registers.flags.n = (low & 0b0100_0000) > 0;
+                self.registers.flags.h = (low & 0b0010_0000) > 0;
+                self.registers.flags.c = (low & 0b0001_0000) > 0;
                 BranchAction::Take
             }
             Push(reg) => {
@@ -1036,7 +1061,7 @@ mod cpu_to_spec {
                     let a = cpu.registers.read8(RegisterKind8::A);
                     cpu.indirect_st(RegisterKind16::Hl, a.0);
                     let hl = cpu.registers.read16(RegisterKind16::Hl);
-                    cpu.registers.write16n(RegisterKind16::Hl, hl.0 - 1);
+                    cpu.registers.write16n(RegisterKind16::Hl, hl.0.wrapping_sub(1));
                 }
             };
             let instr = Instr::Ld(Ld::AOpHlInd(Direction::Neg, PutGet::Put));
@@ -1065,7 +1090,7 @@ mod cpu_to_spec {
                     let a = cpu.registers.read8(RegisterKind8::A);
                     cpu.indirect_st(RegisterKind16::Hl, a.0);
                     let hl = cpu.registers.read16(RegisterKind16::Hl);
-                    cpu.registers.write16n(RegisterKind16::Hl, hl.0 + 1);
+                    cpu.registers.write16n(RegisterKind16::Hl, hl.0.wrapping_add(1));
                 }
             };
             let instr = Instr::Ld(Ld::AOpHlInd(Direction::Pos, PutGet::Put));
@@ -1185,10 +1210,10 @@ mod cpu_to_spec {
                             None => {
                                 cpu.registers.a = R8(hi);
                                 cpu.registers.flags = Flags {
-                                    z: (lo & 0b1000) > 0,
-                                    n: (lo & 0b0100) > 0,
-                                    h: (lo & 0b0010) > 0,
-                                    c: (lo & 0b0001) > 0,
+                                    z: (lo & 0b1000_0000) > 0,
+                                    n: (lo & 0b0100_0000) > 0,
+                                    h: (lo & 0b0010_0000) > 0,
+                                    c: (lo & 0b0001_0000) > 0,
                                 }
                             }
                         };

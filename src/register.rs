@@ -134,7 +134,13 @@ pub struct Registers {
     pub bc: R16,
     pub de: R16,
     pub hl: R16,
-    pub a: R8,   // acc
+    pub a: R8, // acc
+    #[cfg_attr(
+        test,
+        proptest(
+            filter = "|x| (x.0 >= 0xc000 && x.0 <= 0xcfff) || (x.0 >= 0xff80 && x.0 <= 0xfffe)"
+        )
+    )]
     pub sp: R16, // stack pointer
     pub flags: Flags,
 }

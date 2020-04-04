@@ -506,6 +506,10 @@ impl InstrPointer {
         InstrPointer(Addr::directly(0x00))
     }
 
+    pub fn into_u16(&self) -> u16 {
+        (self.0.into_register()).0
+    }
+
     fn rewind(&mut self, n: u16) {
         let new_val = self.0.offset(n, Direction::Neg);
         (*self).0 = new_val
