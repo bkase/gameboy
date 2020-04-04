@@ -46,8 +46,7 @@ pub type Cartridge = &'static [u8; 0x8000];
 
 pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
 
-pub const TEST_01: Cartridge =
-    include_bytes!("../gb-test-roms/cpu_instrs/individual/01-special.gb");
+pub const TEST_01: Cartridge = include_bytes!("../gb-test-roms/cpu_instrs/individual/05-op rp.gb");
 // include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
