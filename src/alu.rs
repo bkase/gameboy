@@ -208,6 +208,15 @@ pub fn rr(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn rrc(flags: &mut Flags, x: u8) -> u8 {
+    let bit0 = if x & 0x1 == 0x1 { 1 } else { 0 };
+    let r = (x >> 1) | (bit0 << 7);
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = bit0 == 0x1;
+    r
+}
+
 pub fn bit(flags: &mut Flags, x: u8, b: u8) {
     assert!(b < 8);
     flags.z = x & (1 << b) == 0;
