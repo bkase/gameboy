@@ -1128,7 +1128,7 @@ mod tests {
         let slot1 = slot.offset(1, Direction::Pos);
         let slot2 = slot.offset(2, Direction::Pos);
 
-        let mut memory = Memory::create(None);
+        let mut memory = Memory::create_with_bootrom();
         let mut ptr = InstrPointer::create();
         ptr.jump(slot);
 
@@ -1257,7 +1257,7 @@ mod tests {
 
     #[test]
     fn bootrom_roundtrip() {
-        let memory = Memory::create(None);
+        let memory = Memory::create_with_bootrom();
         let mut ptr = InstrPointer::create();
 
         let mut acc = Vec::new();

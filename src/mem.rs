@@ -481,6 +481,9 @@ impl Addr {
 }
 
 impl Memory {
+    pub fn create_with_bootrom() -> Memory {
+        Self::create(These::This(Cow::Borrowed(BOOTROM)))
+    }
     pub fn create(roms: Roms) -> Memory {
         let has_bootrom = roms.is_here();
         let (rom0, rom1) = match roms.that() {

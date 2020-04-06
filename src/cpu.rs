@@ -386,14 +386,17 @@ impl Cpu {
 #[cfg(test)]
 mod push_pop_tests {
     use cpu::Cpu;
+    use mem::BOOTROM;
     use register::Registers;
     use register::R16;
+    use std::borrow::Cow;
     use test::proptest::prelude::*;
+    use these::These;
 
     proptest! {
         #[test]
         fn push_pop_self_inverse(x : u16) {
-            let mut cpu = Cpu::create(None);
+            let mut cpu = Cpu::create(These::This(Cow::Borrowed(BOOTROM)));
             cpu.registers.sp = R16(0xff90);
 
             let r16 = R16(x);
