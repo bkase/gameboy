@@ -1,12 +1,20 @@
 use cpu::{Cpu, InterruptKind};
-use mem::{Addr, TriggeredTimer, DR_MARIO, TEST_01, TETRIS, TIC_TAC_TOE};
+use mem::{Addr, Roms, TriggeredTimer};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
+use std::path::PathBuf;
+use these::These;
 use trace;
 use web_utils::log;
 use web_utils::*;
+
+pub struct Config {
+    pub trace: bool,
+    pub roms: Roms,
+}
 
 #[derive(Debug)]
 pub struct Hardware {
@@ -22,6 +30,7 @@ pub struct Hardware {
     // for vblank measurement
     pub vblanks: usize,
     pub start_time: f64,
+    trace: bool,
 }
 
 struct SpacedBytes(Vec<u8>);
@@ -58,10 +67,11 @@ impl Hardware {
 }
 
 impl Hardware {
-    pub fn create(performance: &Performance) -> Hardware {
+    pub fn create(performance: &Performance, config: Config) -> Hardware {
         let mut _set = HashSet::new();
+        let Config { roms, trace } = config;
         Hardware {
-            cpu: Cpu::create(Some(TEST_01)),
+            cpu: Cpu::create(roms),
             ppu: Ppu::create(),
             sound: Sound::create(),
             paused: true,
@@ -71,13 +81,14 @@ impl Hardware {
             clocks_zero: 1,
             vblanks: 0,
             start_time: performance.now(),
+            trace,
         }
     }
 
     // step the hardware forwards once
     // useful for step-debugging
     fn step_(&mut self) -> u32 {
-        if !self.cpu.memory.booting {
+        if !self.cpu.memory.booting && self.trace {
             self.trace_state();
         }
 

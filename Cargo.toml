@@ -25,6 +25,7 @@ wasm-bindgen = "0.2.50"
 packed_struct = "0.3"
 packed_struct_codegen = "0.3"
 js-sys = "0.3.27"
+these = "1.0.0"
 moxie = { git = "https://github.com/anp/moxie" }
 moxie-dom = { git = "https://github.com/anp/moxie" }
 illicit = { git = "https://github.com/anp/moxie" }
@@ -44,7 +45,9 @@ console_error_panic_hook = { version = "0.1.1", optional = true }
 wee_alloc = { version = "0.4.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-clap = "~2.27.0"
+clap = "^2.33"
+structopt = "0.3"
+image = "0.23.3"
 
 [dependencies.web-sys]
 version = "0.3.4"

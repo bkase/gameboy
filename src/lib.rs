@@ -17,6 +17,7 @@ extern crate web_sys;
 #[macro_use]
 extern crate packed_struct_codegen;
 extern crate nom;
+extern crate these;
 
 #[cfg(test)]
 pub mod test {
@@ -48,8 +49,11 @@ mod utils;
 mod web_utils;
 
 use hardware::Hardware;
+use mem::{Cartridge, BOOTROM};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
+use these::These;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{Clamped, JsCast};
 use web_utils::*;
@@ -138,6 +142,15 @@ fn blit_bytes(
     ctx.put_image_data(&data, 0.0, 0.0).expect("put_image_data");
 }
 
+// Cartridges
+pub const TETRIS: &Cartridge = include_bytes!("../Tetris.GB");
+
+// pub const TEST_01: &Cartridge = include_bytes!("../gb-test-roms/cpu_instrs/individual/05-op rp.gb");
+// include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
+
+// pub const TIC_TAC_TOE: &Cartridge = include_bytes!("../tictactoe.gb");
+// pub const DR_MARIO: &Cartridge = include_bytes!("../drmario.gb");
+
 // This function is automatically invoked after the wasm module is instantiated.
 #[wasm_bindgen(start)]
 pub fn run() -> Result<(), JsValue> {
@@ -145,7 +158,13 @@ pub fn run() -> Result<(), JsValue> {
 
     let performance = Performance::create();
     // For now hardware has it's own memory
-    let hardware = Rc::new(RefCell::new(Hardware::create(&performance)));
+    let hardware = Rc::new(RefCell::new(Hardware::create(
+        &performance,
+        hardware::Config {
+            trace: false,
+            roms: These::These(Cow::Borrowed(BOOTROM), Cow::Borrowed(TETRIS)),
+        },
+    )));
 
     // Note: Safari refuses to play any audio unless it's resumed from a
     //       callstack originating at a button press, so we also hook it into

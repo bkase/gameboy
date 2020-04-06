@@ -9,6 +9,7 @@ extern crate packed_struct;
 extern crate packed_struct_codegen;
 extern crate clap;
 extern crate nom;
+extern crate these;
 
 #[cfg(test)]
 pub mod test {

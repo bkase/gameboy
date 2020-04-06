@@ -7,5 +7,5 @@ pkgs.mkShell {
   buildInputs = [
     pkgs.yarn
     rust
-  ];
+  ] ++ (if pkgs.stdenv.isDarwin then [ pkgs.darwin.apple_sdk.frameworks.Security ] else []);
 }

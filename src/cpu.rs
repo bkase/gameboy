@@ -5,9 +5,11 @@ use instr::{
     Arith, Bits, HasDuration, Instr, InstrPointer, Jump, Ld, OffsetBy, PutGet, RegsHl, RegsHlN,
     RetCondition, Rotate,
 };
-use mem::{Addr, Cartridge, Direction, Memory};
+use mem::{Addr, Bootrom, Cartridge, Direction, Memory, Roms, BOOTROM};
 use register::{Flags, Registers, R16, R8};
 use register_kind::{RegisterKind16, RegisterKind8};
+use std::borrow::Cow;
+use these::These;
 
 #[derive(Debug, PartialEq)]
 pub struct Cpu {
@@ -24,10 +26,26 @@ enum BranchAction {
 }
 
 impl Cpu {
-    pub fn create(cartridge: Option<Cartridge>) -> Cpu {
+    pub fn create(roms: Roms) -> Cpu {
+        let mut r = Registers::create();
+        // adjust to state after bootrom
+        // skipping the zeros because we default to zero naturally
+        //
+        // see http://bgb.bircd.org/pandocs.htm#powerupsequence
+        if !roms.is_here() {
+            r.a = R8(0x01);
+            r.flags.z = true;
+            r.flags.n = false;
+            r.flags.h = true;
+            r.flags.c = true;
+            r.bc = R16(0x0013);
+            r.de = R16(0x00d8);
+            r.hl = R16(0x014d);
+            r.sp = R16(0xfffe);
+        }
         Cpu {
-            registers: Registers::create(),
-            memory: Memory::create(cartridge),
+            registers: r,
+            memory: Memory::create(roms),
             ip: InstrPointer::create(),
             interrupt_master_enable: true,
         }
@@ -36,7 +54,7 @@ impl Cpu {
     pub fn create_with_registers(registers: Registers) -> Cpu {
         Cpu {
             registers,
-            memory: Memory::create(None),
+            memory: Memory::create(These::This(Cow::Borrowed(BOOTROM))),
             ip: InstrPointer::create(),
             interrupt_master_enable: true,
         }

@@ -7,9 +7,11 @@ use proptest_derive::Arbitrary;
 use read_view_u8::*;
 use register::R16;
 use sound;
+use std::borrow::Cow;
 use std::convert::TryInto;
 use std::fmt;
 use std::string::String;
+use these::These;
 
 /* 5.1. General memory map
  Interrupt Enable Register
@@ -38,19 +40,13 @@ use std::string::String;
  --------------------------- 0000 --
 */
 
+pub type Bootrom = [u8; 0x100];
+pub type Cartridge = [u8; 0x8000];
+
+pub type Roms = These<Cow<'static, Bootrom>, Cow<'static, Cartridge>>;
+
 // TODO: Switch to unpatched ROM and figure out why lockup happens
-pub const BOOTROM: &[u8; 0x100] = include_bytes!("../DMG_ROM.bin");
-
-// Cartridges
-pub type Cartridge = &'static [u8; 0x8000];
-
-pub const TETRIS: Cartridge = include_bytes!("../Tetris.GB");
-
-pub const TEST_01: Cartridge = include_bytes!("../gb-test-roms/cpu_instrs/individual/05-op rp.gb");
-// include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
-
-pub const TIC_TAC_TOE: Cartridge = include_bytes!("../tictactoe.gb");
-pub const DR_MARIO: Cartridge = include_bytes!("../drmario.gb");
+pub const BOOTROM: &Bootrom = include_bytes!("../DMG_ROM.bin");
 
 #[derive(Copy, Clone, Debug)]
 pub struct TriggeredTimer(pub bool);
@@ -485,16 +481,17 @@ impl Addr {
 }
 
 impl Memory {
-    pub fn create(cartridge: Option<Cartridge>) -> Memory {
-        let (rom0, rom1) = match cartridge {
+    pub fn create(roms: Roms) -> Memory {
+        let has_bootrom = roms.is_here();
+        let (rom0, rom1) = match roms.that() {
             Some(c) => {
                 let (bank0, bank1) = c.split_at(0x4000);
                 (bank0.to_vec(), bank1.to_vec())
             }
             None => (vec![0; 0x4000], vec![0; 0x4000]),
         };
-        Memory {
-            booting: true,
+        let mut mem = Memory {
+            booting: has_bootrom,
             zero: vec![0; 0x7f],
             sprite_oam: vec![OamEntry::create(); 40],
             main: vec![0; 0x2000],
@@ -509,7 +506,35 @@ impl Memory {
             ppu: PpuRegisters::create(),
             sound: sound::Registers::create(),
             joypad: Joypad::create(),
+        };
+        if !has_bootrom {
+            // adjust state after bootrom
+            // skipping the zeros because we default to zero naturally
+            //
+            // see http://bgb.bircd.org/pandocs.htm#powerupsequence
+            let mut f = |addr: u16, v: u8| mem.st8(Addr::directly(addr), v);
+            f(0xFF10, 0x80);
+            f(0xFF11, 0xbf);
+            f(0xFF12, 0xF3);
+            f(0xFF14, 0xBF);
+            f(0xFF16, 0x3F);
+            f(0xFF17, 0x00);
+            f(0xFF19, 0xBF);
+            f(0xFF1A, 0x7F);
+            f(0xFF1B, 0xFF);
+            f(0xFF1C, 0x9F);
+            f(0xFF1E, 0xBF);
+            f(0xFF20, 0xFF);
+            f(0xFF23, 0xBF);
+            f(0xFF24, 0x77);
+            f(0xFF25, 0xF3);
+            f(0xFF26, 0xF1);
+            f(0xFF40, 0x91);
+            f(0xFF47, 0xFC);
+            f(0xFF48, 0xFF);
+            f(0xFF49, 0xFF);
         }
+        mem
     }
 
     pub fn ld_lots(&self, Addr(addr): Addr, length: u16) -> Vec<u8> {
