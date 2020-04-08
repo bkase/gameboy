@@ -6,6 +6,9 @@ in
 pkgs.mkShell {
   buildInputs = [
     pkgs.yarn
+    pkgs.imagemagick
     rust
+    pkgs.dhall
+    pkgs.dhall-json
   ] ++ (if pkgs.stdenv.isDarwin then [ pkgs.darwin.apple_sdk.frameworks.Security ] else []);
 }
