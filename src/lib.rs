@@ -145,7 +145,7 @@ fn blit_bytes(
 // Cartridges
 pub const TETRIS: &Cartridge = include_bytes!("../Tetris.GB");
 
-// pub const TEST_01: &Cartridge = include_bytes!("../gb-test-roms/cpu_instrs/individual/05-op rp.gb");
+// pub const TEST_01: &Cartridge = include_bytes!("../tests/gb-test-roms/cpu_instrs/individual/05-op rp.gb");
 // include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
 // pub const TIC_TAC_TOE: &Cartridge = include_bytes!("../tictactoe.gb");
