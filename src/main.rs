@@ -174,6 +174,7 @@ pub fn main() {
             Some(millis) => {
                 let diff_from_start = now - start;
                 if diff_from_start > f64::from(millis) {
+                    capture_screenshot(&config, "final", &hardware.ppu.screen);
                     exit(124);
                 }
             }
