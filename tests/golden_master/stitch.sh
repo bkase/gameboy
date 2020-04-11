@@ -17,7 +17,7 @@ NEW="$2"
 OUT="$3"
 DIFF="$(mktemp).png"
 
-if diff -q $GOLDEN $NEW; then
+if diff -q "$GOLDEN" "$NEW"; then
   exit 0
 fi
 
