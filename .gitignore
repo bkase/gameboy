@@ -8,4 +8,5 @@ bootrom.asm
 DMG_ROM.hex
 DMG_ROM.bin
 result/
+out/
 

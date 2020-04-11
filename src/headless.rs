@@ -63,8 +63,8 @@ fn capture_screenshot(config: &Config, name: &str, screen: &Screen) {
 }
 
 fn open_and_validate(path: &PathBuf, length: u64) -> File {
-    let file = File::open(path).expect(&format!("Can't open bootrom file at {:?}", path));
-    let metadata = fs::metadata(path).expect("Can't read metadata in bootrom");
+    let file = File::open(path).expect(&format!("Can't open rom file at {:?}", path));
+    let metadata = fs::metadata(path).expect("Can't read metadata in rom");
     if metadata.len() != length {
         eprintln!("Rom is not {:} bytes", length);
         exit(1);
@@ -92,7 +92,7 @@ fn read_cartridge(path: &PathBuf) -> Cartridge {
     buf
 }
 
-pub fn run(config: Config) {
+pub fn run(config: Config) -> i32 {
     let bootrom = read_bootrom(&config.use_bootrom);
     let cartridge = read_cartridge(&config.rom);
 
@@ -117,7 +117,7 @@ pub fn run(config: Config) {
         match hardware.cpu.ip.peek(&hardware.cpu.memory) {
             Instr::Jump(Jr(-2)) => {
                 capture_screenshot(&config, "final", &hardware.ppu.screen);
-                exit(0);
+                return 0;
             }
             _ => (),
         }
@@ -133,7 +133,7 @@ pub fn run(config: Config) {
                 let diff_from_start = now - start;
                 if diff_from_start > f64::from(millis) {
                     capture_screenshot(&config, "final", &hardware.ppu.screen);
-                    exit(124);
+                    return 124;
                 }
             }
             None => (),

@@ -14,7 +14,6 @@ path = "src/main.rs"
 name = "records"
 path = "src/records_main.rs"
 
-
 [features]
 default = ["console_error_panic_hook"]
 
@@ -48,6 +47,8 @@ wee_alloc = { version = "0.4.2", optional = true }
 clap = "^2.33"
 structopt = "0.3"
 image = "0.23.3"
+serde_dhall = "0.5.0"
+serde = "1.0.106"
 
 [dependencies.web-sys]
 version = "0.3.4"
