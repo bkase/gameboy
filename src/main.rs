@@ -144,7 +144,7 @@ pub fn main() {
                         let diff_file = out_dir.join("diff.png");
                         // TODO: Diff and generate report
                         let output = Command::new("bash")
-                            .arg(&golden_path.join(Path::new("stitch.sh")).to_str().unwrap())
+                            .arg(&golden_path.join("stitch.sh").to_str().unwrap())
                             .arg(&golden_file)
                             .arg(&new_file)
                             .arg(&diff_file)
@@ -161,11 +161,12 @@ pub fn main() {
                                 err = true;
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
 
-                                let mut process = Command::new("imgcat")
-                                    .arg("--depth=iterm2")
-                                    .arg(diff_file.to_str().unwrap())
-                                    .spawn()
-                                    .expect("imgcat can't run");
+                                let mut process =
+                                    Command::new(golden_path.join("imgcat").to_str().unwrap())
+                                        .arg("-p")
+                                        .arg(diff_file.to_str().unwrap())
+                                        .spawn()
+                                        .expect("imgcat can't run");
                                 let _ = process.wait().unwrap();
                             } else {
                                 // otherwise there is no diff
