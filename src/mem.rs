@@ -741,15 +741,9 @@ impl Memory {
             0x8000..=0x9fff => self.video[(addr - 0x8000) as usize] = n,
             // begin video ram
             0x4000..=0x7fff => (),
-            0x0150..=0x3fff => {
-                println!("(header) ROM write; do we need to implement bank switching here?")
-            }
-            0x0100..=0x014f =>
-            // cartridge header
-            {
-                println!("(header) ROM write; do we need to implement bank switching here?")
-            }
-            0x0000..=0x00ff => println!("Cannot write to bootrom"),
+            0x0150..=0x3fff => (),
+            0x0100..=0x014f => (),
+            0x0000..=0x00ff => (),
         }
     }
 }

@@ -47,8 +47,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
-use std::process::Command;
-use std::process::ExitStatus;
+use std::process::{Command, ExitStatus, Output};
 use std::str::from_utf8;
 use structopt::StructOpt;
 
@@ -79,6 +78,16 @@ enum Config {
     },
 }
 
+fn exec(name: &str, command: &mut Command) -> Output {
+    let output = command.output().expect(&format!("Failed to run {:}", name));
+    if !output.status.success() {
+        eprintln!("Failed to run {:}", name);
+        eprintln!("OUT: {:}", from_utf8(output.stdout.as_slice()).unwrap());
+        eprintln!("ERR: {:}", from_utf8(output.stderr.as_slice()).unwrap());
+    }
+    output
+}
+
 pub fn main() {
     let config = Config::from_args();
 
@@ -88,19 +97,13 @@ pub fn main() {
         Config::Golden { golden_path } => {
             let specs_path = golden_path.join("golden_tests.dhall");
 
-            let output = Command::new("bash")
-                .arg("-c")
-                .arg(format!(
+            let output = exec(
+                "dhall-to-json",
+                Command::new("bash").arg("-c").arg(format!(
                     "dhall-to-json <<< './{:}'",
                     specs_path.to_str().unwrap()
-                ))
-                .output()
-                .expect("Failed to run dhall-to-json");
-            if !output.status.success() {
-                eprintln!("Failed to run dhall-to-json");
-                eprintln!("OUT: {:}", from_utf8(output.stdout.as_slice()).unwrap());
-                eprintln!("ERR: {:}", from_utf8(output.stderr.as_slice()).unwrap());
-            }
+                )),
+            );
 
             let specs: Vec<Spec> =
                 serde_json::from_str(&from_utf8(output.stdout.as_slice()).unwrap())
@@ -135,57 +138,37 @@ pub fn main() {
                         let golden_file = golden_dir.join(Path::new(
                             new_file.file_name().expect("File should have a file_name"),
                         ));
-                        // TODO: Check if golden file exists
+                        // If golden file doesn't exists, there's nothing for us to diff against
                         if !golden_file.exists() {
                             eprintln!("Missing golden file {:?}; cannot diff", golden_file);
                             continue;
                         }
 
+                        // Diff and generate the report
                         let diff_file = out_dir.join("diff.png");
-                        // TODO: Diff and generate report
-                        let output = Command::new("bash")
-                            .arg(&golden_path.join(Path::new("stitch.sh")).to_str().unwrap())
-                            .arg(&golden_file)
-                            .arg(&new_file)
-                            .arg(&diff_file)
-                            .output()
-                            .expect("Failed to run stitch.sh");
-
+                        let output = exec(
+                            "stitch.sh",
+                            Command::new("bash")
+                                .arg(&golden_path.join("stitch.sh").to_str().unwrap())
+                                .arg(&golden_file)
+                                .arg(&new_file)
+                                .arg(&diff_file),
+                        );
                         if !output.status.success() {
-                            eprintln!("Stich.sh command failed!");
-                            eprintln!("OUT: {:}", from_utf8(output.stdout.as_slice()).unwrap());
-                            eprintln!("ERR: {:}", from_utf8(output.stderr.as_slice()).unwrap());
+                            err = true;
                         } else {
                             // if the diff file exists it means that stitch.sh found a diff
                             if diff_file.exists() {
                                 err = true;
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
 
-                                let output = Command::new("base64")
-                                    .arg("-w0")
-                                    .arg(diff_file.to_str().unwrap())
-                                    // TODO: namespace to a specific build to avoid race
-                                    .output()
-                                    .expect("Failed to run buildkite-agent");
-
-                                if !output.status.success() {
-                                    eprintln!("Base64 failed");
-                                    eprintln!(
-                                        "OUT: {:}",
-                                        from_utf8(output.stdout.as_slice()).unwrap()
-                                    );
-                                    eprintln!(
-                                        "ERR: {:}",
-                                        from_utf8(output.stderr.as_slice()).unwrap()
-                                    );
-                                } else {
-                                    // let b64data = from_utf8(output.stdout.as_slice()).unwrap();
-                                    let mut process = Command::new("imgcat")
+                                let mut process =
+                                    Command::new(golden_path.join("imgcat").to_str().unwrap())
+                                        .arg("-p")
                                         .arg(diff_file.to_str().unwrap())
                                         .spawn()
                                         .expect("imgcat can't run");
-                                    let _ = process.wait().unwrap();
-                                }
+                                let _ = process.wait().unwrap();
                             } else {
                                 // otherwise there is no diff
                                 println!("✅ No diff on {:} @ {:}", r.name, rom)
