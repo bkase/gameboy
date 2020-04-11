@@ -179,11 +179,15 @@ pub fn main() {
                                         from_utf8(output.stderr.as_slice()).unwrap()
                                     );
                                 } else {
-                                    let b64data = from_utf8(output.stdout.as_slice()).unwrap();
-                                    eprintln!(
-                                        "\x33]1337;File=name=diff.png;size={:};inline=1;{:}\x07",
-                                        b64data.len(),
-                                        b64data
+                                    // let b64data = from_utf8(output.stdout.as_slice()).unwrap();
+                                    let mut process = Command::new("~/imgcat")
+                                        .arg(diff_file.to_str().unwrap())
+                                        .spawn()
+                                        .expect("imgcat can't run");
+
+                                    println!(
+                                        "imgcat exited with status {:}",
+                                        process.wait().unwrap()
                                     );
                                 }
                             } else {
