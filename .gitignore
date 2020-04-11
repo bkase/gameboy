@@ -4,9 +4,7 @@ Cargo.lock
 bin/
 pkg/
 wasm-pack.log
-bootrom.asm
-DMG_ROM.hex
-DMG_ROM.bin
 result/
 out/
+roms/
 

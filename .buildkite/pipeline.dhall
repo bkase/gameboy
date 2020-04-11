@@ -10,7 +10,7 @@ let CommandType =
   , plugins: Optional MapType
   }
 let with_plugin : CommandType -> CommandType =
-  \(cmd : CommandType) -> cmd // { plugins = Some [{ mapKey = "git-clean#v0.0.1", mapValue = { flags = "-fdqx --exclude=roms" } }] }
+  \(cmd : CommandType) -> cmd // { plugins = Some [{ mapKey = "git-clean#v0.0.1", mapValue = { flags = "-fdqx --exclude=roms --exclude=result" } }] }
 let a0 : CommandType =
   { command = "unzip -o -P $ROMS_PASSWORD roms.zip", label = "Load proprietary ROMs", key = "unzip", depends_on = None Text, plugins = None MapType }
 let a1 : CommandType =
