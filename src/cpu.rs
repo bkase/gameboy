@@ -226,7 +226,7 @@ impl Cpu {
             }
             Dec(RegsHl::Reg(r)) => {
                 let operand = self.registers.read8(r).0;
-                let result = alu::dec(&mut self.registers.flags, operand);
+                let result = alu::inc(&mut self.registers.flags, operand);
                 self.registers.write8n(r, result);
             }
             Dec(RegsHl::HlInd) => {
