@@ -144,13 +144,13 @@ fn blit_bytes(
 
 // Cartridges
 #[cfg(target_arch = "wasm32")]
-pub const TETRIS: &Cartridge = include_bytes!("../Tetris.GB");
+pub const TETRIS: &Cartridge = include_bytes!("../roms/Tetris.GB");
 
 // pub const TEST_01: &Cartridge = include_bytes!("../tests/gb-test-roms/cpu_instrs/individual/05-op rp.gb");
 // include_bytes!("../../mooneye-gb/tests/build/acceptance/instr/daa.gb");
 
-// pub const TIC_TAC_TOE: &Cartridge = include_bytes!("../tictactoe.gb");
-// pub const DR_MARIO: &Cartridge = include_bytes!("../drmario.gb");
+// pub const TIC_TAC_TOE: &Cartridge = include_bytes!("../roms/tictactoe.gb");
+// pub const DR_MARIO: &Cartridge = include_bytes!("../roms/drmario.gb");
 
 // This function is automatically invoked after the wasm module is instantiated.
 #[cfg(target_arch = "wasm32")]

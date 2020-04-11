@@ -46,7 +46,7 @@ pub type Cartridge = [u8; 0x8000];
 pub type Roms = These<Cow<'static, Bootrom>, Cow<'static, Cartridge>>;
 
 // TODO: Switch to unpatched ROM and figure out why lockup happens
-pub const BOOTROM: &Bootrom = include_bytes!("../DMG_ROM.bin");
+pub const BOOTROM: &Bootrom = include_bytes!("../roms/DMG_ROM.bin");
 
 #[derive(Copy, Clone, Debug)]
 pub struct TriggeredTimer(pub bool);
