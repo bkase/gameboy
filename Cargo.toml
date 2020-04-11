@@ -47,8 +47,11 @@ wee_alloc = { version = "0.4.2", optional = true }
 clap = "^2.33"
 structopt = "0.3"
 image = "0.23.3"
-serde_dhall = "0.5.0"
-serde = "1.0.106"
+serde_json = "1.0"
+
+[target.'cfg(unix)'.dependencies.serde]
+version = "1.0"
+features = ["derive"]
 
 [dependencies.web-sys]
 version = "0.3.4"

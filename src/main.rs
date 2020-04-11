@@ -11,7 +11,7 @@ extern crate packed_struct_codegen;
 extern crate structopt;
 extern crate clap;
 extern crate nom;
-extern crate serde_dhall;
+extern crate serde_json;
 extern crate these;
 #[macro_use]
 extern crate serde;
@@ -64,20 +64,6 @@ struct Spec {
     run: Vec<Run>,
 }
 
-fn main2() {
-    let specs: Vec<Spec> = serde_dhall::from_file("golden_tests.dhall")
-        .parse()
-        .expect("It parses");
-    specs.iter().for_each(|spec| {
-        spec.run.iter().for_each(|run| {
-            println!(
-                "Run rom {:} with {:} timeout {:}",
-                spec.rom, run.name, run.timeout_millis
-            );
-        });
-    });
-}
-
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Run a gameboy emulator without a graphics frontend")]
 enum Config {
@@ -90,8 +76,6 @@ enum Config {
     Golden {
         /// Golden tests folder where the output is stored
         golden_path: PathBuf,
-        /// Dhall file specifying golden tests we want to run
-        specs_path: PathBuf,
     },
 }
 
@@ -100,13 +84,26 @@ pub fn main() {
 
     match config {
         Config::Run { exec_config } => exit(run(exec_config)),
-        Config::Golden {
-            specs_path,
-            golden_path,
-        } => {
-            let specs: Vec<Spec> = serde_dhall::from_file(specs_path)
-                .parse()
-                .expect("It parses");
+        Config::Golden { golden_path } => {
+            let specs_path = golden_path.join("golden_tests.dhall");
+
+            let output = Command::new("bash")
+                .arg("-c")
+                .arg(format!(
+                    "dhall-to-json <<< './{:}'",
+                    specs_path.to_str().unwrap()
+                ))
+                .output()
+                .expect("Failed to run dhall-to-json");
+            if !output.status.success() {
+                eprintln!("Failed to run dhall-to-json");
+                eprintln!("OUT: {:}", from_utf8(output.stdout.as_slice()).unwrap());
+                eprintln!("ERR: {:}", from_utf8(output.stderr.as_slice()).unwrap());
+            }
+
+            let specs: Vec<Spec> =
+                serde_json::from_str(&from_utf8(output.stdout.as_slice()).unwrap())
+                    .expect("It parses");
 
             for spec in specs {
                 let rom = &spec.rom.clone();
