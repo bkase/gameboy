@@ -1,4 +1,4 @@
 steps:
   - command: dhall-to-yaml --quoted .buildkite/pipeline.dhall | buildkite-agent pipeline upload
-    label: ":pipeline: Load from dhall"
+    label: ":pipeline: Load pipeline from dhall"
 
