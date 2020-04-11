@@ -161,31 +161,12 @@ pub fn main() {
                                 err = true;
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
 
-                                let output = Command::new("base64")
-                                    .arg("-w0")
+                                let mut process = Command::new("imgcat")
+                                    .arg("--depth=iterm2")
                                     .arg(diff_file.to_str().unwrap())
-                                    // TODO: namespace to a specific build to avoid race
-                                    .output()
-                                    .expect("Failed to run buildkite-agent");
-
-                                if !output.status.success() {
-                                    eprintln!("Base64 failed");
-                                    eprintln!(
-                                        "OUT: {:}",
-                                        from_utf8(output.stdout.as_slice()).unwrap()
-                                    );
-                                    eprintln!(
-                                        "ERR: {:}",
-                                        from_utf8(output.stderr.as_slice()).unwrap()
-                                    );
-                                } else {
-                                    // let b64data = from_utf8(output.stdout.as_slice()).unwrap();
-                                    let mut process = Command::new("imgcat")
-                                        .arg(diff_file.to_str().unwrap())
-                                        .spawn()
-                                        .expect("imgcat can't run");
-                                    let _ = process.wait().unwrap();
-                                }
+                                    .spawn()
+                                    .expect("imgcat can't run");
+                                let _ = process.wait().unwrap();
                             } else {
                                 // otherwise there is no diff
                                 println!("✅ No diff on {:} @ {:}", r.name, rom)

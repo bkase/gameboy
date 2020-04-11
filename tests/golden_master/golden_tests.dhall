@@ -4,5 +4,8 @@
   , { rom = "../gb-test-roms/cpu_instrs/individual/06-ld r,r.gb"
     , run = [ { name = "main", timeout_millis = 100000 } ]
     }
+  , { rom = "../../roms/Tetris.gb"
+    , run = [ { name = "title", timeout_millis = 1000 } ]
+    }
   ]
 : List ./golden_test_schema.dhall
