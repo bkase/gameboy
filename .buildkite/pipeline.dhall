@@ -5,7 +5,7 @@ let CommandType =
   , depends_on: Optional Text
   }
 let a0 : CommandType =
-  { command = "unzip -P $ROMS_PASSWORD roms.zip", label = "Load proprietary ROMs", key = "unzip", depends_on = None Text }
+  { command = "unzip -o -P $ROMS_PASSWORD roms.zip", label = "Load proprietary ROMs", key = "unzip", depends_on = None Text }
 let a1 : CommandType =
   { command = "nix-build release.nix", label = ":hammer: Full Nixified Release Build", key = "release", depends_on = Some "unzip"}
 let a2 : CommandType =
