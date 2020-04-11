@@ -143,6 +143,7 @@ fn blit_bytes(
 }
 
 // Cartridges
+#[cfg(target_arch = "wasm32")]
 pub const TETRIS: &Cartridge = include_bytes!("../Tetris.GB");
 
 // pub const TEST_01: &Cartridge = include_bytes!("../tests/gb-test-roms/cpu_instrs/individual/05-op rp.gb");
@@ -152,6 +153,7 @@ pub const TETRIS: &Cartridge = include_bytes!("../Tetris.GB");
 // pub const DR_MARIO: &Cartridge = include_bytes!("../drmario.gb");
 
 // This function is automatically invoked after the wasm module is instantiated.
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub fn run() -> Result<(), JsValue> {
     utils::set_panic_hook();
