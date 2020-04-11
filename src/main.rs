@@ -42,12 +42,11 @@ mod utils;
 mod web_utils;
 
 use headless::run;
-use std::env::temp_dir;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
-use std::process::{Command, ExitStatus, Output};
+use std::process::{Command, Output};
 use std::str::from_utf8;
 use structopt::StructOpt;
 
@@ -134,7 +133,16 @@ pub fn main() {
                     });
 
                     for entry in fs::read_dir(&out_dir).expect("Expect dir to begin") {
+                        let diff_file = out_dir.join("$diff.png");
                         let new_file = entry.expect("Entry can load").path();
+
+                        // skip over diffs
+                        if diff_file == new_file {
+                            continue;
+                        }
+                        // Remove diff file so we know it's fresh for the run
+                        let _ = fs::remove_file(&diff_file);
+
                         let golden_file = golden_dir.join(Path::new(
                             new_file.file_name().expect("File should have a file_name"),
                         ));
@@ -145,7 +153,6 @@ pub fn main() {
                         }
 
                         // Diff and generate the report
-                        let diff_file = out_dir.join("diff.png");
                         let output = exec(
                             "stitch.sh",
                             Command::new("bash")
@@ -160,8 +167,25 @@ pub fn main() {
                             // if the diff file exists it means that stitch.sh found a diff
                             if diff_file.exists() {
                                 err = true;
-                                eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
+                                eprintln!(
+                                    "❌ Diff on {:} @ {:} on file {:?}",
+                                    r.name, rom, diff_file
+                                );
 
+                                // try to cat with kitty first
+                                let mut process = Command::new("kitty")
+                                    .arg("+kitten")
+                                    .arg("icat")
+                                    .arg(diff_file.to_str().unwrap())
+                                    .spawn();
+                                match process.iter_mut().next() {
+                                    Some(p) => {
+                                        let _ = p.wait();
+                                    }
+                                    None => (),
+                                };
+
+                                // cat with imgcat for iterm2 compat (+ buildkite logs)
                                 let mut process =
                                     Command::new(golden_path.join("imgcat").to_str().unwrap())
                                         .arg("-p")
