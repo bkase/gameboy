@@ -138,7 +138,7 @@ pub struct Registers {
     #[cfg_attr(
         test,
         proptest(
-            filter = "|x| (x.0 >= 0xc000 && x.0 <= 0xcfff) || (x.0 >= 0xff80 && x.0 <= 0xfffe)"
+            filter = "|x| (x.0 >= 0xc000 && x.0 <= 0xcfff) || (x.0 >= 0xff81 && x.0 <= 0xfffe)"
         )
     )]
     pub sp: R16, // stack pointer
