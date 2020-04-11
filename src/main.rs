@@ -82,6 +82,7 @@ enum Config {
 pub fn main() {
     let config = Config::from_args();
 
+    let mut err = false;
     match config {
         Config::Run { exec_config } => exit(run(exec_config)),
         Config::Golden { golden_path } => {
@@ -157,20 +158,18 @@ pub fn main() {
                         } else {
                             // if the diff file exists it means that stitch.sh found a diff
                             if diff_file.exists() {
+                                err = true;
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
-                                // upload to buildkite
-                                let dest = format!("diff_{:}_{:}", rom, r.name);
-                                let output = Command::new("buildkite-agent")
-                                    .arg("artifact")
-                                    .arg("upload")
+
+                                let output = Command::new("base64")
+                                    .arg("-w0")
                                     .arg(diff_file.to_str().unwrap())
                                     // TODO: namespace to a specific build to avoid race
-                                    .arg(&dest)
                                     .output()
                                     .expect("Failed to run buildkite-agent");
 
                                 if !output.status.success() {
-                                    eprintln!("Buildkite-agent upload failed");
+                                    eprintln!("Base64 failed");
                                     eprintln!(
                                         "OUT: {:}",
                                         from_utf8(output.stdout.as_slice()).unwrap()
@@ -180,10 +179,12 @@ pub fn main() {
                                         from_utf8(output.stderr.as_slice()).unwrap()
                                     );
                                 } else {
-                                    eprintln!(
-                                        "\x33]1338;url=\"artifact://{:}\";alt=\"Diffed file\"",
-                                        dest
-                                    );
+                                    // let b64data = from_utf8(output.stdout.as_slice()).unwrap();
+                                    let mut process = Command::new("imgcat")
+                                        .arg(diff_file.to_str().unwrap())
+                                        .spawn()
+                                        .expect("imgcat can't run");
+                                    let _ = process.wait().unwrap();
                                 }
                             } else {
                                 // otherwise there is no diff
@@ -194,5 +195,9 @@ pub fn main() {
                 }
             }
         }
+    }
+
+    if err {
+        exit(1);
     }
 }
