@@ -5,7 +5,7 @@
     , run = [ { name = "main", timeout_millis = 10000 } ]
     }
   , { rom = "../../roms/Tetris.gb"
-    , run = [ { name = "title", timeout_millis = 10000 } ]
+    , run = [ { name = "title", timeout_millis = 1000 } ]
     }
   ]
 : List ./golden_test_schema.dhall
