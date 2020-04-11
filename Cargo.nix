@@ -628,20 +628,7 @@ rec {
         ];
         
       };
-      "futures 0.1.29" = rec {
-        crateName = "futures";
-        version = "0.1.29";
-        edition = "2015";
-        sha256 = "1vq3cw37knnd0afw3rcjzh71i2l01v5m4ysinrrqdvnn2ql0z60v";
-        authors = [
-          "Alex Crichton <alex@alexcrichton.com>"
-        ];
-        features = {
-          "default" = [ "use_std" "with-deprecated" ];
-        };
-        resolvedDefaultFeatures = [ "default" "use_std" "with-deprecated" ];
-      };
-      "futures 0.3.4" = rec {
+      "futures" = rec {
         crateName = "futures";
         version = "0.3.4";
         edition = "2018";
@@ -1047,10 +1034,6 @@ rec {
           {
             name = "proptest-derive";
             packageId = "proptest-derive";
-          }
-          {
-            name = "wasm-bindgen-test";
-            packageId = "wasm-bindgen-test";
           }
         ];
         features = {
@@ -1590,7 +1573,7 @@ rec {
         dependencies = [
           {
             name = "futures";
-            packageId = "futures 0.3.4";
+            packageId = "futures";
           }
           {
             name = "illicit";
@@ -2469,7 +2452,7 @@ rec {
         dependencies = [
           {
             name = "futures";
-            packageId = "futures 0.3.4";
+            packageId = "futures";
           }
           {
             name = "wasm-bindgen";
@@ -3078,16 +3061,6 @@ rec {
         ];
         features = {
         };
-      };
-      "scoped-tls" = rec {
-        crateName = "scoped-tls";
-        version = "1.0.0";
-        edition = "2015";
-        sha256 = "1hj8lifzvivdb1z02lfnzkshpvk85nkgzxsy2hc0zky9wf894spa";
-        authors = [
-          "Alex Crichton <alex@alexcrichton.com>"
-        ];
-        
       };
       "scoped_threadpool" = rec {
         crateName = "scoped_threadpool";
@@ -3988,42 +3961,6 @@ rec {
         };
         resolvedDefaultFeatures = [ "spans" ];
       };
-      "wasm-bindgen-futures" = rec {
-        crateName = "wasm-bindgen-futures";
-        version = "0.3.27";
-        edition = "2018";
-        sha256 = "073p71skp91d9v2wczl6k7z9p0w25vn43br2v2g1ncbc6hvhnhl3";
-        authors = [
-          "The wasm-bindgen Developers"
-        ];
-        dependencies = [
-          {
-            name = "cfg-if";
-            packageId = "cfg-if";
-          }
-          {
-            name = "futures";
-            packageId = "futures 0.1.29";
-          }
-          {
-            name = "js-sys";
-            packageId = "js-sys";
-          }
-          {
-            name = "wasm-bindgen";
-            packageId = "wasm-bindgen";
-          }
-          {
-            name = "web-sys";
-            packageId = "web-sys";
-            target = { target, features }: (target."feature" == "atomics");
-            features = [ "MessageEvent" "Worker" ];
-          }
-        ];
-        features = {
-          "futures_0_3" = [ "futures-util-preview" "futures-channel-preview" "lazy_static" ];
-        };
-      };
       "wasm-bindgen-macro" = rec {
         crateName = "wasm-bindgen-macro";
         version = "0.2.60";
@@ -4093,67 +4030,6 @@ rec {
         sha256 = "0ffn4152w8n629f29lwjgj3adiyixvdbff3mld49gisssbknzxys";
         authors = [
           "The wasm-bindgen Developers"
-        ];
-        
-      };
-      "wasm-bindgen-test" = rec {
-        crateName = "wasm-bindgen-test";
-        version = "0.2.50";
-        edition = "2018";
-        sha256 = "1h96phc1dmwwqn46k05j2y1mc3ljazh8f1gqqy0x8hm7ccxnknd2";
-        authors = [
-          "The wasm-bindgen Developers"
-        ];
-        dependencies = [
-          {
-            name = "console_error_panic_hook";
-            packageId = "console_error_panic_hook";
-          }
-          {
-            name = "futures";
-            packageId = "futures 0.1.29";
-          }
-          {
-            name = "js-sys";
-            packageId = "js-sys";
-          }
-          {
-            name = "scoped-tls";
-            packageId = "scoped-tls";
-          }
-          {
-            name = "wasm-bindgen";
-            packageId = "wasm-bindgen";
-          }
-          {
-            name = "wasm-bindgen-futures";
-            packageId = "wasm-bindgen-futures";
-          }
-          {
-            name = "wasm-bindgen-test-macro";
-            packageId = "wasm-bindgen-test-macro";
-          }
-        ];
-        
-      };
-      "wasm-bindgen-test-macro" = rec {
-        crateName = "wasm-bindgen-test-macro";
-        version = "0.2.50";
-        edition = "2018";
-        sha256 = "19bvmw8mqlwh6wkbzgs3cnlkywrv8q2kkqggz6y0p158930xm287";
-        procMacro = true;
-        authors = [
-          "The wasm-bindgen Developers"
-        ];
-        dependencies = [
-          {
-            name = "proc-macro2";
-            packageId = "proc-macro2 0.4.30";
-          }
-          {
-            name = "quote";
-            packageId = "quote 0.6.13";
-          }
         ];
         
       };
@@ -4585,7 +4461,7 @@ rec {
           "XrSpace" = [ "EventTarget" ];
           "XrViewerPose" = [ "XrPose" ];
         };
-        resolvedDefaultFeatures = [ "AnimationEvent" "Attr" "AudioContext" "AudioContextState" "AudioDestinationNode" "AudioNode" "AudioParam" "AudioProcessingEvent" "AudioScheduledSourceNode" "BaseAudioContext" "BeforeUnloadEvent" "BlobEvent" "CanvasRenderingContext2d" "CharacterData" "ClipboardEvent" "CloseEvent" "CompositionEvent" "DeviceMotionEvent" "DeviceOrientationEvent" "Document" "DragEvent" "Element" "ErrorEvent" "Event" "EventTarget" "ExtendableEvent" "FetchEvent" "FocusEvent" "GainNode" "GamepadEvent" "HashChangeEvent" "HtmlCanvasElement" "HtmlElement" "HtmlInputElement" "IdbVersionChangeEvent" "ImageData" "KeyboardEvent" "MessageEvent" "MouseEvent" "NamedNodeMap" "Node" "NodeList" "NotificationEvent" "OfflineAudioCompletionEvent" "OscillatorNode" "OscillatorType" "PageTransitionEvent" "PointerEvent" "PopStateEvent" "ProgressEvent" "PushEvent" "SpeechRecognitionEvent" "SpeechSynthesisErrorEvent" "SpeechSynthesisEvent" "Storage" "StorageEvent" "Text" "TimeEvent" "TouchEvent" "TransitionEvent" "UiEvent" "UserProximityEvent" "WheelEvent" "Window" "Worker" "console" ];
+        resolvedDefaultFeatures = [ "AnimationEvent" "Attr" "AudioContext" "AudioContextState" "AudioDestinationNode" "AudioNode" "AudioParam" "AudioProcessingEvent" "AudioScheduledSourceNode" "BaseAudioContext" "BeforeUnloadEvent" "BlobEvent" "CanvasRenderingContext2d" "CharacterData" "ClipboardEvent" "CloseEvent" "CompositionEvent" "DeviceMotionEvent" "DeviceOrientationEvent" "Document" "DragEvent" "Element" "ErrorEvent" "Event" "EventTarget" "ExtendableEvent" "FetchEvent" "FocusEvent" "GainNode" "GamepadEvent" "HashChangeEvent" "HtmlCanvasElement" "HtmlElement" "HtmlInputElement" "IdbVersionChangeEvent" "ImageData" "KeyboardEvent" "MessageEvent" "MouseEvent" "NamedNodeMap" "Node" "NodeList" "NotificationEvent" "OfflineAudioCompletionEvent" "OscillatorNode" "OscillatorType" "PageTransitionEvent" "PointerEvent" "PopStateEvent" "ProgressEvent" "PushEvent" "SpeechRecognitionEvent" "SpeechSynthesisErrorEvent" "SpeechSynthesisEvent" "Storage" "StorageEvent" "Text" "TimeEvent" "TouchEvent" "TransitionEvent" "UiEvent" "UserProximityEvent" "WheelEvent" "Window" "console" ];
       };
       "wee_alloc" = rec {
         crateName = "wee_alloc";

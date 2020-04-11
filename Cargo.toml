@@ -80,7 +80,6 @@ features = [
 ]
 
 [dev-dependencies]
-wasm-bindgen-test = "0.2.50"
 proptest = "0.9.1"
 proptest-derive = "0.1.0"
 
