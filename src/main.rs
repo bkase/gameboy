@@ -159,7 +159,7 @@ pub fn main() {
                             if diff_file.exists() {
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
                                 // upload to buildkite
-                                let dest = format!("diff_{:}_{:}", rom, r.name);
+                                let dest = format!("artifact://diff_{:}_{:}", rom, r.name);
                                 let output = Command::new("buildkite-agent")
                                     .arg("artifact")
                                     .arg("upload")
@@ -180,10 +180,7 @@ pub fn main() {
                                         from_utf8(output.stderr.as_slice()).unwrap()
                                     );
                                 } else {
-                                    eprintln!(
-                                        "\x33]1338;url=\"artifact://{:}\";alt=\"Diffed file\"",
-                                        dest
-                                    );
+                                    eprintln!("\x33]1338;url=\"{:}\";alt=\"Diffed file\"", dest);
                                 }
                             } else {
                                 // otherwise there is no diff

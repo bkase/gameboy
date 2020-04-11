@@ -22,4 +22,4 @@ let a3 : CommandType =
 let b1 : CommandType =
   with_plugin (with_unzip { command = "nix-shell shell.nix --run \"./result/bin/headless golden tests/golden_master\"", label = "Golden Master Tests", key = "golden", depends_on = Some "release", plugins = None MapType })
 in
-{ steps = [ a1, a2, a3, b1 ] }
+{ steps = [ a1, b1, a2, a3 ] }
