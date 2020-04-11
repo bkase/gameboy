@@ -180,15 +180,11 @@ pub fn main() {
                                     );
                                 } else {
                                     // let b64data = from_utf8(output.stdout.as_slice()).unwrap();
-                                    let mut process = Command::new("/Users/bkase/imgcat")
+                                    let mut process = Command::new("imgcat")
                                         .arg(diff_file.to_str().unwrap())
                                         .spawn()
                                         .expect("imgcat can't run");
-
-                                    println!(
-                                        "imgcat exited with status {:}",
-                                        process.wait().unwrap()
-                                    );
+                                    let _ = process.wait().unwrap();
                                 }
                             } else {
                                 // otherwise there is no diff
