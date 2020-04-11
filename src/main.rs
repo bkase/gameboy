@@ -82,6 +82,7 @@ enum Config {
 pub fn main() {
     let config = Config::from_args();
 
+    let mut err = false;
     match config {
         Config::Run { exec_config } => exit(run(exec_config)),
         Config::Golden { golden_path } => {
@@ -157,9 +158,11 @@ pub fn main() {
                         } else {
                             // if the diff file exists it means that stitch.sh found a diff
                             if diff_file.exists() {
+                                err = true;
                                 eprintln!("❌ Diff on {:} @ {:}", r.name, rom);
 
                                 let output = Command::new("base64")
+                                    .arg("-w0")
                                     .arg(diff_file.to_str().unwrap())
                                     // TODO: namespace to a specific build to avoid race
                                     .output()
@@ -176,7 +179,12 @@ pub fn main() {
                                         from_utf8(output.stderr.as_slice()).unwrap()
                                     );
                                 } else {
-                                    eprintln!("\x33]1338;url=data:image/png;base64,{:};alt=\"Diffed file\"", from_utf8(output.stdout.as_slice()).unwrap());
+                                    let b64data = from_utf8(output.stdout.as_slice()).unwrap();
+                                    eprintln!(
+                                        "\x33]1337;File=name=diff.png;size={:};inline=1;{:}\x07",
+                                        b64data.len(),
+                                        b64data
+                                    );
                                 }
                             } else {
                                 // otherwise there is no diff
@@ -187,5 +195,9 @@ pub fn main() {
                 }
             }
         }
+    }
+
+    if err {
+        exit(1);
     }
 }
