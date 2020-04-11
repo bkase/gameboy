@@ -15,4 +15,4 @@ let a3 : CommandType =
 let b1 : CommandType =
   { command = "nix-shell shell.nix --run \"./result/bin/headless golden tests/golden_master tests/golden_master/golden_tests.dhall\"", label = "Golden Master Tests", key = "golden", depends_on = Some "release" }
 in
-{ steps = [ a1, a2, a3, b1 ] }
+{ steps = [ a0, a1, a2, a3, b1 ] }
