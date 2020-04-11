@@ -387,8 +387,8 @@ impl Cpu {
 mod push_pop_tests {
     use cpu::Cpu;
     use mem::BOOTROM;
-    use register::Registers;
-    use register::R16;
+    use register::Flags;
+    use register::{R16, R8};
     use std::borrow::Cow;
     use test::proptest::prelude::*;
     use these::These;
@@ -406,16 +406,19 @@ mod push_pop_tests {
         }
 
         #[test]
-        fn push_pop_af_self_inverse_cpu(regs: Registers) {
-            let mut cpu = Cpu::create_with_registers(regs.clone());
+        fn push_pop_af_self_inverse_cpu(a: R8, flags: Flags) {
+            let mut cpu = Cpu::create(These::This(Cow::Borrowed(BOOTROM)));
+            cpu.registers.sp = R16(0xff90);
+            cpu.registers.a = a;
+            cpu.registers.flags = flags.clone();
             // PushAf, PopAf
             cpu.inject_instrs_update_ip(vec![0xf5, 0xf1]);
 
             cpu.execute();
             cpu.execute();
 
-            assert_eq!(cpu.registers.a, regs.a, "The A register");
-            assert_eq!(cpu.registers.flags, regs.flags, "The flags");
+            assert_eq!(cpu.registers.a, a, "The A register");
+            assert_eq!(cpu.registers.flags, flags, "The flags");
         }
     }
 }
