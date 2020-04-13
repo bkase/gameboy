@@ -76,29 +76,16 @@ fn addhl_(left: u16, right: u16) -> (u16, bool, bool) {
 
     let bottom_12 = (left32 & 0xfff) + (right32 & 0xfff);
     let carry_at_11 = (bottom_12 & 0x1000) == 0x1000;
-    let carry_at_end = (left32 + right32) & 0x10_000 == 0x10_000;
+    let carry_at_end = (left32 + right32) > 0xffff;
     (left.wrapping_add(right), carry_at_11, carry_at_end)
 }
 
 // TODO: This is a little hacky, and the logic could be wrong. Check this.
-// returns result, carry_at_3, carry_at_7
+// returns result, carry_at_11, carry_at_end
 fn addsp_(left: u16, right: i8) -> (u16, bool, bool) {
-    let (abs, is_sub) = if right > 0 {
-        (right as u8, false)
-    } else {
-        ((-right) as u8, true)
-    };
+    let (_, carry_at_3, carry_at_end) = adc_(left as u8, right as u8, false);
 
-    if is_sub {
-        let (res8, borrow_at_4, borrow_at_end) = sub_((left & 0xff) as u8, abs);
-        let result =
-            ((left & 0xff00).wrapping_sub(if borrow_at_end { 1 } else { 0 })) | (u16::from(res8));
-        (result, borrow_at_4, borrow_at_end)
-    } else {
-        let (res8, carry_at_3, carry_at_end) = add_((left & 0xff) as u8, abs);
-        let result = ((left & 0xff00) | (u16::from(res8))).wrapping_add(1);
-        (result, carry_at_3, carry_at_end)
-    }
+    (left.wrapping_add(right as u16), carry_at_3, carry_at_end)
 }
 
 pub fn addsp(flags: &mut Flags, left: u16, right: i8) -> u16 {
