@@ -13,14 +13,13 @@ use register::Flags;
 */
 // returns result, was there a borrow at 4, and was there a borrow at the end
 fn sbc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
-    let left16 = u16::from(left);
-    let right16 = u16::from(right);
+    let left16 = i16::from(left);
+    let right16 = i16::from(right);
 
     let old_carry_num = if old_carry { 1 } else { 0 };
-    let bottom_nibble_approx = ((left16 & 0x0f) | 0x80) - ((right16 + old_carry_num) & 0x0f);
 
-    let borrow_at_4 = (bottom_nibble_approx & 0x10) == 0x10;
-    let borrow_at_end = ((left16 | 0x8000) - (right16 + old_carry_num)) & 0x100 == 0x100;
+    let borrow_at_4 = (left16 & 0x0f) - (right16 & 0x0f) - old_carry_num < 0;
+    let borrow_at_end = (left16 & 0xff) - (right16 & 0xff) - old_carry_num < 0;
     (
         left.wrapping_sub(right).wrapping_sub(old_carry_num as u8),
         borrow_at_4,
@@ -56,9 +55,9 @@ fn adc_(left: u8, right: u8, old_carry: bool) -> (u8, bool, bool) {
     let right16 = u16::from(right);
 
     let old_carry_num = if old_carry { 1 } else { 0 };
-    let bottom_nibble = (left16 & 0x0f) + ((right16 + old_carry_num) & 0x0f);
-    let carry_at_3 = (bottom_nibble & 0x10) == 0x10;
-    let carry_at_end = (left16 + right16 + old_carry_num) & 0x100 == 0x100;
+    let bottom_nibble = (left16 & 0x0f) + (right16 & 0x0f) + old_carry_num;
+    let carry_at_3 = bottom_nibble > 0x0f;
+    let carry_at_end = (left16 + right16 + old_carry_num) > 0xff;
     (
         left.wrapping_add(right).wrapping_add(old_carry_num as u8),
         carry_at_3,
