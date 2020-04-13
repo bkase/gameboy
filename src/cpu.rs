@@ -144,9 +144,11 @@ impl Cpu {
             DwordGetsAddr(r16, addr) => self.registers.write16r(r16, addr.into_register()),
             SpGetsHl => self.registers.sp = self.registers.hl,
             HlGetsSpOffset(r8) => {
+                // same flag switch as addsp;
+                let _ = alu::addsp(&mut self.registers.flags, self.registers.sp.0, r8);
                 self.registers.hl = Addr::indirectly(self.registers.sp)
                     .offset_signed(r8)
-                    .into_register()
+                    .into_register();
             }
         };
         BranchAction::Take
