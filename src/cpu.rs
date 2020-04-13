@@ -865,6 +865,84 @@ mod cpu_to_spec {
         }
     }
 
+    #[test]
+    fn adc_manual_examples() {
+        /*
+         * Examples: When A = E1h, E = 0Fh, (HL) = 1Eh, and CY = 1,
+         *             ADC A, E ; A ← F1h, Z ← 0, H ← 1, CY ← 0
+         *             ADC A, 3Bh ; A ← 1Dh, Z ← 0, H ← 0, CY ← -1
+         *             ADC A, (HL) ; A ← 00h, Z ← 1, H ← 1, CY ← 1
+         */
+        struct Expected {
+            a: R8,
+            z: bool,
+            h: bool,
+            cy: bool,
+        }
+
+        let init = || {
+            let mut regs = Registers::create();
+            regs.a = R8(0xe1);
+            regs.set_e(R8(0x0f));
+            regs.hl = R16(0xca00);
+            regs.flags.c = true;
+
+            let mut cpu = Cpu::create_with_registers(regs.clone());
+            cpu.memory.st8(Addr::indirectly(regs.hl), 0x1e);
+            cpu
+        };
+
+        let check = |name: &str, cpu: &mut Cpu, expected: Expected| {
+            println!("Checking '{:}'", name);
+            assert_eq!(cpu.registers.a, expected.a, "A is not correct");
+            assert_eq!(cpu.registers.flags.z, expected.z, "Z is not correct");
+            assert_eq!(cpu.registers.flags.h, expected.h, "H is not correct");
+            assert_eq!(cpu.registers.flags.c, expected.cy, "C is not correct");
+        };
+
+        // ADC A, E ; A ← F1h, Z ← 0, H ← 1, CY ← 0
+        let mut cpu = init();
+        cpu.execute_instr(Instr::Arith(Arith::Adc(RegsHlN::Reg(RegisterKind8::E))));
+        check(
+            "Reg",
+            &mut cpu,
+            Expected {
+                a: R8(0xf1),
+                z: false,
+                h: true,
+                cy: false,
+            },
+        );
+
+        // ADC A, 3Bh ; A ← 1Dh, Z ← 0, H ← 0, CY ← -1
+        let mut cpu = init();
+        cpu.execute_instr(Instr::Arith(Arith::Adc(RegsHlN::N(0x3b))));
+        check(
+            "Literal",
+            &mut cpu,
+            Expected {
+                a: R8(0x1d),
+                z: false,
+                h: false,
+                cy: true,
+            },
+        );
+
+        // ADC A, (HL) ; A ← 00h, Z ← 1, H ← 1, CY ← 1
+        let mut cpu = init();
+        cpu.execute_instr(Instr::Arith(Arith::Adc(RegsHlN::HlInd)));
+        check(
+            "HlInd",
+            &mut cpu,
+            Expected {
+                a: R8(0x00),
+                z: true,
+                h: true,
+                cy: true,
+            },
+        );
+    }
+
     proptest! {
         #[test]
         fn ld_r_r_(regs: Registers) {
