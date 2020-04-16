@@ -58,6 +58,7 @@ struct Run {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct Spec {
+    use_bootrom: Option<String>,
     rom: String,
     run: Vec<Run>,
 }
@@ -110,6 +111,7 @@ pub fn main() {
 
             for spec in specs {
                 let rom = &spec.rom.clone();
+                let use_bootrom = &spec.use_bootrom.clone();
                 for r in &spec.run {
                     let sub_screenshot_dir = Path::new(
                         Path::new(&rom)
@@ -125,7 +127,9 @@ pub fn main() {
                     fs::create_dir_all(&golden_dir).expect("Dir created properly");
 
                     let _code = run(headless::Config {
-                        use_bootrom: None,
+                        use_bootrom: use_bootrom
+                            .clone()
+                            .map(|s| PathBuf::new().join(&golden_path).join(&s)),
                         trace: false,
                         screenshot_directory: Some(out_dir.clone()),
                         timeout: Some(r.timeout_millis),

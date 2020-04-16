@@ -486,7 +486,7 @@ impl Memory {
     }
     pub fn create(roms: Roms) -> Memory {
         let has_bootrom = roms.is_here();
-        let (rom0, rom1) = match roms.that() {
+        let (rom0, rom1) = match roms.there() {
             Some(c) => {
                 let (bank0, bank1) = c.split_at(0x4000);
                 (bank0.to_vec(), bank1.to_vec())
