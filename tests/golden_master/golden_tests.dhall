@@ -19,7 +19,7 @@ in    [ ten "../gb-test-roms/cpu_instrs/individual/01-special.gb"
       , { use_bootrom = Some "../../roms/DMG_ROM.bin"
         , rom = "../../roms/Tetris.gb"
         , run =
-          [ { name = "boot", timeout_millis = 3500 }
+          [ { name = "boot", timeout_millis = 4000 }
           , { name = "title", timeout_millis = 5000 }
           ]
         }
