@@ -48,6 +48,7 @@ clap = "^2.33"
 structopt = "0.3"
 image = "0.23.3"
 serde_json = "1.0"
+ansi-escapes = "0.1"
 
 [target.'cfg(unix)'.dependencies.serde]
 version = "1.0"

@@ -86,6 +86,16 @@ rec {
         ];
         
       };
+      "ansi-escapes" = rec {
+        crateName = "ansi-escapes";
+        version = "0.1.0";
+        edition = "2015";
+        sha256 = "1cv85bik542kzpvxm17bwfsr6g317cmfl0ih1vcy4gsqi1gzyfqn";
+        authors = [
+          "Linus Unnebäck <linus@folkdatorn.se>"
+        ];
+        
+      };
       "ansi_term" = rec {
         crateName = "ansi_term";
         version = "0.11.0";
@@ -941,6 +951,11 @@ rec {
         ];
         dependencies = [
           {
+            name = "ansi-escapes";
+            packageId = "ansi-escapes";
+            target = { target, features }: target."unix";
+          }
+          {
             name = "cfg-if";
             packageId = "cfg-if";
           }
@@ -1178,7 +1193,7 @@ rec {
         dependencies = [
           {
             name = "proc-macro-error";
-            packageId = "proc-macro-error 1.0.0";
+            packageId = "proc-macro-error";
           }
           {
             name = "quote";
@@ -1536,7 +1551,7 @@ rec {
         dependencies = [
           {
             name = "proc-macro-error";
-            packageId = "proc-macro-error 1.0.0";
+            packageId = "proc-macro-error";
           }
           {
             name = "proc-macro-hack";
@@ -1826,9 +1841,9 @@ rec {
       };
       "num_cpus" = rec {
         crateName = "num_cpus";
-        version = "1.12.0";
+        version = "1.13.0";
         edition = "2015";
-        sha256 = "1riw641hsmp2vwb9wz7d26dsycrjbw3zf4nd6p18kzw5y1a3a826";
+        sha256 = "1cv6yxhz2zbnwn8pn1yn8grg7zsnd523947fby41a737aqvryj85";
         authors = [
           "Sean McArthur <sean@seanmonstar.com>"
         ];
@@ -2043,43 +2058,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "simd" "std" ];
       };
-      "proc-macro-error 0.4.12" = rec {
-        crateName = "proc-macro-error";
-        version = "0.4.12";
-        edition = "2018";
-        sha256 = "1rvpaadwv7vmsp142qqh2axqrr9v78f1nvdsi9nhmfhy10kk1wqq";
-        authors = [
-          "CreepySkeleton <creepy-skeleton@yandex.ru>"
-        ];
-        dependencies = [
-          {
-            name = "proc-macro-error-attr";
-            packageId = "proc-macro-error-attr 0.4.12";
-          }
-          {
-            name = "proc-macro2";
-            packageId = "proc-macro2 1.0.10";
-          }
-          {
-            name = "quote";
-            packageId = "quote 1.0.3";
-          }
-          {
-            name = "syn";
-            packageId = "syn 1.0.17";
-            usesDefaultFeatures = false;
-            features = [ "derive" "parsing" "proc-macro" "printing" ];
-          }
-        ];
-        buildDependencies = [
-          {
-            name = "version_check";
-            packageId = "version_check";
-          }
-        ];
-        
-      };
-      "proc-macro-error 1.0.0" = rec {
+      "proc-macro-error" = rec {
         crateName = "proc-macro-error";
         version = "1.0.0";
         edition = "2018";
@@ -2090,7 +2069,7 @@ rec {
         dependencies = [
           {
             name = "proc-macro-error-attr";
-            packageId = "proc-macro-error-attr 1.0.0";
+            packageId = "proc-macro-error-attr";
           }
           {
             name = "proc-macro2";
@@ -2115,44 +2094,7 @@ rec {
         ];
         
       };
-      "proc-macro-error-attr 0.4.12" = rec {
-        crateName = "proc-macro-error-attr";
-        version = "0.4.12";
-        edition = "2018";
-        sha256 = "1pk9mwcfnpf8favgc2cl4sqlmi818p96hg8pfb51wg5nzmvlnnwa";
-        procMacro = true;
-        authors = [
-          "CreepySkeleton <creepy-skeleton@yandex.ru>"
-        ];
-        dependencies = [
-          {
-            name = "proc-macro2";
-            packageId = "proc-macro2 1.0.10";
-          }
-          {
-            name = "quote";
-            packageId = "quote 1.0.3";
-          }
-          {
-            name = "syn";
-            packageId = "syn 1.0.17";
-            usesDefaultFeatures = false;
-            features = [ "derive" "parsing" "proc-macro" "printing" ];
-          }
-          {
-            name = "syn-mid";
-            packageId = "syn-mid";
-          }
-        ];
-        buildDependencies = [
-          {
-            name = "version_check";
-            packageId = "version_check";
-          }
-        ];
-        
-      };
-      "proc-macro-error-attr 1.0.0" = rec {
+      "proc-macro-error-attr" = rec {
         crateName = "proc-macro-error-attr";
         version = "1.0.0";
         edition = "2018";
@@ -3291,9 +3233,9 @@ rec {
       };
       "structopt" = rec {
         crateName = "structopt";
-        version = "0.3.12";
+        version = "0.3.13";
         edition = "2018";
-        sha256 = "178m7wxnjyy9a8a961z74nazjsg79rfv3gv9g3bykfrrjmqs5yn8";
+        sha256 = "1yq0bj88jmrddaygciy60q3yxsvabhh4vvzm9nvxgpq7s7la4vgz";
         authors = [
           "Guillaume Pinot <texitoi@texitoi.eu>"
           "others"
@@ -3329,9 +3271,9 @@ rec {
       };
       "structopt-derive" = rec {
         crateName = "structopt-derive";
-        version = "0.4.5";
+        version = "0.4.6";
         edition = "2018";
-        sha256 = "0c04bbzc5bmr2ns6qy35yz55nn3xvlq4dpwxdynnljb9ikhvi21z";
+        sha256 = "1b6rxgjj6i9bvl83xsl38nfcq3a72gfhjlb6hvii5bzv11yci2d4";
         procMacro = true;
         authors = [
           "Guillaume Pinot <texitoi@texitoi.eu>"
@@ -3343,7 +3285,7 @@ rec {
           }
           {
             name = "proc-macro-error";
-            packageId = "proc-macro-error 0.4.12";
+            packageId = "proc-macro-error";
           }
           {
             name = "proc-macro2";
