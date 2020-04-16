@@ -15,6 +15,7 @@ extern crate serde_json;
 extern crate these;
 #[macro_use]
 extern crate serde;
+extern crate ansi_escapes;
 
 #[cfg(test)]
 pub mod test {
@@ -37,6 +38,7 @@ mod register;
 mod register_kind;
 mod screen;
 mod sound;
+mod terminal;
 mod trace;
 mod utils;
 mod web_utils;
@@ -76,6 +78,11 @@ enum Config {
         /// Golden tests folder where the output is stored
         golden_path: PathBuf,
     },
+    /// The head is the terminal!!
+    Term {
+        #[structopt(flatten)]
+        exec_config: headless::Config,
+    },
 }
 
 fn exec(name: &str, command: &mut Command) -> Output {
@@ -93,6 +100,7 @@ pub fn main() {
 
     let mut err = false;
     match config {
+        Config::Term { exec_config } => terminal::run(exec_config),
         Config::Run { exec_config } => exit(run(exec_config)),
         Config::Golden { golden_path } => {
             let specs_path = golden_path.join("golden_tests.dhall");

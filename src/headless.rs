@@ -72,7 +72,7 @@ fn open_and_validate(path: &PathBuf, length: u64) -> File {
     file
 }
 
-fn read_bootrom(use_bootrom: &Option<PathBuf>) -> Option<Bootrom> {
+pub fn read_bootrom(use_bootrom: &Option<PathBuf>) -> Option<Bootrom> {
     use_bootrom.as_ref().map(|path| {
         let mut bootrom = open_and_validate(path, 0x100);
         let mut buf: Bootrom = [0; 0x100];
@@ -83,7 +83,7 @@ fn read_bootrom(use_bootrom: &Option<PathBuf>) -> Option<Bootrom> {
     })
 }
 
-fn read_cartridge(path: &PathBuf) -> Cartridge {
+pub fn read_cartridge(path: &PathBuf) -> Cartridge {
     let mut cartridge = open_and_validate(path, 0x8000);
     let mut buf: Cartridge = [0; 0x8000];
     cartridge

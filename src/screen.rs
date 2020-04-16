@@ -39,6 +39,16 @@ impl Screen {
     }
 
     #[inline]
+    pub fn get(&self, coord: Coordinate) -> Rgb {
+        let idx: usize = (u32::from(coord.y) * self.width * 4 + u32::from(coord.x) * 4) as usize;
+        Rgb {
+            r: self.data[idx],
+            g: self.data[idx + 1],
+            b: self.data[idx + 2],
+        }
+    }
+
+    #[inline]
     pub fn bang(&mut self, rgb: Rgb, coord: Coordinate) {
         // Total size = height * width * 4
         //
