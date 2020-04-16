@@ -1,4 +1,4 @@
-use cpu::{Cpu, InterruptKind};
+use cpu::{Cpu, ExecutionEffect, InterruptKind};
 use mem::{Addr, Roms, TriggeredTimer};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
@@ -31,6 +31,8 @@ pub struct Hardware {
     pub vblanks: usize,
     pub start_time: f64,
     trace: bool,
+    // set on HALT or STOP insructions
+    waiting: bool,
 }
 
 struct SpacedBytes(Vec<u8>);
@@ -82,6 +84,7 @@ impl Hardware {
             vblanks: 0,
             start_time: performance.now(),
             trace,
+            waiting: false,
         }
     }
 
@@ -92,7 +95,18 @@ impl Hardware {
             self.trace_state();
         }
 
-        let elapsed_duration = self.cpu.execute();
+        // if we're not waiting, then execute the next instruction
+        // otherwise wait!!
+        let (elapsed_duration, effect) = if !self.waiting {
+            self.cpu.execute()
+        } else {
+            (1, None)
+        };
+        match effect {
+            Some(ExecutionEffect::Wait) => self.waiting = true,
+            None => (),
+        };
+
         let TriggeredVblank(triggered_vblank) =
             self.ppu.advance(&mut self.cpu.memory, elapsed_duration);
         // TODO: Is this okay that we ppu advance after the CPU tick? I.e. do we execute that
@@ -105,6 +119,11 @@ impl Hardware {
             .cpu
             .memory
             .advance_timers((self.clocks_elapsed % 4194304) as u32);
+
+        if triggered_vblank || triggered_timer {
+            // unconditionally stop waiting after _attempting_ interrupt even if it was disabled
+            self.waiting = false;
+        }
 
         // attempt interrupts
         if triggered_vblank {

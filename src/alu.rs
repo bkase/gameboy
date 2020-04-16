@@ -260,6 +260,15 @@ pub fn shift_right_carry(flags: &mut Flags, x: u8) -> u8 {
     r
 }
 
+pub fn shift_right_carry_loop(flags: &mut Flags, x: u8) -> u8 {
+    let r = (x >> 1) | x & 0x80;
+
+    flags.reset();
+    flags.z = r == 0;
+    flags.c = x & 0x1 == 0x1;
+    r
+}
+
 // DAA instruction is weird
 // https://ehaskins.com/2018-01-30%20Z80%20DAA/
 pub fn daa(flags: &mut Flags, x: u8) -> u8 {

@@ -218,6 +218,7 @@ pub enum Arith {
     Dec(RegsHl),
     Swap(RegsHl),
     Sla(RegsHl),
+    Sra(RegsHl),
     Srl(RegsHl),
     Cpl,
 
@@ -244,6 +245,7 @@ impl fmt::Display for Arith {
             Dec(x) => write!(f, "dec {:}", x),
             Swap(x) => write!(f, "swap {:}", x),
             Sla(x) => write!(f, "sla {:}", x),
+            Sra(x) => write!(f, "sra {:}", x),
             Srl(x) => write!(f, "srl {:}", x),
             Cpl => write!(f, "cpl"),
 
@@ -283,6 +285,10 @@ impl HasDuration for Arith {
                 RegsHl::Reg(_) => (2, None),
                 RegsHl::HlInd => (4, None),
             },
+            Sra(x) => match x {
+                RegsHl::Reg(_) => (2, None),
+                RegsHl::HlInd => (4, None),
+            },
             Srl(x) => match x {
                 RegsHl::Reg(_) => (2, None),
                 RegsHl::HlInd => (4, None),
@@ -296,8 +302,10 @@ pub enum Rotate {
     Rla,
     Rra,
     Rlca,
+    Rrca,
     Rl(RegsHl),
     Rlc(RegsHl),
+    Rrc(RegsHl),
     Rr(RegsHl),
 }
 use self::Rotate::*;
@@ -308,8 +316,10 @@ impl fmt::Display for Rotate {
             Rla => write!(f, "rla"),
             Rra => write!(f, "rra"),
             Rlca => write!(f, "rlca"),
+            Rrca => write!(f, "rrca"),
             Rl(r) => write!(f, "rl {:}", r),
             Rlc(r) => write!(f, "rlc {:}", r),
+            Rrc(r) => write!(f, "rrc {:}", r),
             Rr(r) => write!(f, "rr {:}", r),
         }
     }
@@ -321,10 +331,13 @@ impl HasDuration for Rotate {
             Rla => (1, None),
             Rra => (1, None),
             Rlca => (1, None),
+            Rrca => (1, None),
             Rl(RegsHl::HlInd) => (4, None),
             Rl(RegsHl::Reg(_)) => (2, None),
             Rlc(RegsHl::HlInd) => (4, None),
             Rlc(RegsHl::Reg(_)) => (2, None),
+            Rrc(RegsHl::HlInd) => (4, None),
+            Rrc(RegsHl::Reg(_)) => (2, None),
             Rr(RegsHl::HlInd) => (4, None),
             Rr(RegsHl::Reg(_)) => (2, None),
         }
@@ -443,6 +456,7 @@ pub enum Instr {
     Scf,
     Daa,
     Halt,
+    Stop,
     Ccf,
     InvalidOp(u8),
 }
@@ -471,6 +485,7 @@ impl fmt::Display for Instr {
             Ccf => write!(f, "ccf"),
             Daa => write!(f, "daa"),
             Halt => write!(f, "halt"),
+            Stop => write!(f, "stop"),
             InvalidOp(n) => write!(f, "bad {:x}", n),
         }
     }
@@ -493,7 +508,7 @@ impl HasDuration for Instr {
             RetCc(_) => (5, Some(2)),
             Nop => (1, None),
             InvalidOp(_) => (1, None),
-            Di | Ei | Scf | Ccf | Daa | Halt => (1, None),
+            Di | Ei | Scf | Ccf | Daa | Halt | Stop => (1, None),
         }
     }
 }
@@ -686,8 +701,11 @@ pub trait ReadOnlyTape {
             0x0b => (Arith(Dec16(Bc)), vec![pos0]),
             0x0c => (Arith(Inc(RegsHl::Reg(C))), vec![pos0]),
             0x0d => (Arith(Dec(RegsHl::Reg(C))), vec![pos0]),
-            0x0f => panic!(format!("unimplemented instruction ${:x}", pos0)),
-            0x10 => panic!(format!("unimplemented instruction ${:x}", pos0)),
+            0x0f => (Rotate(Rrca), vec![pos0]),
+            0x10 => {
+                let pos1 = self.peek8_offset(1);
+                (Stop, vec![pos0, pos1])
+            }
             0x13 => (Arith(Inc16(De)), vec![pos0]),
             0x14 => (Arith(Inc(RegsHl::Reg(D))), vec![pos0]),
             0x15 => (Arith(Dec(RegsHl::Reg(D))), vec![pos0]),
@@ -856,6 +874,10 @@ pub trait ReadOnlyTape {
                         let r = reg_lookup(pos1);
                         (Rotate(Rlc(r)), vec![pos0, pos1])
                     }
+                    0x08..=0x0f => {
+                        let r = reg_lookup(pos1 - 0x08);
+                        (Rotate(Rrc(r)), vec![pos0, pos1])
+                    }
                     0x10..=0x17 => {
                         let r = reg_lookup(pos1 - 0x10);
                         (Rotate(Rl(r)), vec![pos0, pos1])
@@ -867,6 +889,10 @@ pub trait ReadOnlyTape {
                     0x20..=0x27 => {
                         let r = reg_lookup(pos1 - 0x20);
                         (Arith(Sla(r)), vec![pos0, pos1])
+                    }
+                    0x28..=0x2f => {
+                        let r = reg_lookup(pos1 - 0x28);
+                        (Arith(Sra(r)), vec![pos0, pos1])
                     }
                     0x30 => (Arith(Swap(RegsHl::Reg(B))), vec![pos0, pos1]),
                     0x31 => (Arith(Swap(RegsHl::Reg(C))), vec![pos0, pos1]),
