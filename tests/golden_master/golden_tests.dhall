@@ -1,4 +1,3 @@
--- Note: Test 09 currently panics due to unimplemented instructions
 let Schema = ./golden_test_schema.dhall
 
 let ten =
@@ -16,6 +15,7 @@ in    [ ten "../gb-test-roms/cpu_instrs/individual/01-special.gb"
       , ten "../gb-test-roms/cpu_instrs/individual/06-ld r,r.gb"
       , ten "../gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb"
       , ten "../gb-test-roms/cpu_instrs/individual/08-misc instrs.gb"
+      , ten "../gb-test-roms/cpu_instrs/individual/09-op r,r.gb"
       , { use_bootrom = Some "../../roms/DMG_ROM.bin"
         , rom = "../../roms/Tetris.gb"
         , run =

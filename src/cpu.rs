@@ -23,6 +23,7 @@ pub struct Cpu {
 enum BranchAction {
     Take,
     Skip,
+    Wait,
 }
 
 impl Cpu {
@@ -281,6 +282,16 @@ impl Cpu {
                 let result = alu::shift_left_carry(&mut self.registers.flags, operand.0);
                 self.indirect_st(RegisterKind16::Hl, result);
             }
+            Sra(RegsHl::Reg(r)) => {
+                let operand = self.registers.read8(r).0;
+                let result = alu::shift_right_carry_loop(&mut self.registers.flags, operand);
+                self.registers.write8n(r, result);
+            }
+            Sra(RegsHl::HlInd) => {
+                let operand = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::shift_right_carry_loop(&mut self.registers.flags, operand.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
             Srl(RegsHl::Reg(r)) => {
                 let operand = self.registers.read8(r).0;
                 let result = alu::shift_right_carry(&mut self.registers.flags, operand);
@@ -310,11 +321,22 @@ impl Cpu {
             Rlca => {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rlc(&mut self.registers.flags, n.0);
+                self.registers.flags.z = false;
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
                 self.registers.write8n(RegisterKind8::A, result);
             }
             Rra => {
                 let n = self.registers.read8(RegisterKind8::A);
                 let result = alu::rr(&mut self.registers.flags, n.0);
+                self.registers.flags.z = false;
+                self.registers.flags.n = false;
+                self.registers.flags.h = false;
+                self.registers.write8n(RegisterKind8::A, result);
+            }
+            Rrca => {
+                let n = self.registers.read8(RegisterKind8::A);
+                let result = alu::rrc(&mut self.registers.flags, n.0);
                 self.registers.flags.z = false;
                 self.registers.flags.n = false;
                 self.registers.flags.h = false;
@@ -348,6 +370,16 @@ impl Cpu {
             Rr(RegsHl::HlInd) => {
                 let n = self.indirect_ld(RegisterKind16::Hl);
                 let result = alu::rr(&mut self.registers.flags, n.0);
+                self.indirect_st(RegisterKind16::Hl, result);
+            }
+            Rrc(RegsHl::Reg(r)) => {
+                let n = self.registers.read8(r);
+                let result = alu::rrc(&mut self.registers.flags, n.0);
+                self.registers.write8n(r, result);
+            }
+            Rrc(RegsHl::HlInd) => {
+                let n = self.indirect_ld(RegisterKind16::Hl);
+                let result = alu::rrc(&mut self.registers.flags, n.0);
                 self.indirect_st(RegisterKind16::Hl, result);
             }
         };
@@ -431,6 +463,10 @@ pub enum InterruptKind {
     Timer,
     Serial,
     Joypad,
+}
+
+pub enum ExecutionEffect {
+    Wait,
 }
 
 impl Cpu {
@@ -735,7 +771,8 @@ impl Cpu {
                 self.registers.write8n(RegisterKind8::A, result);
                 BranchAction::Take
             }
-            Halt => panic!("Halt instruction unimplemented in CPU"),
+            Halt => BranchAction::Wait,
+            Stop => BranchAction::Wait,
         }
     }
 
@@ -752,13 +789,14 @@ impl Cpu {
 
     /// Execute the current instruction returning the duration it did take. Note: This can be
     /// different from the peeked duration as time taken differs based on branch takes or skips.
-    pub fn execute(&mut self) -> u32 {
+    pub fn execute(&mut self) -> (u32, Option<ExecutionEffect>) {
         let instr = self.ip.read(&self.memory);
         let (take_duration, skip_duration) = instr.duration();
         let action = self.execute_instr(instr);
         match action {
-            BranchAction::Take => take_duration,
-            BranchAction::Skip => skip_duration.unwrap_or_else(|| take_duration),
+            BranchAction::Take => (take_duration, None),
+            BranchAction::Skip => (skip_duration.unwrap_or_else(|| take_duration), None),
+            BranchAction::Wait => (take_duration, Some(ExecutionEffect::Wait)),
         }
     }
 
