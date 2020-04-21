@@ -43,21 +43,22 @@ pub struct Config {
     pub rom: PathBuf,
 }
 
+pub fn save_screenshot(path: &Path, screen: &Screen) {
+    let mut file = File::create(path).expect("Cannot create screenshot");
+    let encoder = PNGEncoder::new(file);
+    encoder
+        .encode(
+            screen.data.as_slice(),
+            screen.width,
+            screen.height,
+            image::ColorType::Rgba8,
+        )
+        .expect("Couldn't write png to file");
+}
+
 fn capture_screenshot(config: &Config, name: &str, screen: &Screen) {
     match &config.screenshot_directory {
-        Some(dir) => {
-            let mut file = File::create(Path::new(dir).join(name.to_owned() + ".png"))
-                .expect("Cannot create screenshot");
-            let encoder = PNGEncoder::new(file);
-            encoder
-                .encode(
-                    screen.data.as_slice(),
-                    screen.width,
-                    screen.height,
-                    image::ColorType::Rgba8,
-                )
-                .expect("Couldn't write png to file");
-        }
+        Some(dir) => save_screenshot(&Path::new(dir).join(name.to_owned() + ".png"), screen),
         None => (),
     }
 }

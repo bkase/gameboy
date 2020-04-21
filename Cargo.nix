@@ -116,7 +116,17 @@ rec {
         ];
         
       };
-      "arrayvec" = rec {
+      "arrayref" = rec {
+        crateName = "arrayref";
+        version = "0.3.6";
+        edition = "2015";
+        sha256 = "0i6m1l3f73i0lf0cjdf5rh3xpvxydyhfbakq7xx7bkrp5qajgid4";
+        authors = [
+          "David Roundy <roundyd@physics.oregonstate.edu>"
+        ];
+        
+      };
+      "arrayvec 0.4.12" = rec {
         crateName = "arrayvec";
         version = "0.4.12";
         edition = "2015";
@@ -136,6 +146,18 @@ rec {
           "serde-1" = [ "serde" ];
         };
         resolvedDefaultFeatures = [ "array-sizes-33-128" "default" "std" ];
+      };
+      "arrayvec 0.5.1" = rec {
+        crateName = "arrayvec";
+        version = "0.5.1";
+        edition = "2018";
+        sha256 = "1f5mca8kiiwhvhxd1mbnq68j6v6rk139sch567zwwzl6hs37vxyg";
+        authors = [
+          "bluss"
+        ];
+        features = {
+          "default" = [ "std" ];
+        };
       };
       "atty" = rec {
         crateName = "atty";
@@ -231,6 +253,20 @@ rec {
         ];
         
       };
+      "base64" = rec {
+        crateName = "base64";
+        version = "0.11.0";
+        edition = "2018";
+        sha256 = "1iqmims6yvr6vwzyy54qd672zw29ipjj17p8klcr578c9ajpw6xl";
+        authors = [
+          "Alice Maz <alice@alicemaz.com>"
+          "Marshall Pierce <marshall@mpierce.org>"
+        ];
+        features = {
+          "default" = [ "std" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
+      };
       "bit-set" = rec {
         crateName = "bit-set";
         version = "0.5.1";
@@ -278,6 +314,34 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
+      "blake2b_simd" = rec {
+        crateName = "blake2b_simd";
+        version = "0.5.10";
+        edition = "2018";
+        sha256 = "12icvk8ixlivv3jv5nyrg01sajp4s279zb1kmif0nfja4ms2vyyq";
+        authors = [
+          "Jack O'Connor"
+        ];
+        dependencies = [
+          {
+            name = "arrayref";
+            packageId = "arrayref";
+          }
+          {
+            name = "arrayvec";
+            packageId = "arrayvec 0.5.1";
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "constant_time_eq";
+            packageId = "constant_time_eq";
+          }
+        ];
+        features = {
+          "default" = [ "std" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
+      };
       "bumpalo" = rec {
         crateName = "bumpalo";
         version = "3.2.1";
@@ -313,6 +377,19 @@ rec {
           "default" = [ "std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
+      };
+      "cc" = rec {
+        crateName = "cc";
+        version = "1.0.50";
+        edition = "2018";
+        crateBin = [];
+        sha256 = "1kdqm8ka7xg9h56b694pcz29ka33fsz27mzrphqc78gx96h8zqlm";
+        authors = [
+          "Alex Crichton <alex@alexcrichton.com>"
+        ];
+        features = {
+          "parallel" = [ "jobserver" ];
+        };
       };
       "cfg-if" = rec {
         crateName = "cfg-if";
@@ -428,6 +505,16 @@ rec {
             name = "wasm-bindgen";
             packageId = "wasm-bindgen";
           }
+        ];
+        
+      };
+      "constant_time_eq" = rec {
+        crateName = "constant_time_eq";
+        version = "0.1.5";
+        edition = "2015";
+        sha256 = "1g3vp04qzmk6cpzrd19yci6a95m7ap6wy7wkwgiy2pjklklrfl14";
+        authors = [
+          "Cesar Eduardo Barros <cesarb@cesarb.eti.br>"
         ];
         
       };
@@ -583,6 +670,38 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "lazy_static" "std" ];
       };
+      "ctrlc" = rec {
+        crateName = "ctrlc";
+        version = "3.1.4";
+        edition = "2015";
+        sha256 = "19qps8xw9vpsssrhn6rn46scx66gn0811kinjqf4ryprvy3acjvs";
+        authors = [
+          "Antti Keränen <detegr@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "nix";
+            packageId = "nix";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "winapi";
+            packageId = "winapi";
+            target = { target, features }: target."windows";
+            features = [ "consoleapi" "handleapi" "synchapi" "winbase" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "winapi";
+            packageId = "winapi";
+            target = {target, features}: target."windows";
+            features = [ "fileapi" "processenv" "winnt" ];
+          }
+        ];
+        features = {
+        };
+      };
       "deflate" = rec {
         crateName = "deflate";
         version = "0.8.4";
@@ -604,6 +723,58 @@ rec {
         features = {
           "gzip" = [ "gzip-header" ];
         };
+      };
+      "dirs" = rec {
+        crateName = "dirs";
+        version = "2.0.2";
+        edition = "2015";
+        sha256 = "1qymhyq7w7wlf1dirq6gsnabdyzg6yi2yyxkx6c4ldlkbjdaibhk";
+        authors = [
+          "Simon Ochsenreither <simon@ochsenreither.de>"
+        ];
+        dependencies = [
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "dirs-sys";
+            packageId = "dirs-sys";
+          }
+        ];
+        
+      };
+      "dirs-sys" = rec {
+        crateName = "dirs-sys";
+        version = "0.3.4";
+        edition = "2015";
+        sha256 = "0yyykdcmbc476z1v9m4z5jb8y91dw6kgzpkiqi2ig07xx0yv585g";
+        authors = [
+          "Simon Ochsenreither <simon@ochsenreither.de>"
+        ];
+        dependencies = [
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "libc";
+            packageId = "libc";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "redox_users";
+            packageId = "redox_users";
+            target = { target, features }: (target."os" == "redox");
+          }
+          {
+            name = "winapi";
+            packageId = "winapi";
+            target = { target, features }: target."windows";
+            features = [ "knownfolders" "objbase" "shlobj" "winbase" "winerror" ];
+          }
+        ];
+        
       };
       "either" = rec {
         crateName = "either";
@@ -970,6 +1141,11 @@ rec {
             optional = true;
           }
           {
+            name = "ctrlc";
+            packageId = "ctrlc";
+            target = { target, features }: target."unix";
+          }
+          {
             name = "illicit";
             packageId = "illicit";
           }
@@ -1003,6 +1179,16 @@ rec {
             packageId = "packed_struct_codegen";
           }
           {
+            name = "rustyline";
+            packageId = "rustyline";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "rustyline-derive";
+            packageId = "rustyline-derive";
+            target = { target, features }: target."unix";
+          }
+          {
             name = "serde";
             packageId = "serde";
             target = { target, features }: target."unix";
@@ -1011,6 +1197,11 @@ rec {
           {
             name = "serde_json";
             packageId = "serde_json";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "shlex";
+            packageId = "shlex";
             target = { target, features }: target."unix";
           }
           {
@@ -1367,7 +1558,7 @@ rec {
         dependencies = [
           {
             name = "arrayvec";
-            packageId = "arrayvec";
+            packageId = "arrayvec 0.4.12";
             optional = true;
             features = [ "array-sizes-33-128" ];
           }
@@ -1411,7 +1602,7 @@ rec {
           "rustc-dep-of-std" = [ "align" "rustc-std-workspace-core" ];
           "use_std" = [ "std" ];
         };
-        resolvedDefaultFeatures = [ "default" "std" ];
+        resolvedDefaultFeatures = [ "default" "extra_traits" "std" ];
       };
       "lock_api" = rec {
         crateName = "lock_api";
@@ -1676,6 +1867,42 @@ rec {
           "webdom" = [ "augdom/webdom" "raf" ];
         };
         resolvedDefaultFeatures = [ "default" "raf" "webdom" ];
+      };
+      "nix" = rec {
+        crateName = "nix";
+        version = "0.17.0";
+        edition = "2015";
+        sha256 = "0qvk09kib3jpvpbaps0682nav20ibql61pf1s2h8jx9v5igpir2h";
+        authors = [
+          "The nix-rust Project Developers"
+        ];
+        dependencies = [
+          {
+            name = "bitflags";
+            packageId = "bitflags";
+          }
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "libc";
+            packageId = "libc";
+            features = [ "extra_traits" ];
+          }
+          {
+            name = "void";
+            packageId = "void";
+          }
+        ];
+        buildDependencies = [
+          {
+            name = "cc";
+            packageId = "cc";
+            target = {target, features}: (target."os" == "dragonfly");
+          }
+        ];
+        
       };
       "nodrop" = rec {
         crateName = "nodrop";
@@ -2912,6 +3139,31 @@ rec {
         ];
         
       };
+      "redox_users" = rec {
+        crateName = "redox_users";
+        version = "0.3.4";
+        edition = "2015";
+        sha256 = "0cbl5w16l3bqm22i4vszclf6hzpljxicghmllw7j13az4s9k1ch9";
+        authors = [
+          "Jose Narvaez <goyox86@gmail.com>"
+          "Wesley Hershberger <mggmugginsmc@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "getrandom";
+            packageId = "getrandom";
+          }
+          {
+            name = "redox_syscall";
+            packageId = "redox_syscall";
+          }
+          {
+            name = "rust-argon2";
+            packageId = "rust-argon2";
+          }
+        ];
+        
+      };
       "regex-syntax" = rec {
         crateName = "regex-syntax";
         version = "0.6.17";
@@ -2940,6 +3192,35 @@ rec {
             packageId = "winapi";
             target = { target, features }: target."windows";
             features = [ "std" "errhandlingapi" "winerror" "fileapi" "winbase" ];
+          }
+        ];
+        
+      };
+      "rust-argon2" = rec {
+        crateName = "rust-argon2";
+        version = "0.7.0";
+        edition = "2018";
+        sha256 = "05xh5wfxgzq3b6jys8r34f3hmqqfs8ylvf934n9z87wfv95szj1b";
+        libName = "argon2";
+        authors = [
+          "Martijn Rijkeboer <mrr@sru-systems.com>"
+        ];
+        dependencies = [
+          {
+            name = "base64";
+            packageId = "base64";
+          }
+          {
+            name = "blake2b_simd";
+            packageId = "blake2b_simd";
+          }
+          {
+            name = "constant_time_eq";
+            packageId = "constant_time_eq";
+          }
+          {
+            name = "crossbeam-utils";
+            packageId = "crossbeam-utils";
           }
         ];
         
@@ -2992,6 +3273,89 @@ rec {
           "timeout" = [ "wait-timeout" ];
         };
         resolvedDefaultFeatures = [ "timeout" "wait-timeout" ];
+      };
+      "rustyline" = rec {
+        crateName = "rustyline";
+        version = "6.1.1";
+        edition = "2018";
+        sha256 = "0cn3vmvy5q6q2gn7hygivb70nsw15jc24b7gcg8np1fshi53i9v1";
+        authors = [
+          "Katsu Kawakami <kkawa1570@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "dirs";
+            packageId = "dirs";
+            optional = true;
+          }
+          {
+            name = "libc";
+            packageId = "libc";
+          }
+          {
+            name = "log";
+            packageId = "log";
+          }
+          {
+            name = "memchr";
+            packageId = "memchr";
+          }
+          {
+            name = "nix";
+            packageId = "nix";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "unicode-segmentation";
+            packageId = "unicode-segmentation";
+          }
+          {
+            name = "unicode-width";
+            packageId = "unicode-width";
+          }
+          {
+            name = "utf8parse";
+            packageId = "utf8parse";
+            target = { target, features }: target."unix";
+          }
+          {
+            name = "winapi";
+            packageId = "winapi";
+            target = { target, features }: target."windows";
+            features = [ "consoleapi" "handleapi" "minwindef" "processenv" "winbase" "wincon" "winuser" ];
+          }
+        ];
+        features = {
+          "default" = [ "with-dirs" ];
+          "with-dirs" = [ "dirs" ];
+          "with-fuzzy" = [ "skim" ];
+        };
+        resolvedDefaultFeatures = [ "default" "dirs" "with-dirs" ];
+      };
+      "rustyline-derive" = rec {
+        crateName = "rustyline-derive";
+        version = "0.3.1";
+        edition = "2018";
+        sha256 = "0daj9szvfi442vj2fhm7qb92wmzv7g75qsjq9a6ycnqac4lhx9al";
+        procMacro = true;
+        authors = [
+          "gwenn"
+        ];
+        dependencies = [
+          {
+            name = "quote";
+            packageId = "quote 1.0.3";
+          }
+          {
+            name = "syn";
+            packageId = "syn 1.0.17";
+          }
+        ];
+        
       };
       "ryu" = rec {
         crateName = "ryu";
@@ -3147,6 +3511,16 @@ rec {
           "std" = [ "serde/std" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
+      };
+      "shlex" = rec {
+        crateName = "shlex";
+        version = "0.1.1";
+        edition = "2015";
+        sha256 = "1lmv6san7g8dv6jdfp14m7bdczq9ss7j7bgsfqyqjc3jnjfippvz";
+        authors = [
+          "comex <comexk@gmail.com>"
+        ];
+        
       };
       "slab" = rec {
         crateName = "slab";
@@ -3752,6 +4126,19 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
+      "utf8parse" = rec {
+        crateName = "utf8parse";
+        version = "0.2.0";
+        edition = "2018";
+        sha256 = "0wjkvy22cxg023vkmvq2wwkgqyqam0d4pjld3m13blfg594lnvlk";
+        authors = [
+          "Joe Wilm <joe@jwilm.com>"
+          "Christian Duerr <contact@christianduerr.com>"
+        ];
+        features = {
+        };
+        resolvedDefaultFeatures = [ "default" ];
+      };
       "vec_map" = rec {
         crateName = "vec_map";
         version = "0.8.1";
@@ -3798,6 +4185,19 @@ rec {
           "Sergio Benitez <sb@sergio.bz>"
         ];
         
+      };
+      "void" = rec {
+        crateName = "void";
+        version = "1.0.2";
+        edition = "2015";
+        sha256 = "0zc8f0ksxvmhvgx4fdg0zyn6vdnbxd2xv9hfx4nhzg6kbs4f80ka";
+        authors = [
+          "Jonathan Reem <jonathan.reem@gmail.com>"
+        ];
+        features = {
+          "default" = [ "std" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
       };
       "wait-timeout" = rec {
         crateName = "wait-timeout";
@@ -4467,7 +4867,7 @@ rec {
         features = {
           "debug" = [ "impl-debug" ];
         };
-        resolvedDefaultFeatures = [ "consoleapi" "errhandlingapi" "fileapi" "handleapi" "memoryapi" "minwinbase" "minwindef" "ntsecapi" "ntstatus" "processenv" "profileapi" "std" "synchapi" "winbase" "winerror" "winnt" ];
+        resolvedDefaultFeatures = [ "consoleapi" "errhandlingapi" "fileapi" "handleapi" "knownfolders" "memoryapi" "minwinbase" "minwindef" "ntsecapi" "ntstatus" "objbase" "processenv" "profileapi" "shlobj" "std" "synchapi" "winbase" "wincon" "winerror" "winnt" "winuser" ];
       };
       "winapi-i686-pc-windows-gnu" = rec {
         crateName = "winapi-i686-pc-windows-gnu";

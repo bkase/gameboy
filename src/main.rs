@@ -2,6 +2,7 @@
 #![feature(track_caller)]
 #![feature(exclusive_range_pattern)]
 #![feature(or_patterns)]
+#![feature(box_syntax, box_patterns)]
 #![recursion_limit = "512"]
 
 extern crate packed_struct;
@@ -16,6 +17,10 @@ extern crate these;
 #[macro_use]
 extern crate serde;
 extern crate ansi_escapes;
+extern crate rustyline;
+#[macro_use]
+extern crate rustyline_derive;
+extern crate shlex;
 
 #[cfg(test)]
 pub mod test {
@@ -28,6 +33,7 @@ extern crate image;
 
 mod alu;
 mod cpu;
+mod debugger;
 mod hardware;
 mod headless;
 mod instr;
@@ -83,6 +89,10 @@ enum Config {
         #[structopt(flatten)]
         exec_config: headless::Config,
     },
+    Debug {
+        /// Debug this rom
+        rom: PathBuf,
+    },
 }
 
 fn exec(name: &str, command: &mut Command) -> Output {
@@ -100,6 +110,7 @@ pub fn main() {
 
     let mut err = false;
     match config {
+        Config::Debug { rom } => debugger::run(&rom),
         Config::Term { exec_config } => terminal::run(exec_config),
         Config::Run { exec_config } => exit(run(exec_config)),
         Config::Golden { golden_path } => {

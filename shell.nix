@@ -10,5 +10,6 @@ pkgs.mkShell {
     rust
     pkgs.dhall
     pkgs.dhall-json
+    pkgs.wla-dx
   ] ++ (if pkgs.stdenv.isDarwin then [ pkgs.darwin.apple_sdk.frameworks.Security ] else []);
 }
