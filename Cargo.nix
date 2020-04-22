@@ -1184,11 +1184,6 @@ rec {
             target = { target, features }: target."unix";
           }
           {
-            name = "rustyline-derive";
-            packageId = "rustyline-derive";
-            target = { target, features }: target."unix";
-          }
-          {
             name = "serde";
             packageId = "serde";
             target = { target, features }: target."unix";
@@ -3335,27 +3330,6 @@ rec {
           "with-fuzzy" = [ "skim" ];
         };
         resolvedDefaultFeatures = [ "default" "dirs" "with-dirs" ];
-      };
-      "rustyline-derive" = rec {
-        crateName = "rustyline-derive";
-        version = "0.3.1";
-        edition = "2018";
-        sha256 = "0daj9szvfi442vj2fhm7qb92wmzv7g75qsjq9a6ycnqac4lhx9al";
-        procMacro = true;
-        authors = [
-          "gwenn"
-        ];
-        dependencies = [
-          {
-            name = "quote";
-            packageId = "quote 1.0.3";
-          }
-          {
-            name = "syn";
-            packageId = "syn 1.0.17";
-          }
-        ];
-        
       };
       "ryu" = rec {
         crateName = "ryu";

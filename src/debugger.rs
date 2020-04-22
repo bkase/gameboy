@@ -8,8 +8,7 @@ use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, Validator};
-use rustyline::{Cmd, CompletionType, Config, Context, EditMode, Editor, KeyPress};
-use rustyline_derive::Helper;
+use rustyline::{Cmd, CompletionType, Config, Context, EditMode, Editor, Helper, KeyPress};
 use shlex;
 use std::env;
 use std::iter::Extend;
@@ -384,7 +383,6 @@ enum Line {
     StepInto,
 }
 
-#[derive(Helper)]
 struct MyHelper {
     completer: FilenameCompleter,
     highlighter: MatchingBracketHighlighter,
@@ -392,6 +390,7 @@ struct MyHelper {
     hinter: HistoryHinter,
     colored_prompt: String,
 }
+impl Helper for MyHelper {}
 
 impl Completer for MyHelper {
     type Candidate = Pair;
