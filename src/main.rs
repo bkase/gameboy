@@ -18,8 +18,6 @@ extern crate these;
 extern crate serde;
 extern crate ansi_escapes;
 extern crate rustyline;
-#[macro_use]
-extern crate rustyline_derive;
 extern crate shlex;
 
 #[cfg(test)]
