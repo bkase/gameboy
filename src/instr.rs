@@ -513,6 +513,71 @@ impl HasDuration for Instr {
     }
 }
 
+// This was an artifact of a time when it seemed like it would be necessary to
+// keep a cache of seen instructions in order to print the stream backwards.
+// Keeping this here because it's interesting and maybe will become a blog post.
+//
+// A "well-behaved" lens, but not a "very well-behaved" lens
+//
+// PutGet -- jumping to what you are at doesn't change anything
+// forall t. t = t.jump( t.into_addr() )
+//
+// GetPut -- you get what you've jumped to
+// forall t a. a = t.jump(a).into_addr()
+//
+// The very well case
+// ( Not in this case!! )
+// PutPut -- jumping twice is the same as jumping once
+// forall t a b. t.jump(b) = t.jump(a).jump(b)
+//
+// Why not? Because we want to admit the "trace" computation
+// so we can print instructions backwards.
+//
+// This is not that easy, we can't just walk backwards in memory:
+// Consider the following example:
+//
+// ... $c4 $cb $2f $00 ...
+//                  ^
+//
+// We are currently at $00, the `nop` instruction. If we look one byte back we
+// see we have $2f or the bitwise complement instruction. But if we look
+// another byte back we see $cb which is the prefix opcode for 2-byte
+// instructions -- so we should have interpreted the $2f as $cb $2f or the
+// shift-right into carry instruction. But then we look another byte back: $c4
+// or the call if the zero flag is not set instruction which uses the following
+// two bytes for the address! So we should have interpreted it as $c4 $cb $2f or
+// "call nz, $2fcb" some function in bank 0 of a gameboy ROM.
+//
+// Three bytes is the longest an instruction can take on this processor so you
+// always need to look three bytes behind the earliest instruction you want to
+// print. This leads to a heuristic so you know when to stop walking backwards.
+//
+// Knowing this, we can induce a backwards iterator on the instruction stream
+// carefully.
+//
+/*
+pub trait InstrPointerTrait {
+    fn create() -> Self;
+    fn into_addr(&self) -> Addr;
+    fn jump(&mut self, addr: Addr);
+
+    fn into_u16(&self) -> u16 {
+        self.into_addr().into_register().0
+    }
+    fn offset_by(&mut self, n: i8) {
+        self.jump(self.into_addr().offset_signed(n));
+    }
+    fn inc_by(&mut self, n: u16) {
+        let res = self.into_u16();
+        self.jump(Addr::directly(res + n));
+    }
+
+    fn inc(&mut self) {
+        self.inc_by(1);
+    }
+}
+*/
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct InstrPointer(pub Addr);
@@ -521,38 +586,30 @@ impl InstrPointer {
         InstrPointer(Addr::directly(0x00))
     }
 
-    pub fn into_u16(&self) -> u16 {
-        (self.0.into_register()).0
-    }
-
-    fn rewind(&mut self, n: u16) {
-        let new_val = self.0.offset(n, Direction::Neg);
-        (*self).0 = new_val
-    }
-
-    fn inc(&mut self) {
-        let new_val = self.0.offset(1, Direction::Pos);
-        (*self).0 = new_val
-    }
-
-    fn inc_by(&mut self, n: u16) {
-        let new_val = self.0.offset(n, Direction::Pos);
-        (*self).0 = new_val;
+    fn into_addr(&self) -> Addr {
+        self.0
     }
 
     pub fn jump(&mut self, addr: Addr) {
         (*self).0 = addr
     }
+}
 
+// bonus functions:
+impl InstrPointer {
+    pub fn into_u16(&self) -> u16 {
+        self.into_addr().into_register().0
+    }
     pub fn offset_by(&mut self, n: i8) {
-        let (offset, direction) = if n > 0 {
-            (n as u16, Direction::Pos)
-        } else {
-            ((-n) as u16, Direction::Neg)
-        };
+        self.jump(self.into_addr().offset_signed(n));
+    }
+    fn inc_by(&mut self, n: u16) {
+        let res = self.into_u16();
+        self.jump(Addr::directly(res + n));
+    }
 
-        let new_val = self.0.offset(offset, direction);
-        (*self).0 = new_val;
+    fn inc(&mut self) {
+        self.inc_by(1);
     }
 }
 
@@ -1115,6 +1172,55 @@ use register_kind::RegisterKind16::*;
 use register_kind::RegisterKind8::*;
 impl<'a> LiveInstrPointer<'a> {}
 
+pub struct InstrPointerForwards<'a>(LiveInstrPointer<'a>);
+impl<'a> Iterator for InstrPointerForwards<'a> {
+    type Item = (Instr, Vec<u8>);
+
+    fn next(&mut self) -> Option<(Instr, Vec<u8>)> {
+        // TODO: Don't let this crash when it reads off the edge of the world
+        Some(self.0.read_())
+    }
+}
+pub struct InstrPointerBackwards<'a>(LiveInstrPointer<'a>);
+impl<'a> Iterator for InstrPointerBackwards<'a> {
+    type Item = (Instr, Vec<u8>);
+
+    fn next(&mut self) -> Option<(Instr, Vec<u8>)> {
+        let start_addr = self.0.ptr.into_addr();
+        // if we're at the start, stop
+        if start_addr == Addr::directly(0x00) {
+            return None;
+        }
+
+        // rewind (up to) 3 bytes
+        self.0
+            .advance(-1 * (u16::min(3, start_addr.into_register().0) as i8));
+
+        // try moving until we either decode an instruction that ends at the
+        // point we started (and emit), or we decode past it (and give up) --
+        // this second case can happen if we've jumped into the middle of
+        // somewhere in RAM for example
+        while self.0.ptr.into_addr() < start_addr {
+            let try_addr = self.0.ptr.into_addr();
+
+            let data = self.0.read_();
+            // a hit, we decoded an instruction that successfully ended on our
+            // start address
+            if self.0.ptr.into_addr() == start_addr {
+                // start we now are located at this earlier address
+                self.0.ptr.jump(try_addr);
+                return Some(data);
+            }
+            // start over 1 byte later
+            self.0.ptr.jump(try_addr);
+            self.0.advance(1);
+        }
+
+        // give up; we couldn't decode anything that is consistent
+        None
+    }
+}
+
 impl InstrPointer {
     pub fn read(&mut self, memory: &Memory) -> Instr {
         LiveInstrPointer::create(self, memory).read()
@@ -1130,6 +1236,14 @@ impl InstrPointer {
 
     pub fn peek_(&mut self, memory: &Memory) -> (Instr, Vec<u8>) {
         LiveInstrPointer::create(self, memory).peek_()
+    }
+
+    pub fn instrs_forwards<'a>(&'a mut self, memory: &'a Memory) -> InstrPointerForwards<'a> {
+        InstrPointerForwards(LiveInstrPointer::create(self, memory))
+    }
+
+    pub fn instrs_backwards<'a>(&'a mut self, memory: &'a Memory) -> InstrPointerBackwards<'a> {
+        InstrPointerBackwards(LiveInstrPointer::create(self, memory))
     }
 }
 
