@@ -2,6 +2,8 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 use hardware::{self, Hardware};
 use headless;
+use instr::Instr;
+use instr::InstrPointer;
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::config::OutputStreamType;
 use rustyline::error::ReadlineError;
@@ -12,6 +14,7 @@ use rustyline::{Cmd, CompletionType, Config, Context, EditMode, Editor, Helper, 
 use shlex;
 use std::env;
 use std::iter::Extend;
+use std::iter::Iterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -381,6 +384,8 @@ enum Line {
     StepOver,
     /// Step-into
     StepInto,
+    /// Disassemble
+    Disassemble,
 }
 
 struct MyHelper {
@@ -515,12 +520,43 @@ fn cmd(performance: &Performance, hardware: &mut Hardware, running: Arc<AtomicBo
             match expr {
                 Some(e) => {
                     let res: u16 = e.eval(hardware);
-                    println!("  {:}", res)
+                    println!("  ${:x}", res)
                 }
                 None => (),
             }
         }
         Line::Continue => exec_until_interrupt(performance, hardware, running),
+        Line::StepInto => hardware.step(),
+        Line::Disassemble => {
+            let mut ip1 = hardware.cpu.ip.clone();
+            let mut ip2 = hardware.cpu.ip.clone();
+
+            let mut forwards_runner = ip1.instrs_forwards(&hardware.cpu.memory);
+            let backwards_runnner = ip2.instrs_backwards(&hardware.cpu.memory);
+
+            let (curr, _) = forwards_runner.next().unwrap();
+
+            // TODO: Clean up this iterator mess
+            //
+            let mut first_few: Vec<String> = backwards_runnner
+                .take(5)
+                .map(|(i, _)| format!("    {:}", i))
+                .collect::<Vec<String>>()
+                .iter()
+                .rev()
+                .map(|s| s.clone())
+                .collect::<Vec<String>>();
+
+            first_few.push(format!(" => {:}", curr));
+
+            first_few
+                .iter()
+                .map(|s| s.clone())
+                .chain(forwards_runner.take(5).map(|(i, _)| format!("    {:}", i)))
+                .for_each(|s| {
+                    println!("{:}", s);
+                })
+        }
         _ => println!("Line: {:?}", line),
     }
 }
