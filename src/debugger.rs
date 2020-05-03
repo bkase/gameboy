@@ -534,25 +534,29 @@ fn cmd(performance: &Performance, hardware: &mut Hardware, running: Arc<AtomicBo
             let mut forwards_runner = ip1.instrs_forwards(&hardware.cpu.memory);
             let backwards_runnner = ip2.instrs_backwards(&hardware.cpu.memory);
 
-            let (curr, _) = forwards_runner.next().unwrap();
+            let (curr, _, curr_addr) = forwards_runner.next().unwrap();
 
             // TODO: Clean up this iterator mess
             //
             let mut first_few: Vec<String> = backwards_runnner
                 .take(5)
-                .map(|(i, _)| format!("    {:}", i))
+                .map(|(i, _, addr)| format!("    {:}: {:}", addr, i))
                 .collect::<Vec<String>>()
                 .iter()
                 .rev()
                 .map(|s| s.clone())
                 .collect::<Vec<String>>();
 
-            first_few.push(format!(" => {:}", curr));
+            first_few.push(format!(" => {:}: {:}", curr_addr, curr));
 
             first_few
                 .iter()
                 .map(|s| s.clone())
-                .chain(forwards_runner.take(5).map(|(i, _)| format!("    {:}", i)))
+                .chain(
+                    forwards_runner
+                        .take(5)
+                        .map(|(i, _, addr)| format!("    {:}: {:}", addr, i)),
+                )
                 .for_each(|s| {
                     println!("{:}", s);
                 })
