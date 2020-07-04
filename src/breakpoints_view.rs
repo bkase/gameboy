@@ -108,7 +108,10 @@ pub fn breakpoints_view() {
             let addr = Addr::directly(decode_hex(&bp));
             bps.push(bp);
 
-            hardware.borrow_mut().breakpoints.insert(addr);
+            hardware
+                .borrow_mut()
+                .breakpoints
+                .insert(addr, format!("GUI {:}", addr));
         }
     }
 
@@ -129,7 +132,7 @@ pub fn breakpoints_view() {
                             let addr = Addr::directly(decode_hex(&value));
                             bps.push(value);
                             // add it to breakpoints
-                            hardware.borrow_mut().breakpoints.insert(addr);
+                            hardware.borrow_mut().breakpoints.insert(addr, format!("GUI {:}", addr));
                             // update localstorage
                             sync_local_storage(&bps);
                             Some(bps)

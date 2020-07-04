@@ -1,6 +1,7 @@
 #![feature(proc_macro_hygiene)]
 #![feature(track_caller)]
 #![feature(exclusive_range_pattern)]
+#![feature(box_syntax, box_patterns)]
 #![feature(or_patterns)]
 #![recursion_limit = "512"]
 
@@ -30,6 +31,7 @@ mod alu;
 mod breakpoints_view;
 mod cpu;
 mod cpu_control_view;
+mod expr;
 mod gameboy_view;
 mod hardware;
 mod instr;

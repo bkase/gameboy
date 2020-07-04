@@ -1,9 +1,11 @@
 use cpu::{Cpu, ExecutionEffect, InterruptKind};
+use expr;
+use expr::Eval;
 use mem::{Addr, Roms, TriggeredTimer};
 use ppu::{Ppu, TriggeredVblank};
 use sound::Sound;
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 use these::These;
@@ -24,7 +26,8 @@ pub struct Hardware {
     pub paused: bool,
     // dirty bit, aka we need to redraw things with this is true
     pub dirty: bool,
-    pub breakpoints: HashSet<Addr>,
+    pub breakpoints: BTreeMap<Addr, String>,
+    pub computed_breakpoints: BTreeMap<String, expr::E>,
     pub clocks_elapsed: u64,
     clocks_zero: u64,
     // for vblank measurement
@@ -70,7 +73,6 @@ impl Hardware {
 
 impl Hardware {
     pub fn create(performance: &Performance, config: Config) -> Hardware {
-        let mut _set = HashSet::new();
         let Config { roms, trace } = config;
         Hardware {
             cpu: Cpu::create(roms),
@@ -78,7 +80,8 @@ impl Hardware {
             sound: Sound::create(),
             paused: true,
             dirty: false,
-            breakpoints: _set,
+            breakpoints: BTreeMap::new(),
+            computed_breakpoints: BTreeMap::new(),
             clocks_elapsed: 0,
             clocks_zero: 1,
             vblanks: 0,
@@ -173,9 +176,25 @@ impl Hardware {
             duration = self.cpu.peek_next();
 
             // hit a breakpoint?
-            if self.breakpoints.contains(&self.cpu.ip.0) {
-                self.paused = true;
-                break;
+            match self.breakpoints.get(&self.cpu.ip.0) {
+                Some(name) => {
+                    log(&format!("Flipped breakpoint {:}", name));
+                    self.paused = true;
+                    break;
+                }
+                None => {
+                    // check all computed breakpoints
+                    for (name, v) in &self.computed_breakpoints {
+                        if v.eval(&self) == 0 {
+                            log(&format!("Flipped computed breakpoint {:}", name));
+                            self.paused = true;
+                            break;
+                        }
+                    }
+                    if self.paused {
+                        break;
+                    }
+                }
             }
         }
 
