@@ -18,6 +18,7 @@ pub mod test {
 
 mod alu;
 mod cpu;
+mod expr;
 mod hardware;
 mod instr;
 mod mem;
