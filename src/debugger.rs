@@ -475,7 +475,7 @@ fn exec_until_interrupt(
 
             let now_ = performance.now();
             sleep(Duration::from_micros(
-                16_667 - (((now_ - now) * 1000.) as u64),
+                16_667 - u64::min(16_667, ((now_ - now) * 1000.) as u64),
             ))
         } else {
             break;
