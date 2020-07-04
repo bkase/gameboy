@@ -107,4 +107,4 @@ let wasmStep
         , key = "wasm"
         }
 
-in  { steps = [ lintStep, releaseStep, goldenStep, wasmStep ] }
+in  { steps = [ lintStep, releaseStep, goldenStep ] }

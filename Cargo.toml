@@ -25,10 +25,10 @@ packed_struct = "0.3"
 packed_struct_codegen = "0.3"
 js-sys = "0.3.27"
 these = "1.0.0"
-moxie = { git = "https://github.com/anp/moxie" }
-moxie-dom = { git = "https://github.com/anp/moxie" }
-illicit = { git = "https://github.com/anp/moxie" }
-topo = { git = "https://github.com/anp/moxie" }
+moxie = { git = "https://github.com/anp/moxie", rev = "4658adf815b0020e2ce4b5f335c58c5201eda882" }
+moxie-dom = { git = "https://github.com/anp/moxie", rev = "4658adf815b0020e2ce4b5f335c58c5201eda882" }
+illicit = { git = "https://github.com/anp/moxie", rev = "4658adf815b0020e2ce4b5f335c58c5201eda882" }
+topo = { git = "https://github.com/anp/moxie", rev = "4658adf815b0020e2ce4b5f335c58c5201eda882" }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires

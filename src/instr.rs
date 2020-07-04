@@ -1174,18 +1174,20 @@ impl<'a> LiveInstrPointer<'a> {}
 
 pub struct InstrPointerForwards<'a>(LiveInstrPointer<'a>);
 impl<'a> Iterator for InstrPointerForwards<'a> {
-    type Item = (Instr, Vec<u8>);
+    type Item = (Instr, Vec<u8>, Addr);
 
-    fn next(&mut self) -> Option<(Instr, Vec<u8>)> {
+    fn next(&mut self) -> Option<(Instr, Vec<u8>, Addr)> {
         // TODO: Don't let this crash when it reads off the edge of the world
-        Some(self.0.read_())
+        let addr = self.0.ptr.into_addr();
+        let (i, bs) = self.0.read_();
+        Some((i, bs, addr))
     }
 }
 pub struct InstrPointerBackwards<'a>(LiveInstrPointer<'a>);
 impl<'a> Iterator for InstrPointerBackwards<'a> {
-    type Item = (Instr, Vec<u8>);
+    type Item = (Instr, Vec<u8>, Addr);
 
-    fn next(&mut self) -> Option<(Instr, Vec<u8>)> {
+    fn next(&mut self) -> Option<(Instr, Vec<u8>, Addr)> {
         let start_addr = self.0.ptr.into_addr();
         // if we're at the start, stop
         if start_addr == Addr::directly(0x00) {
@@ -1203,13 +1205,13 @@ impl<'a> Iterator for InstrPointerBackwards<'a> {
         while self.0.ptr.into_addr() < start_addr {
             let try_addr = self.0.ptr.into_addr();
 
-            let data = self.0.read_();
+            let (i, bs) = self.0.read_();
             // a hit, we decoded an instruction that successfully ended on our
             // start address
             if self.0.ptr.into_addr() == start_addr {
                 // start we now are located at this earlier address
                 self.0.ptr.jump(try_addr);
-                return Some(data);
+                return Some((i, bs, try_addr));
             }
             // start over 1 byte later
             self.0.ptr.jump(try_addr);
