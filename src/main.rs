@@ -32,6 +32,7 @@ extern crate image;
 mod alu;
 mod cpu;
 mod debugger;
+mod expr;
 mod hardware;
 mod headless;
 mod instr;
